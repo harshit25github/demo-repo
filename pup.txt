@@ -1,0 +1,19 @@
+const lowestIndex = await page.evaluate(() => {
+  const elements = Array.from(document.querySelectorAll('.price-selector')); // replace with actual selector
+
+  const prices = elements.map(el => {
+    const text = el.innerText.trim();
+    const match = text.match(/\$?(\d+(?:\.\d+)?)/); // extract numeric part
+    return match ? parseFloat(match[1]) : Infinity;
+  });
+
+  // Find the index of the minimum price
+  let minIndex = 0;
+  for (let i = 1; i < prices.length; i++) {
+    if (prices[i] < prices[minIndex]) {
+      minIndex = i;
+    }
+  }
+
+  return minIndex; // 0-based index
+});
