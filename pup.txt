@@ -1,19 +1,15 @@
-const lowestIndex = await page.evaluate(() => {
-  const elements = Array.from(document.querySelectorAll('.price-selector')); // replace with actual selector
+async function waitForElementWithText(page, text, selector = '*', timeout = 10000, interval = 500) {
+  const maxTime = Date.now() + timeout;
 
-  const prices = elements.map(el => {
-    const text = el.innerText.trim();
-    const match = text.match(/\$?(\d+(?:\.\d+)?)/); // extract numeric part
-    return match ? parseFloat(match[1]) : Infinity;
-  });
+  while (Date.now() < maxTime) {
+    const found = await page.$$eval(selector, (elements, targetText) => {
+      return elements.some(el => el.innerText.trim() === targetText);
+    }, text);
 
-  // Find the index of the minimum price
-  let minIndex = 0;
-  for (let i = 1; i < prices.length; i++) {
-    if (prices[i] < prices[minIndex]) {
-      minIndex = i;
-    }
+    if (found) return true;
+
+    await new Promise(res => setTimeout(res, interval));
   }
 
-  return minIndex; // 0-based index
-});
+  throw new Error(`Element with text "${text}" not found within ${timeout}ms`);
+}
