@@ -1,14 +1,21 @@
-async function waitForXPath(page, xpath, timeout = 10000, interval = 500) {
-  const maxTime = Date.now() + timeout;
+const XLSX = require('xlsx');
+const fs = require('fs');
 
-  while (Date.now() < maxTime) {
-    const elements = await page.$x(xpath);
+// Sample data
+const data = [
+  { name: 'Alice', age: 25, email: 'alice@example.com' },
+  { name: 'Bob', age: 30, email: 'bob@example.com' },
+  { name: 'Charlie', age: 28, email: 'charlie@example.com' },
+];
 
-    if (elements.length > 0) return elements[0]; // Found the element!
+// Convert to worksheet
+const worksheet = XLSX.utils.json_to_sheet(data);
 
-    await new Promise(res => setTimeout(res, interval));
-  }
+// Create a new workbook and append the worksheet
+const workbook = XLSX.utils.book_new();
+XLSX.utils.book_append_sheet(workbook, worksheet, 'Sheet1');
 
-  throw new Error(`Element not found for XPath: ${xpath}`);
-}
+// Write to file
+XLSX.writeFile(workbook, 'output.xlsx');
 
+console.log('Excel file created: output.xlsx');
