@@ -1,43 +1,50 @@
-function getThirdWeekSundayAndSaturday() {
-  const today = new Date();
-  const nextMonth = (today.getMonth() + 1) % 12;
-  const year = today.getMonth() === 11 ? today.getFullYear() + 1 : today.getFullYear();
+const ExcelJS = require('exceljs');
 
-  // Start from the 1st of next month
-  const firstDay = new Date(year, nextMonth, 1);
+async function exportWithColorCondition() {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Comparison');
 
-  let weekCount = 0;
-  let thirdSunday = null;
-  let thirdSaturday = null;
+  // Sample data
+  const data = [
+    { name: 'Alice', comparison: 'A is greater than B' },
+    { name: 'Bob', comparison: 'B is greater than A' },
+    { name: 'Charlie', comparison: 'A is greater than B' },
+  ];
 
-  for (let day = 1; day <= 31; day++) {
-    const currentDate = new Date(year, nextMonth, day);
-    if (currentDate.getMonth() !== nextMonth) break; // Stop when month changes
+  // Add headers
+  sheet.columns = [
+    { header: 'NAME', key: 'name', width: 20 },
+    { header: 'COMPARISON', key: 'comparison', width: 30 }
+  ];
 
-    const dayOfWeek = currentDate.getDay(); // 0 = Sunday, 6 = Saturday
+  // Add data rows with conditional styling
+  data.forEach(row => {
+    const newRow = sheet.addRow(row);
 
-    if (dayOfWeek === 0) weekCount++; // Count each Sunday as a new week
+    // Get the cell to conditionally format
+    const cell = newRow.getCell('comparison');
 
-    if (weekCount === 3 && dayOfWeek === 0) {
-      thirdSunday = currentDate;
+    if (cell.value === 'A is greater than B') {
+      cell.font = { color: { argb: 'FFFF0000' } }; // Red
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFFFCCCC' } // light red background
+      };
+    } else {
+      cell.font = { color: { argb: 'FF006100' } }; // Green
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFCCFFCC' } // light green background
+      };
     }
+  });
 
-    if (weekCount === 3 && dayOfWeek === 6) {
-      thirdSaturday = currentDate;
-    }
-  }
-
-  const format = (date) =>
-    `${(date.getMonth() + 1).toString().padStart(2, '0')}/` +
-    `${date.getDate().toString().padStart(2, '0')}/` +
-    `${date.getFullYear()}`;
-
-  return {
-    sunday: format(thirdSunday),
-    saturday: format(thirdSaturday)
-  };
+  // Save file
+  await workbook.xlsx.writeFile('comparison_result.xlsx');
+  console.log('Excel file written with conditional formatting.');
 }
 
-const { sunday, saturday } = getThirdWeekSundayAndSaturday();
-console.log('Third Sunday:', sunday);
-console.log('Third Saturday:', saturday);
+exportWithColorCondition();
+
