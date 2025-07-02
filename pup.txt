@@ -1,11 +1,43 @@
-function compareFloats(a, b) {
-  const diff = Math.abs(a - b).toFixed(2);
+function getThirdWeekSundayAndSaturday() {
+  const today = new Date();
+  const nextMonth = (today.getMonth() + 1) % 12;
+  const year = today.getMonth() === 11 ? today.getFullYear() + 1 : today.getFullYear();
 
-  if (a === b) {
-    return `Both values are equal.`;
-  } else if (a < b) {
-    return `A (${a}) is less than B (${b}) by ${diff}`;
-  } else {
-    return `B (${b}) is less than A (${a}) by ${diff}`;
+  // Start from the 1st of next month
+  const firstDay = new Date(year, nextMonth, 1);
+
+  let weekCount = 0;
+  let thirdSunday = null;
+  let thirdSaturday = null;
+
+  for (let day = 1; day <= 31; day++) {
+    const currentDate = new Date(year, nextMonth, day);
+    if (currentDate.getMonth() !== nextMonth) break; // Stop when month changes
+
+    const dayOfWeek = currentDate.getDay(); // 0 = Sunday, 6 = Saturday
+
+    if (dayOfWeek === 0) weekCount++; // Count each Sunday as a new week
+
+    if (weekCount === 3 && dayOfWeek === 0) {
+      thirdSunday = currentDate;
+    }
+
+    if (weekCount === 3 && dayOfWeek === 6) {
+      thirdSaturday = currentDate;
+    }
   }
+
+  const format = (date) =>
+    `${(date.getMonth() + 1).toString().padStart(2, '0')}/` +
+    `${date.getDate().toString().padStart(2, '0')}/` +
+    `${date.getFullYear()}`;
+
+  return {
+    sunday: format(thirdSunday),
+    saturday: format(thirdSaturday)
+  };
 }
+
+const { sunday, saturday } = getThirdWeekSundayAndSaturday();
+console.log('Third Sunday:', sunday);
+console.log('Third Saturday:', saturday);
