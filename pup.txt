@@ -1,17 +1,30 @@
-function convertToIsoTime(dateStr, timeStr) {
-  // Convert MM/DD/YYYY ➜ YYYY-MM-DD
-  const [month, day, year] = dateStr.split('/');
-  const formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+function getThirdWeekSunSatOfNextMonth() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const nextMonth = today.getMonth() + 1;
 
-  // Combine and parse
-  const fullDateTime = new Date(`${formattedDate} ${timeStr}`);
+  // Find the Sunday of the week containing the 1st of the month
+  const firstOfNextMonth = new Date(year, nextMonth, 1);
+  const firstDayOfWeek = firstOfNextMonth.getDay(); // 0 = Sun, 1 = Mon...
+  const offsetToSunday = -firstDayOfWeek; // can be negative or 0
+  const firstWeekSunday = new Date(year, nextMonth, 1 + offsetToSunday);
 
-  // Format to 'YYYY-MM-DDTHH:MM:00'
-  const iso = fullDateTime.toISOString().slice(0, 19); // exclude milliseconds + Z
-  return iso;
+  // 3rd week's Sunday = first week Sunday + 14 days
+  const thirdWeekSunday = new Date(firstWeekSunday);
+  thirdWeekSunday.setDate(firstWeekSunday.getDate() + 14);
+
+  const thirdWeekSaturday = new Date(thirdWeekSunday);
+  thirdWeekSaturday.setDate(thirdWeekSunday.getDate() + 6);
+
+  const format = (date) => {
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    const yyyy = date.getFullYear();
+    return `${mm}/${dd}/${yyyy}`;
+  };
+
+  return {
+    sunday: format(thirdWeekSunday),
+    saturday: format(thirdWeekSaturday),
+  };
 }
-
-// ✅ Example usage:
-const date = '08/17/2025';
-const time = '6:04 AM';
-console.log(convertToIsoTime(date, time)); // ➜ '2025-08-17T06:04:00'
