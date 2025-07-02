@@ -1,50 +1,17 @@
-const ExcelJS = require('exceljs');
+function convertToIsoTime(dateStr, timeStr) {
+  // Convert MM/DD/YYYY ➜ YYYY-MM-DD
+  const [month, day, year] = dateStr.split('/');
+  const formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
 
-async function exportWithColorCondition() {
-  const workbook = new ExcelJS.Workbook();
-  const sheet = workbook.addWorksheet('Comparison');
+  // Combine and parse
+  const fullDateTime = new Date(`${formattedDate} ${timeStr}`);
 
-  // Sample data
-  const data = [
-    { name: 'Alice', comparison: 'A is greater than B' },
-    { name: 'Bob', comparison: 'B is greater than A' },
-    { name: 'Charlie', comparison: 'A is greater than B' },
-  ];
-
-  // Add headers
-  sheet.columns = [
-    { header: 'NAME', key: 'name', width: 20 },
-    { header: 'COMPARISON', key: 'comparison', width: 30 }
-  ];
-
-  // Add data rows with conditional styling
-  data.forEach(row => {
-    const newRow = sheet.addRow(row);
-
-    // Get the cell to conditionally format
-    const cell = newRow.getCell('comparison');
-
-    if (cell.value === 'A is greater than B') {
-      cell.font = { color: { argb: 'FFFF0000' } }; // Red
-      cell.fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FFFFCCCC' } // light red background
-      };
-    } else {
-      cell.font = { color: { argb: 'FF006100' } }; // Green
-      cell.fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FFCCFFCC' } // light green background
-      };
-    }
-  });
-
-  // Save file
-  await workbook.xlsx.writeFile('comparison_result.xlsx');
-  console.log('Excel file written with conditional formatting.');
+  // Format to 'YYYY-MM-DDTHH:MM:00'
+  const iso = fullDateTime.toISOString().slice(0, 19); // exclude milliseconds + Z
+  return iso;
 }
 
-exportWithColorCondition();
-
+// ✅ Example usage:
+const date = '08/17/2025';
+const time = '6:04 AM';
+console.log(convertToIsoTime(date, time)); // ➜ '2025-08-17T06:04:00'
