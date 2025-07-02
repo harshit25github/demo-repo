@@ -1,21 +1,27 @@
-const XLSX = require('xlsx');
-const fs = require('fs');
+function getNextMonthDates() {
+  const today = new Date();
 
-// Sample data
-const data = [
-  { name: 'Alice', age: 25, email: 'alice@example.com' },
-  { name: 'Bob', age: 30, email: 'bob@example.com' },
-  { name: 'Charlie', age: 28, email: 'charlie@example.com' },
-];
+  // Move to next month
+  const nextMonth = today.getMonth() + 1; // JS months are 0-based
+  const year = nextMonth > 11 ? today.getFullYear() + 1 : today.getFullYear();
+  const month = nextMonth % 12; // wrap around if December
 
-// Convert to worksheet
-const worksheet = XLSX.utils.json_to_sheet(data);
+  // Create dates
+  const date20 = new Date(year, month, 20);
+  const date26 = new Date(year, month, 26);
 
-// Create a new workbook and append the worksheet
-const workbook = XLSX.utils.book_new();
-XLSX.utils.book_append_sheet(workbook, worksheet, 'Sheet1');
+  // Format function: MM/DD/YYYY
+  const format = (date) =>
+    `${(date.getMonth() + 1).toString().padStart(2, '0')}/` +
+    `${date.getDate().toString().padStart(2, '0')}/` +
+    `${date.getFullYear()}`;
 
-// Write to file
-XLSX.writeFile(workbook, 'output.xlsx');
+  return {
+    date20: format(date20),
+    date26: format(date26),
+  };
+}
 
-console.log('Excel file created: output.xlsx');
+const { date20, date26 } = getNextMonthDates();
+console.log('Next month 20th:', date20);
+console.log('Next month 26th:', date26);
