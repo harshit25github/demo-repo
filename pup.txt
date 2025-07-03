@@ -1,27 +1,35 @@
-function getThirdWeekSaturdayOfNextMonthWithTime(timeStr) {
+function getThirdWeekDayTimesCSV(timeArray, dayType = 'sunday') {
   const today = new Date();
   const year = today.getFullYear();
   const nextMonth = today.getMonth() + 1;
 
-  // Step 1: Find the week that contains the 1st of next month
+  // 1. Get the 1st of next month
   const firstOfNextMonth = new Date(year, nextMonth, 1);
-  const firstDayOfWeek = firstOfNextMonth.getDay(); // 0 = Sun, 1 = Mon, ...
-  const offsetToSunday = -firstDayOfWeek;
-  const firstWeekSunday = new Date(year, nextMonth, 1 + offsetToSunday);
 
-  // Step 2: Get the 3rd week's Saturday (Sunday + 14 days + 6)
-  const thirdWeekSaturday = new Date(firstWeekSunday);
-  thirdWeekSaturday.setDate(firstWeekSunday.getDate() + 14 + 6); // 3rd week Sat
+  // 2. Find the correct weekday offset
+  const targetDay = dayType.toLowerCase() === 'saturday' ? 6 : 0; // 0 = Sunday, 6 = Saturday
+  const firstDayOfMonth = firstOfNextMonth.getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
+  let dayOffset = (7 + targetDay - firstDayOfMonth) % 7;
 
-  // Step 3: Parse the time string (e.g., "1:40 AM")
-  const [time, meridiem] = timeStr.trim().split(' ');
-  let [hours, minutes] = time.split(':').map(Number);
-  if (meridiem === 'PM' && hours !== 12) hours += 12;
-  if (meridiem === 'AM' && hours === 12) hours = 0;
+  // 3. Get the 1st target day (saturday/sunday), then add 14 days for 3rd week
+  const thirdWeekTargetDate = new Date(year, nextMonth, 1 + dayOffset + 14);
 
-  // Step 4: Set time on the 3rd Saturday date
-  thirdWeekSaturday.setHours(hours, minutes, 0, 0);
+  // 4. Helper for formatting
+  const pad = (n) => String(n).padStart(2, '0');
 
-  // Step 5: Return in ISO format, slice off milliseconds and 'Z'
-  return thirdWeekSaturday.toISOString().slice(0, 19);
+  // 5. Map over each time string
+  const result = timeArray.map((timeStr) => {
+    const [time, meridiem] = timeStr.trim().split(' ');
+    let [hours, minutes] = time.split(':').map(Number);
+    if (meridiem === 'PM' && hours !== 12) hours += 12;
+    if (meridiem === 'AM' && hours === 12) hours = 0;
+
+    const dateWithTime = new Date(thirdWeekTargetDate);
+    dateWithTime.setHours(hours, minutes, 0, 0);
+    dateWithTime.setHours(dateWithTime.getHours() - 4); // Subtract 4 hours
+
+    return `${dateWithTime.getFullYear()}-${pad(dateWithTime.getMonth() + 1)}-${pad(dateWithTime.getDate())}T${pad(dateWithTime.getHours())}:${pad(dateWithTime.getMinutes())}:00`;
+  });
+
+  return result.join(', ');
 }
