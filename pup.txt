@@ -1,40 +1,9 @@
-function getCalendarAlignedWeekTimesCSV(timeArray, dayType = 'sunday') {
-  const today = new Date();
-  const year = today.getFullYear();
-  const nextMonth = today.getMonth() + 1;
+const today = new Date();
 
-  // 1. Get the first day of next month
-  const firstOfMonth = new Date(year, nextMonth, 1);
+const dd = String(today.getDate()).padStart(2, '0');
+const mm = String(today.getMonth() + 1).padStart(2, '0'); // Months are 0-based
+const yyyy = today.getFullYear();
 
-  // 2. Backtrack to the Sunday that starts the week containing the 1st
-  const firstWeekSunday = new Date(firstOfMonth);
-  firstWeekSunday.setDate(firstOfMonth.getDate() - firstOfMonth.getDay());
+const formattedDate = `${dd}-${mm}-${yyyy}`;
 
-  // 3. Third week's Sunday = firstWeekSunday + 14 days
-  const thirdWeekSunday = new Date(firstWeekSunday);
-  thirdWeekSunday.setDate(firstWeekSunday.getDate() + 14); // 3rd full week start
-
-  // 4. If asking for Saturday, add 6 days
-  const targetDate = new Date(thirdWeekSunday);
-  if (dayType.toLowerCase() === 'saturday') {
-    targetDate.setDate(thirdWeekSunday.getDate() + 6);
-  }
-
-  const pad = (n) => String(n).padStart(2, '0');
-
-  const result = timeArray.map((timeStr) => {
-    const [time, meridiem] = timeStr.trim().split(' ');
-    let [hours, minutes] = time.split(':').map(Number);
-    if (meridiem === 'PM' && hours !== 12) hours += 12;
-    if (meridiem === 'AM' && hours === 12) hours = 0;
-
-    const dateWithTime = new Date(targetDate);
-    dateWithTime.setHours(hours, minutes, 0, 0);
-    dateWithTime.setHours(dateWithTime.getHours() - 4); // Subtract 4 hours
-
-    return `${dateWithTime.getFullYear()}-${pad(dateWithTime.getMonth() + 1)}-${pad(dateWithTime.getDate())}T${pad(dateWithTime.getHours())}:${pad(dateWithTime.getMinutes())}:00`;
-  });
-
-  return result.join(', ');
-}
-
+console.log(formattedDate); // e.g., "04-07-2025"
