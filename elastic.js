@@ -1,3 +1,37 @@
+import { Client } from '@elastic/elasticsearch';
+
+const client = new Client({
+  node: 'http://localhost:9200',
+  auth: {
+    username: 'elastic',         // or from .env
+    password: 'changeme'
+  }
+});
+
+/**
+ * Marks the document with given ID as processed (i.e., sets processed: true)
+ */
+async function markAsProcessed(index: string, docId: string) {
+  try {
+    const response = await client.update({
+      index,
+      id: docId,
+      body: {
+        doc: {
+          processed: true
+        }
+      }
+    });
+
+    console.log(`✅ Document ${docId} updated as processed.`);
+    return response;
+  } catch (error) {
+    console.error(`❌ Failed to update document ${docId}:`, error.meta?.body || error);
+  }
+}
+
+
+
 require('dotenv').config();
 const fs = require('fs');
 const { Client } = require('@elastic/elasticsearch');
