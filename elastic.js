@@ -1,3 +1,35 @@
+
+
+const result = await client.search({
+  index: 'your-index',
+  body: {
+    query: {
+      bool: {
+        must: [
+          { term: { processed: false } },
+          {
+            bool: {
+              should: [
+                { term: { 'error.keyword': '' } },
+                {
+                  bool: {
+                    must_not: {
+                      exists: {
+                        field: 'error'
+                      }
+                    }
+                  }
+                }
+              ],
+              minimum_should_match: 1
+            }
+          }
+        ]
+      }
+    }
+  }
+});
+
 import { Client } from '@elastic/elasticsearch';
 
 const client = new Client({
