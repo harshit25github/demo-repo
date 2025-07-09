@@ -1,9 +1,15 @@
-const today = new Date();
+function getMonthAndDate(dateStr) {
+  const [dd, mm, yyyy] = dateStr.split('-');
+  
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-const dd = String(today.getDate()).padStart(2, '0');
-const mm = String(today.getMonth() + 1).padStart(2, '0'); // Months are 0-based
-const yyyy = today.getFullYear();
+  const monthIndex = parseInt(mm, 10) - 1;
+  const month = monthNames[monthIndex];
+  
+  return { month, day: dd };
+}
 
-const formattedDate = `${dd}-${mm}-${yyyy}`;
-
-console.log(formattedDate); // e.g., "04-07-2025"
+// Example usage
+const result = getMonthAndDate("17-08-2025");
+console.log(result);  // { month: 'Aug', day: '17' }
