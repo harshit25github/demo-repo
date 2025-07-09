@@ -1,83 +1,11 @@
-import fs from 'fs';
-import path from 'path';
-import xlsx from 'xlsx';
-import nodemailer from 'nodemailer';
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
 
-// 1. Group data by recipient
-function groupDataByRecipient(dataArray) {
-  const groups = {};
-
-  for (const item of dataArray) {
-    const emails = Array.isArray(item.requestedForEmails)
-      ? item.requestedForEmails
-      : [item.requestedForEmails];
-
-    emails.forEach(email => {
-      if (!groups[email]) groups[email] = [];
-      groups[email].push(item);
-    });
-  }
-
-  return groups;
-}
-
-// 2. Generate Excel sheet for a recipient
-function generateExcelForRecipient(recipient, data) {
-  const worksheet = xlsx.utils.json_to_sheet(data);
-  const workbook = xlsx.utils.book_new();
-  xlsx.utils.book_append_sheet(workbook, worksheet, 'Sheet1');
-
-  const fileName = `Report_${recipient.replace(/[@.]/g, '_')}.xlsx`;
-  const filePath = path.join('./reports', fileName);
-
-  if (!fs.existsSync('./reports')) fs.mkdirSync('./reports');
-  xlsx.writeFile(workbook, filePath);
-
-  return filePath;
-}
-
-// 3. Send email with Excel attachment
-async function sendNotification(recipient, filePath) {
-  const transporter = nodemailer.createTransport({
-    service: 'gmail', // or your SMTP provider
-    auth: {
-      user: 'your_email@gmail.com',
-      pass: 'your_app_password',
-    },
-  });
-
-  const info = await transporter.sendMail({
-    from: 'your_email@gmail.com',
-    to: recipient,
-    subject: 'Your Notification Report',
-    text: 'Please find attached your report.',
-    attachments: [
-      {
-        filename: path.basename(filePath),
-        path: filePath,
-      },
-    ],
-  });
-
-  console.log(`✅ Email sent to ${recipient}: ${info.messageId}`);
-}
-
-// 4. Main function
-async function processAndNotify(dataArray) {
-  const groupedData = groupDataByRecipient(dataArray);
-
-  for (const [recipient, group] of Object.entries(groupedData)) {
-    const filePath = generateExcelForRecipient(recipient, group);
-    await sendNotification(recipient, filePath);
-  }
-}
-
-// Example data
-const sampleData = [
-  { id: 1, name: 'Alice', requestedForEmails: ['alice@example.com'] },
-  { id: 2, name: 'Bob', requestedForEmails: ['bob@example.com', 'carol@example.com'] },
-  { id: 3, name: 'Carol', requestedForEmails: ['carol@example.com'] },
-];
-
-// Start
-processAndNotify(sampleData).catch(console.error);
+  const formattedDateTime = [
+    now.getFullYear(),
+    pad(now.getMonth() + 1),
+    pad(now.getDate()),
+    pad(now.getHours()),
+    pad(now.getMinutes()),
+    pad(now.getSeconds())
+  ].join('___');
