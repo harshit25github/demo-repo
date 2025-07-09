@@ -1,4 +1,4 @@
-  const now = new Date();
+ const now = new Date();
   const pad = n => String(n).padStart(2, '0');
 
   const formattedDateTime = [
@@ -9,3 +9,7 @@
     pad(now.getMinutes()),
     pad(now.getSeconds())
   ].join('___');
+
+  const safeRecipient = recipient.replace(/[@.]/g, '_');
+  const fileName = `${safeRecipient}_${formattedDateTime}.xlsx`;
+  const filePath = path.join('./reports', fileName);
