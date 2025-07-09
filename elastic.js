@@ -3,6 +3,34 @@ import { Client } from '@elastic/elasticsearch';
 const client = new Client({
   node: 'http://localhost:9200',
   auth: {
+    username: 'elastic',
+    password: 'changeme'
+  }
+});
+
+/**
+ * Upload a single document without specifying an ID (Elasticsearch auto-generates one).
+ */
+async function uploadDocument(index: string, document: object) {
+  try {
+    const response = await client.index({
+      index,
+      document,
+      refresh: 'wait_for'  // ensures it's searchable immediately
+    });
+
+    console.log(`✅ Document indexed with auto ID: ${response.body._id}`);
+    return response;
+  } catch (error) {
+    console.error('❌ Error uploading document:', error.meta?.body || error);
+  }
+}
+
+import { Client } from '@elastic/elasticsearch';
+
+const client = new Client({
+  node: 'http://localhost:9200',
+  auth: {
     username: 'elastic',         // or from .env
     password: 'changeme'
   }
