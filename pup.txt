@@ -1,15 +1,24 @@
-function getMonthAndDate(dateStr) {
-  const [dd, mm, yyyy] = dateStr.split('-');
-  
-  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function formatAllToISO(dateStr, timeArr) {
+  const [dd, mm, yy] = dateStr.split('-').map(Number);
+  const fullYear = yy < 50 ? 2000 + yy : 1900 + yy;
 
-  const monthIndex = parseInt(mm, 10) - 1;
-  const month = monthNames[monthIndex];
-  
-  return { month, day: dd };
+  const pad = n => String(n).padStart(2, '0');
+
+  return timeArr.map(timeStr => {
+    let [time, meridiem] = timeStr.trim().split(' ');
+    let [hours, minutes] = time.split(':').map(Number);
+
+    if (meridiem.toUpperCase() === 'PM' && hours !== 12) hours += 12;
+    if (meridiem.toUpperCase() === 'AM' && hours === 12) hours = 0;
+
+    return `${fullYear}-${pad(mm)}-${pad(dd)}T${pad(hours)}:${pad(minutes)}:00`;
+  }).join(',');
 }
 
 // Example usage
-const result = getMonthAndDate("17-08-2025");
-console.log(result);  // { month: 'Aug', day: '17' }
+const dateStr = "05-07-25";
+const times = ["6:00 AM", "10:30 PM"];
+const result = formatAllToISO(dateStr, times);
+
+console.log(result);
+// 👉 "2025-07-05T06:00:00,2025-07-05T22:30:00"
