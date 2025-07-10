@@ -1,3 +1,27 @@
+const { Client } = require('@elastic/elasticsearch');
+require('dotenv').config(); // if using .env
+
+let elasticClient = null;
+
+function getElasticClient() {
+  if (!elasticClient) {
+    elasticClient = new Client({
+      node: process.env.ELASTIC_NODE || 'http://localhost:9200',
+      auth: {
+        username: process.env.ELASTIC_USERNAME || 'elastic',
+        password: process.env.ELASTIC_PASSWORD || 'changeme'
+      }
+    });
+
+    console.log('✅ Elasticsearch client created');
+  } else {
+    console.log('ℹ️ Reusing existing Elasticsearch client');
+  }
+
+  return elasticClient;
+}
+
+module.exports = { getElasticClient };
 
 
 const result = await client.search({
