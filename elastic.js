@@ -1,3 +1,27 @@
+
+const { Client } = require('@elastic/elasticsearch');
+const client = new Client({ node: 'http://localhost:9200' });
+
+async function deleteAllDocuments(indexName) {
+  try {
+    const result = await client.deleteByQuery({
+      index: indexName,
+      body: {
+        query: {
+          match_all: {}
+        }
+      },
+      refresh: true // ensures changes are visible immediately
+    });
+
+    console.log(`🗑️ Deleted ${result.body.deleted} documents from '${indexName}'`);
+  } catch (error) {
+    console.error('❌ Failed to delete documents:', error.meta?.body || error);
+  }
+}
+
+deleteAllDocuments('your-index-name');
+
 const { Client } = require('@elastic/elasticsearch');
 require('dotenv').config(); // if using .env
 const { Client } = require('@elastic/elasticsearch');
