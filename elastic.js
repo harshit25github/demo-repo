@@ -1,5 +1,37 @@
 const { Client } = require('@elastic/elasticsearch');
 require('dotenv').config(); // if using .env
+const { Client } = require('@elastic/elasticsearch');
+
+const client = new Client({ node: 'http://localhost:9200' });
+
+async function getDocsWithErrorAndUnprocessed(index) {
+  const result = await client.search({
+    index,
+    body: {
+      query: {
+        bool: {
+          must: [
+            { term: { processed: false } },
+            {
+              script: {
+                script: {
+                  source: "doc['error.keyword'].value.length() > 1",
+                  lang: 'painless'
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  });
+
+  return result.body.hits.hits.map(doc => doc._source);
+}
+
+getDocsWithErrorAndUnprocessed('your-index-name')
+  .then(docs => console.log('📄 Found:', docs.length))
+  .catch(console.error);
 
 let elasticClient = null;
 
