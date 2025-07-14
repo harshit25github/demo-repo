@@ -1,6 +1,7 @@
 const { Client } = require('@elastic/elasticsearch');
 require('dotenv').config(); // if using .env
 const { Client } = require('@elastic/elasticsearch');
+              "source": "doc.containsKey('error.keyword') && doc['error.keyword'].size() > 0 && doc['error.keyword'].value.length() > 1",
 
 const client = new Client({ node: 'http://localhost:9200' });
 
