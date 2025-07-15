@@ -1,3 +1,22 @@
+This initiative aimed to bridge internal analytics with HubSpot’s CRM platform by integrating Power BI dashboards into HubSpot. The goal was to enable business teams to access key performance metrics and operational insights directly within the CRM, improving visibility and faster decision-making without switching platforms.
+
+✅ Work Done:
+Explored and implemented custom card creation within HubSpot to display live Power BI visualizations embedded in the CRM interface.
+
+Investigated and tested secure ways to connect internal data sources to HubSpot, ensuring data protection and controlled access across systems.
+
+Focused on scalable integration practices, considering authentication, role-based access, and data refresh patterns.
+
+Ensured all data flows between Power BI and HubSpot adhered to internal security policies and best practices.
+
+🎯 Business Benefits:
+Empowered non-technical teams to consume critical data insights directly within HubSpot without needing to access external dashboards.
+
+Improved data accessibility, contextual awareness, and CRM engagement through in-place analytics.
+
+Laid a secure and reusable foundation for future data integrations between internal analytics and customer-facing platforms.
+
+-----
 🔹 Section 1 – Self-Rated 4 (FPCloud, DupeCancellation, Volaris)
 Built and scaled the FPCloud platform, enabling dynamic entity onboarding, UI-based editing, and relationship management via Backstage.
 
@@ -15,6 +34,7 @@ Applied log encryption and package updates across bots to meet security and perf
 Supported smooth operations by proactively handling edge cases and platform updates.
 
 Delivered consistent results through reliable automation handling without introducing regressions.
+Worked on HubSpot–Power BI integration, exploring secure ways to populate data from internal sources into HubSpot while adhering to best practices in data sharing and access control; also explored custom card creation within HubSpot to visualize insights directly from Power BI.
 
 
 ----
