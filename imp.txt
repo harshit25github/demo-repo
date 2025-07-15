@@ -1,3 +1,61 @@
+In the first half of the year, I took ownership of multiple high-impact initiatives across automation and platform development, delivering measurable business outcomes and improving internal efficiency. I focused on scalable solutions like FPCloud, enhanced existing bots, and enabled price intelligence through new tools. I also contributed to team growth by mentoring new joiners and actively collaborating across functions.
+Provided knowledge transfer and guidance to new joiners, helping them understand the existing automation suite, FPCloud platform, and its management processes, ensuring smooth onboarding and long-term maintainability.
+FPCloud – Backstage Platform Enhancements 
+
+-----
+
+🔹 Passion for Customer
+Proactively built and enhanced automations (e.g., DupeCancellation, Volaris pricing tool) and internal platforms (FPCloud) to directly improve customer-facing team efficiency, data accuracy, and service visibility.
+
+🔹 Ownership & Accountability
+Took end-to-end ownership of key platforms like FPCloud and DupeCancellation, driving architectural decisions, implementing critical security updates, and delivering reliable, long-term solutions with minimal supervision.
+
+🔹 Fast Execution – Bias for Action
+Quickly responded to evolving requirements by redesigning bots (Dupe, QClosed, QFollowUp), launching the Volaris pricing tool from scratch, and delivering multiple impactful Backstage features in a short timeframe.
+
+🔹 Teamwork & Collaboration
+Collaborated closely with cross-functional teams to implement reusable scaffolding solutions, shared platform components, and streamlined workflows that have been adopted across teams for entity management and automation.
+
+---
+
+Designed and developed a complete workflow for managing internal entities using Backstage:
+
+Built a dynamic template generation system powered by schema.yaml, supporting conditional field rendering (dependsOn) and multiple input types.
+
+Enabled editing of existing entities (like VMs) directly via UI forms, with partial update support and YAML integrity checks.
+
+Handled complex relationship management (e.g., linking Components to Systems, Systems to Domains/Owners).
+
+Led the system design for VM spin-up workflows, including resource metadata capture and lifecycle tracking within Backstage.
+
+Developed custom Backstage processors to sync schema-driven UIs with templates and enforce structure without manual effort.
+
+Volaris Price Comparison Automation
+
+Created a new automation to compare Volaris direct contracts with Cheapoair contracts, identifying discrepancies and revenue-impacting gaps.
+
+Enabled weekly difference analysis and trend detection, offering actionable insights to internal pricing and operations teams.
+
+DupeCancellation Bot Redesign
+
+Shifted the bot’s logic from booking cancellation to Compass case closure, resulting in a 90% success rate and expanded automation coverage.
+
+Delivered a measurable FTE benefit of 2 and improved process efficiency.
+
+Enhanced security by integrating encrypted logging and updating critical packages.
+----
+QClosed and QFollowUp Enhancements
+
+Maintained and adapted bots in response to UI changes, ensuring continued automation stability.
+
+Improved booking coverage and updated packages to ensure compatibility.
+
+Integrated log encryption, aligning with organization-wide security practices.
+
+DateChange Automation
+
+Performed log encryption and package updates, improving runtime security and stability.
+---
 📌 Project: Backstage Developer Portal – Feature Development & Enhancements
 📄 Business Justification:
 To streamline developer onboarding, improve visibility across internal services, and enhance lifecycle ownership, we built and extended a custom Backstage Developer Portal. The platform empowers teams to create, manage, and discover software components, systems, APIs, and resources in a standardized and self-service manner.
