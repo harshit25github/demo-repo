@@ -3,7 +3,7 @@ Provided knowledge transfer and guidance to new joiners, helping them understand
 FPCloud – Backstage Platform Enhancements 
 
 -----
-
+Provided knowledge transfer and guidance to new joiners, helping them understand the existing automation suite, FPCloud platform, and its management processes, ensuring smooth onboarding and long-term maintainability
 🔹 Passion for Customer
 Proactively built and enhanced automations (e.g., DupeCancellation, Volaris pricing tool) and internal platforms (FPCloud) to directly improve customer-facing team efficiency, data accuracy, and service visibility.
 
