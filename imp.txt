@@ -1,3 +1,35 @@
+1. CCD/CCV Queue Verification Logic
+Integrated logic to check both CCD and CCV queues before proceeding with any action.
+
+If the booking is not found in either queue, the bot now adds a clear comment in the booking and exits gracefully without processing.
+
+Prevents unnecessary actions and improves process accuracy.
+
+2. Engine-Specific Handling to Prevent Absorption
+Implemented handling logic to identify and bypass specific booking engines that pose a risk of absorption or conflict.
+
+Adds a safeguard layer to avoid false processing or booking duplication during bot execution.
+
+3. Compass Case Auto-Closure Logic
+Enhanced logic to ensure that if all conditions are successfully met (queue verification, ACR creation, etc.), the Compass case is automatically closed by the bot.
+
+Improved consistency and reduced manual overhead for support teams.
+
+4. Clear In-Booking Comments for Transparency
+Every action taken by the bot is now clearly documented within the booking.
+
+Ensures full traceability for support agents and avoids confusion or duplicate efforts in post-processing.
+
+5. Email Communication to Customers
+Bot now sends automated, formatted emails to customers when an action is taken (e.g., booking closure).
+
+Ensures proper communication and reduces dependency on manual follow-ups.
+
+6. Throughput & Performance Uplift
+With the new enhancements, the bot's coverage increased from 80 to 130 bookings per day.
+
+The Compass case closure success rate improved to 80%, delivering greater operational impact and consistency.
+----
 1. End-to-End Automation of Contract Comparison
 Developed an automated system to compare Volaris airline contracts with corresponding Cheapoair contracts.
 
