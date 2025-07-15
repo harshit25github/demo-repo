@@ -1,3 +1,94 @@
+1. Dynamic Template Generation using schema.yaml
+Introduced a schema-driven approach to Backstage scaffolder templates.
+
+Enabled teams to define UI form fields through a centralized schema.yaml, avoiding hardcoded template duplication.
+
+Supported advanced field types like dropdown, checkbox, radio, and text, with validations like regex, minLength, and required flags.
+
+Introduced dependsOn logic to conditionally display fields (e.g., OS version depends on selected OS).
+
+Improved maintainability and scalability of scaffolding templates across multiple entity types.
+
+2. Custom Backstage Processor for Template Sync
+Developed a custom processor that automatically compares and syncs template.yaml with schema.yaml.
+
+Ensures:
+
+Missing fields are added,
+
+Obsolete fields are removed,
+
+Constraints like required, default, and validation rules are updated.
+
+Commits changes only if actual differences are detected, avoiding unnecessary version noise.
+
+Logged all changes for traceability and debugging.
+
+3. UI-Based Editing of Existing Entities
+Built a dynamic editing flow to update entities (e.g., VMs, Systems, APIs) through a form-driven interface.
+
+Supported partial updates — only the fields modified by the user are updated in the catalog-info.yaml, preserving the rest.
+
+Handled multi-entity YAMLs with proper entity targeting using metadata.name.
+
+4. Advanced Relationship Management
+Managed complex entity relationships, such as:
+
+Systems linked to Domains and Owners.
+
+Components related to multiple APIs and Resources.
+
+Implemented dynamic handling of:
+
+consumesApis, providesApis with kind: API
+
+consumesResources with kind: Resource
+
+Cleaned up empty arrays to avoid bloated or invalid YAMLs.
+
+5. File Upload Integration for APIs
+Enabled users to upload API definition files (e.g., Swagger/OpenAPI JSON).
+
+Uploaded files are stored in a shared repo (e.g., fp-api) without triggering builds.
+
+Updated the corresponding API entity with a relative file path using spec.definition.$text.
+
+6. Catalog Editing APIs
+Developed a robust API layer to support entity updates via API (in addition to the UI).
+
+Features:
+
+Patch-based updates
+
+Entity isolation within multi-entity YAMLs
+
+Safe removal of fields when values are empty (e.g., empty relationship arrays)
+
+7. Security and Compliance Enhancements
+Implemented log encryption where automation touched sensitive metadata or entities.
+
+Ensured role-based access and adherence to internal policies for Git updates.
+
+8. Email Notification and Excel Integration
+Built an email notification engine that:
+
+Groups payloads by recipient,
+
+Generates Excel files per user,
+
+Sends consolidated data with context.
+
+Useful for surfacing errors, booking statuses, or any entity-level operations tracked in Backstage.
+
+🎯 Business & Operational Impact
+Reduced onboarding time by 50–60% for new entities.
+
+Empowered teams to self-serve and manage their services/entities independently.
+
+Established Backstage as a central source of truth for service metadata and relationships.
+
+Created a scalable, auditable, and future-ready foundation for engineering governance.
+----
 This initiative aimed to bridge internal analytics with HubSpot’s CRM platform by integrating Power BI dashboards into HubSpot. The goal was to enable business teams to access key performance metrics and operational insights directly within the CRM, improving visibility and faster decision-making without switching platforms.
 
 ✅ Work Done:
