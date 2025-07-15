@@ -1,3 +1,24 @@
+🔹 Section 1 – Self-Rated 4 (FPCloud, DupeCancellation, Volaris)
+Built and scaled the FPCloud platform, enabling dynamic entity onboarding, UI-based editing, and relationship management via Backstage.
+
+Redesigned the DupeCancellation bot, increasing success rate to 90% and delivering 2 FTE benefit through improved logic and Compass closure focus.
+
+Developed a new Volaris price comparison automation to detect contract gaps and deliver weekly trend insights.
+
+Ensured security and maintainability by integrating encrypted logging and upgrading core packages across solutions.
+
+🔹 Section 2 – Self-Rated 3 (QFollowUp, QClosed, DateChange)
+Maintained and enhanced bots like QClosed and QFollowUp, adapting to UI changes and increasing booking coverage.
+
+Applied log encryption and package updates across bots to meet security and performance standards.
+
+Supported smooth operations by proactively handling edge cases and platform updates.
+
+Delivered consistent results through reliable automation handling without introducing regressions.
+
+
+----
+
 In the first half of the year, I took ownership of multiple high-impact initiatives across automation and platform development, delivering measurable business outcomes and improving internal efficiency. I focused on scalable solutions like FPCloud, enhanced existing bots, and enabled price intelligence through new tools. I also contributed to team growth by mentoring new joiners and actively collaborating across functions.
 Provided knowledge transfer and guidance to new joiners, helping them understand the existing automation suite, FPCloud platform, and its management processes, ensuring smooth onboarding and long-term maintainability.
 FPCloud – Backstage Platform Enhancements 
