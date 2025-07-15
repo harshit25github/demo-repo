@@ -1,3 +1,140 @@
+📌 Project: Backstage Developer Portal – Feature Development & Enhancements
+📄 Business Justification:
+To streamline developer onboarding, improve visibility across internal services, and enhance lifecycle ownership, we built and extended a custom Backstage Developer Portal. The platform empowers teams to create, manage, and discover software components, systems, APIs, and resources in a standardized and self-service manner.
+It has significantly reduced manual metadata handling, improved collaboration across teams, and served as a single source of truth for service documentation and ownership.
+
+✅ Key Features & Enhancements (Till January):
+
+
+Dynamic Entity Management
+
+
+Developed entity templates and onboarding workflows for:
+
+
+Domains, Subdomains, Systems, Components, APIs, and Resources (e.g., VMs)
+
+
+
+
+Managed relationships (e.g., Systems linked to Domains and Owners) and supported consistent entity structure across the organization.
+
+
+
+
+Centralized Schema-Driven UI
+
+
+Introduced support for dynamic schema.yaml files to drive scaffolder forms.
+
+
+Supported multiple field types: text, dropdown, checkbox, and radio, along with conditional rendering using dependsOn.
+
+
+
+
+Custom Backstage Processor
+
+
+Built a processor to compare schema.yaml and template.yaml:
+
+
+Adds missing fields
+
+
+Removes extra fields
+
+
+Enforces field rules like defaults and validations
+
+
+
+
+Commits updates only when changes are detected, reducing unnecessary git operations.
+
+
+
+
+Editing APIs for Existing Entities
+
+
+Developed APIs to update catalog-info.yaml for:
+
+
+Resources (e.g., VMs), Components, APIs, Domains, SubDomains, Systems
+
+
+
+
+Handled dynamic field updates (partial patching), field removal when arrays are empty, and selective updates without impacting unrelated entities in multi-YAML files.
+
+
+
+
+Advanced File Upload for API Specs
+
+
+Enabled uploading of spec files (like OpenAPI JSON).
+
+
+Stored files in a common repo (e.g., fp-api) and linked them via relative path in the spec.definition.$text field.
+
+
+
+
+Component Relationships Support
+
+
+Handled dynamic population of fields like consumesApis, consumesResources, providesApis using correct kind values.
+
+
+Automatically removed fields if they were left empty, maintaining YAML cleanliness.
+
+
+
+
+Email Notification Automation
+
+
+Built logic to group data by recipients, generate per-user Excel sheets, and send notifications using a unified function.
+📌 Project: Volaris Price Comparison Automation
+📄 Description:
+Developed a new automation that compares Volaris airline contract prices with corresponding Cheapoair contracts to identify discrepancies, pricing trends, and potential revenue leakage.
+
+✅ Work Done:
+Automated price extraction and comparison logic between Volaris direct contracts and Cheapoair rates.
+
+Built weekly difference analysis to observe trends and track price variations over time.
+
+Designed the solution to highlight gaps or mismatches in pricing, aiding decision-makers in contract adjustments or escalation.
+
+🎯 Impact:
+Improved visibility into price alignment issues between Volaris and Cheapoair.
+
+Enabled data-driven decisions to address potential inconsistencies and protect revenue.
+
+Reduced manual comparison efforts through automation and trend-based reporting.
+
+📌 Project: DateChange
+📄 Description:
+DateChange is a bot designed to automate booking date modification tasks, reducing manual effort in scenarios where users need to reschedule or adjust bookings.
+✅ Enhancements / Work Done:
+
+
+Integrated encrypted logging to enhance the security and integrity of runtime data.
+
+
+Updated existing packages to streamline the automation process, improve performance, and maintain compatibility with latest frameworks.
+
+
+🎯 Impact:
+
+
+Improved the bot’s security posture and compliance through encrypted logs.
+
+
+Enhanced maintainability and reliability of the automation with updated dependencies.
+---
 📌 Project: QClosed
 📄 Description:
 QClosed is an automation bot designed to handle bookings where quality closures are required. It involves UI-based automation to interact with internal platforms and complete closure actions.
