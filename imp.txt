@@ -1,3 +1,52 @@
+1. End-to-End Automation of Contract Comparison
+Developed an automated system to compare Volaris airline contracts with corresponding Cheapoair contracts.
+
+Extracted pricing data from both sources, aligned them contract-wise, and flagged any differences automatically.
+
+Eliminated the need for manual comparison across multiple sources, reducing human error and time.
+
+2. Weekly Price Difference & Trend Analysis
+Implemented logic to:
+
+Capture and store price data on a weekly basis.
+
+Calculate week-over-week pricing variations for each contract pair.
+
+Detect trends like consistent underpricing or overpricing in one source.
+
+Enabled teams to proactively identify price drifts and act early.
+
+3. Gap Detection & Highlighting
+Added intelligent comparison layers to:
+
+Identify mismatches between expected Volaris pricing and Cheapoair offerings.
+
+Highlight gaps that could impact revenue, customer trust, or contractual compliance.
+
+Outputs were formatted in a way that made them easy to review by non-technical stakeholders.
+
+4. Secure & Scalable Data Handling
+Ensured the automation followed data protection best practices while accessing and comparing contracts.
+
+Designed the framework to be scalable:
+
+Can be extended to compare other carriers or agencies in the future.
+
+Modular enough to plug into BI dashboards or notification systems.
+
+5. Actionable Reporting & Visibility
+Provided structured output that could be used by:
+
+Business/commercial teams to correct pricing gaps.
+
+Operations teams to monitor price drift trends.
+
+Finance/revenue teams to detect missed revenue opportunities.
+
+Lays the groundwork for Power BI integration or alerting automation in the next phase.
+
+
+---
 1. Dynamic Template Generation using schema.yaml
 Introduced a schema-driven approach to Backstage scaffolder templates.
 
