@@ -1,15 +1,16 @@
- const now = new Date();
-  const pad = n => String(n).padStart(2, '0');
+function getCalendarPositionFromDate(dateString) {
+  const [mm, dd, yyyy] = dateString.split("-").map(Number);
+  const targetDate = new Date(yyyy, mm - 1, dd);
 
-  const formattedDateTime = [
-    now.getFullYear(),
-    pad(now.getMonth() + 1),
-    pad(now.getDate()),
-    pad(now.getHours()),
-    pad(now.getMinutes()),
-    pad(now.getSeconds())
-  ].join('___');
+  // 1st day of the month
+  const firstDay = new Date(yyyy, mm - 1, 1);
+  const startDayOfWeek = firstDay.getDay(); // 0 = Sunday, 6 = Saturday
 
-  const safeRecipient = recipient.replace(/[@.]/g, '_');
-  const fileName = `${safeRecipient}_${formattedDateTime}.xlsx`;
-  const filePath = path.join('./reports', fileName);
+  // Calculate day offset from the first day
+  const dayOffset = dd + startDayOfWeek - 1;
+
+  const tr = Math.floor(dayOffset / 7) + 1; // Row number (week)
+  const td = (dayOffset % 7) + 1;           // Column number (day of week)
+
+  return { tr, td };
+}
