@@ -1,5 +1,29 @@
-I hope you're doing well. I would like to request an upgrade of the Node.js version currently being used in our environment.
+Originally designed to handle duplicate bookings caused by technical errors or repeated user actions, the Dupe Cancellation bot focused on automatically cancelling one of the duplicate bookings and closing the associated Compass case.
+✅ Enhancements / Work Done:
 
-The upgrade is required to support the latest features and dependencies in our project, ensure compatibility with modern libraries, and improve performance and security.
 
-Please let me know if you need any additional details or if there is a standard process to follow for this request.
+Redesigned the bot POC to shift the focus from cancelling bookings to directly closing Compass cases, increasing the bot’s applicability and reducing unnecessary cancellations.
+
+
+Achieved a 90% success rate by improving logic and expanding coverage across more booking scenarios.
+
+
+Delivered an FTE benefit of 2, reducing manual intervention and improving team efficiency.
+
+
+Integrated log encryption to enhance bot data security and compliance.
+
+
+Updated existing packages to streamline the process and improve overall maintainability.
+
+
+🎯 Impact:
+
+
+Broader booking coverage and improved resolution handling.
+
+
+Significant performance uplift and reduced operational load.
+
+
+Strengthened security posture with encrypted logging.
