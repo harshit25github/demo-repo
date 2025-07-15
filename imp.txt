@@ -1,3 +1,65 @@
+📌 Project: QClosed
+📄 Description:
+QClosed is an automation bot designed to handle bookings where quality closures are required. It involves UI-based automation to interact with internal platforms and complete closure actions.
+✅ Enhancements / Work Done:
+
+
+Updated UI selectors and automation logic to accommodate changes in the front-end elements, ensuring continued reliability of the bot.
+
+
+Expanded booking coverage by refining logic to handle more complex or previously unhandled cases.
+
+
+Integrated encrypted logging to improve data protection and audit readiness.
+
+
+Upgraded supporting packages for improved performance, stability, and compatibility.
+
+
+🎯 Impact:
+
+
+Maintained high reliability despite evolving UI changes.
+
+
+Enhanced automation coverage and reduced manual overhead.
+
+
+Improved security through encrypted logs.
+
+
+
+📌 Project: QFollowUp
+📄 Description:
+QFollowUp automation handles post-booking scenarios that require additional follow-up actions or validations. It relies on UI automation similar to QClosed.
+✅ Enhancements / Work Done:
+
+
+Adapted automation scripts to reflect recent changes in the UI structure and navigation flow.
+
+
+Increased booking coverage by handling a wider variety of follow-up scenarios.
+
+
+Added encrypted log integration to secure sensitive runtime data.
+
+
+Performed package upgrades to align with internal standards and improve maintainability.
+
+
+🎯 Impact:
+
+
+Ensured continuity of automation despite UI-level changes.
+
+
+Boosted process efficiency and reduced error rates in follow-up handling.
+
+
+Strengthened bot compliance and traceability through secure logging.
+
+----- Dupe
+
 Originally designed to handle duplicate bookings caused by technical errors or repeated user actions, the Dupe Cancellation bot focused on automatically cancelling one of the duplicate bookings and closing the associated Compass case.
 ✅ Enhancements / Work Done:
 
