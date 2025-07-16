@@ -1,4 +1,7 @@
-const result = Array.from(map.entries()).map(([chatID, arr]) => {
-  const first = arr[0];
-  return first ? { chatID, title: first.content } : null;
-}).filter(Boolean);
+const text = "Total price is 1,200.34 USD";
+
+const match = text.match(/\b\d{1,3}(?:,\d{3})*(?:\.\d+)?|\d+(\.\d+)?\b/);
+
+const value = match ? parseFloat(match[0].replace(/,/g, '')) : null;
+
+console.log(value); // 1200.34
