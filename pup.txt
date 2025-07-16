@@ -1,7 +1,7 @@
+import parsePrice from 'parse-price';
+
 const text = "$1,000.34 USD";
+const result = parsePrice(text);
 
-const match = text.match(/[\$₹€£]?\s?\d{1,3}(?:,\d{3})*(?:\.\d+)?|\d+(\.\d+)?/);
-
-const value = match ? parseFloat(match[0].replace(/[^0-9.]/g, '')) : null;
-
-console.log(value); // 1000.34
+console.log(result.price);      // 1000.34 (number)
+console.log(result.currency);   // "$"
