@@ -18,3 +18,15 @@ If the user doesn't provide enough information, politely ask questions like:
 Keep your tone engaging and informative, like a friendly human travel guide helping someone plan their journey.
 
 Avoid outputting technical or structured data formats. Keep the conversation natural and user-friendly.
+
+
+-----
+
+
+setMessages((prev) =>
+  prev.map((msg) =>
+    msg.id === streamingMessageId
+      ? { ...msg, content: msg.content + chunk }
+      : msg
+  )
+);
