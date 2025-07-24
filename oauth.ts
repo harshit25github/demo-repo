@@ -1,3 +1,33 @@
+callbacks: {
+  async signIn({ user, account }) {
+    // If this is an Azure AD login, link or create a user in the database:
+    if (account?.provider === "azure-ad") {
+      const email = user.email!;
+      let localUser = await getUser(email);
+      if (!localUser) {
+        // Create a new user in your DB for first-time Azure AD login (no password needed)
+        localUser = await createUser({ email, name: user.name });
+      }
+      user.id = localUser.id;  // attach DB user ID to NextAuth user object
+    }
+    return true;
+  },
+  async jwt({ token, user }) {
+    if (user) {
+      token.uid = user.id;  // persist user ID (for Azure AD, this is set above)
+    }
+    return token;
+  },
+  async session({ session, token }) {
+    if (token?.uid) {
+      session.user.id = token.uid as string;
+    }
+    return session;
+  }
+}
+
+
+---------
 import NextAuth from "next-auth"
 import AzureADProvider from "next-auth/providers/azure-ad"
 
