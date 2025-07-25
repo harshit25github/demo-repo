@@ -141,5 +141,62 @@ export const config = {
 };
 
 
+----
+
+  // lib/pkce.ts
+import crypto from "crypto";
+
+export function base64URLEncode(buffer: Buffer) {
+  return buffer
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
+
+export function sha256(buffer: Buffer) {
+  return crypto.createHash("sha256").update(buffer).digest();
+}
+
+export function generatePkcePair(): { codeVerifier: string; codeChallenge: string } {
+  const codeVerifier = base64URLEncode(crypto.randomBytes(32));
+  const codeChallenge = base64URLEncode(sha256(Buffer.from(codeVerifier)));
+  return { codeVerifier, codeChallenge };
+}
+---
+
+
+  import { NextResponse } from "next/server";
+import { cca } from "@/lib/azureAuthConfig";
+import { generatePkcePair } from "@/lib/pkce";
+import { serialize } from "cookie";
+
+export async function GET() {
+  // ① generate a fresh PKCE pair
+  const { codeVerifier, codeChallenge } = generatePkcePair();
+
+  // ② get the Azure AD authorize URL, including code_challenge
+  const authUrl = await cca.getAuthCodeUrl({
+    scopes:       ["openid", "profile", "email"],
+    redirectUri:  `${process.env.APP_URL}/api/auth/callback/microsoft-entra-id`,
+    responseMode: "form_post",             // still use form_post or query
+    codeChallenge,                        // PKCE code challenge
+    codeChallengeMethod: "S256",          // using SHA‑256
+  });
+
+  // ③ store the code_verifier in an HTTP‑only cookie for the callback
+  const res = NextResponse.redirect(authUrl);
+  res.headers.append(
+    "Set-Cookie",
+    serialize("msal_code_verifier", codeVerifier, {
+      httpOnly: true,
+      secure:   process.env.NODE_ENV === "production",
+      path:     "/",     // available on callback path
+      maxAge:   300,     // 5 minutes is enough
+    })
+  );
+
+  return res;
+}
 
   
