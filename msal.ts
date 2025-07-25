@@ -1,132 +1,145 @@
-// pages/api/auth/redirect.ts  (or app/api/auth/redirect/route.ts)
+// lib/azureAuthConfig.ts
+import { ConfidentialClientApplication } from "@azure/msal-node";
 
-import type { NextApiRequest, NextApiResponse } from "next";
-import { ConfidentialClientApplication }  from "@azure/msal-node";
-import { serialize } from "cookie";
-import { jwtVerify } from "jose";
-// ─ your DB helper; replace with your own
-import { upsertUser } from "@/lib/db/users";  
-
-const msalConfig = {
+export const cca = new ConfidentialClientApplication({
   auth: {
     clientId:     process.env.AZURE_AD_CLIENT_ID!,
     clientSecret: process.env.AZURE_AD_CLIENT_SECRET!,
-    authority:    `https://login.microsoftonline.com/${process.env.AZURE_AD_TENANT_ID}`,
-  }
-};
-
-const cca = new ConfidentialClientApplication(msalConfig);
-
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  try {
-    const { code } = req.query as { code?: string };
-    if (!code) return res.status(400).send("Missing code");
-
-    // 1️⃣ Exchange the code for tokens
-    const tokenResponse = await cca.acquireTokenByCode({
-      code,
-      scopes:      ["openid", "profile", "email"],
-      redirectUri: `${process.env.APP_URL}/api/auth/redirect`,
-    });
-
-    if (!tokenResponse?.idToken) {
-      throw new Error("No ID token from Azure");
-    }
-
-    // 2️⃣ Verify & decode the ID token
-    const { payload } = await jwtVerify(
-      tokenResponse.idToken,
-      Buffer.from(process.env.AZURE_AD_CLIENT_SECRET!, "utf8"),  // for prod, fetch keys from the JWKS endpoint
-      {
-        issuer:   `https://login.microsoftonline.com/${process.env.AZURE_AD_TENANT_ID}/v2.0`,
-        audience: process.env.AZURE_AD_CLIENT_ID!,
-      }
-    );
-
-    // 3️⃣ Upsert the user in your DB
-    //    Extract the fields you care about:
-    const { sub: azureId, email, name } = payload as any;
-    await upsertUser({ azureId, email, name });
-
-    // 4️⃣ Set a session cookie (just using the raw ID token here)
-    const cookie = serialize("msal_session", tokenResponse.idToken, {
-      httpOnly: true,
-      secure:   process.env.NODE_ENV === "production",
-      path:     "/",
-      maxAge:   tokenResponse.expiresIn,
-    });
-    res.setHeader("Set-Cookie", cookie);
-
-    // 5️⃣ Redirect home
-    res.redirect("/");
-  } catch (err: any) {
-    console.error("Auth redirect error:", err);
-    res.status(500).send("Authentication error");
-  }
-}
-------
-
-// lib/msalClient.ts
-import { PublicClientApplication } from "@azure/msal-browser";
-
-export const msalConfig = {
-  auth: {
-    clientId:   process.env.NEXT_PUBLIC_AZURE_AD_CLIENT_ID!,
-    authority: `https://login.microsoftonline.com/${process.env.NEXT_PUBLIC_AZURE_AD_TENANT_ID}`,
-    redirectUri: `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/redirect`,
+    authority:    `https://login.microsoftonline.com/${process.env.AZURE_AD_TENANT_ID}`, 
   },
-  cache: { cacheLocation: "sessionStorage" }
-};
+});
 
-export const msalInstance = new PublicClientApplication(msalConfig);
 
 ----
 
-"use client";
+  // app/(auth)/api/auth/login/microsoft-entra-id/route.ts
+import { NextResponse } from "next/server";
+import { cca } from "@/lib/azureAuthConfig";
 
-import { msalInstance } from "@/lib/msalClient";
+export async function GET() {
+  const authUrl = await cca.getAuthCodeUrl({
+    scopes:      ["openid", "profile", "email"],
+    redirectUri: `${process.env.APP_URL}/api/auth/callback/microsoft-entra-id`,
+    prompt:      "select_account",
+  });
+  return NextResponse.redirect(authUrl);
+}
 
-export default function LoginButton() {
-  return (
-    <button onClick={() => {
-      msalInstance.loginRedirect({
-        scopes: ["openid","profile","email"],
-      });
-    }}>
-      Sign in with Microsoft
-    </button>
+
+
+---
+
+
+
+  // app/(auth)/api/auth/callback/microsoft-entra-id/route.ts
+import { NextResponse, NextRequest } from "next/server";
+import { cca } from "@/lib/azureAuthConfig";
+import { createRemoteJWKSet, jwtVerify } from "jose";
+import { upsertUser } from "@/lib/db/users";
+import { serialize } from "cookie";
+
+export async function GET(req: NextRequest) {
+  const url    = new URL(req.url);
+  const code   = url.searchParams.get("code");
+  if (!code) return NextResponse.redirect("/login");
+
+  // 1️⃣ Exchange the code for tokens
+  const tokenRes = await cca.acquireTokenByCode({
+    code,
+    scopes:      ["openid", "profile", "email"],
+    redirectUri: `${process.env.APP_URL}/api/auth/callback/microsoft-entra-id`,
+  });
+  const idToken = tokenRes.idToken!;
+  
+  // 2️⃣ Verify & decode the ID token using MS’s JWKS
+  const jwks = createRemoteJWKSet(
+    new URL(`https://login.microsoftonline.com/${process.env.AZURE_AD_TENANT_ID}/discovery/v2.0/keys`)
   );
+  const { payload } = await jwtVerify(idToken, jwks, {
+    issuer:   `https://login.microsoftonline.com/${process.env.AZURE_AD_TENANT_ID}/v2.0`,
+    audience: process.env.AZURE_AD_CLIENT_ID!,
+  });
+
+  // 3️⃣ Upsert the user into your DB
+  const { sub: azureId, name, preferred_username: email } = payload as any;
+  await upsertUser({ azureId, email, name });
+
+  // 4️⃣ Set an HTTP‑only cookie with the raw ID token
+  const cookie = serialize("msal_session", idToken, {
+    httpOnly: true,
+    secure:   process.env.NODE_ENV === "production",
+    path:     "/",
+    maxAge:   tokenRes.expiresIn,
+  });
+  const res = NextResponse.redirect("/");
+  res.headers.set("Set-Cookie", cookie);
+  return res;
 }
 
 
 ---
 
 
-// app/page.tsx (or app/dashboard/page.tsx)
-import { cookies } from "next/headers";
-import { jwtVerify } from "jose";
-import { redirect } from "next/navigation";
+  "use client";
+import Link from "next/link";
 
-export default async function Home() {
-  const cookieStore = cookies();
-  const token = cookieStore.get("msal_session")?.value;
-  if (!token) return redirect("/login");
-
-  // Verify & decode (again) to get user info
-  const { payload } = await jwtVerify(
-    token,
-    Buffer.from(process.env.AZURE_AD_CLIENT_SECRET!, "utf8"),
-    {
-      issuer:   `https://login.microsoftonline.com/${process.env.AZURE_AD_TENANT_ID}/v2.0`,
-      audience: process.env.AZURE_AD_CLIENT_ID!,
-    }
-  );
-
+export default function LoginPage() {
   return (
-    <main>
-      <h1>Welcome, {(payload as any).name}</h1>
-      <p>Your email: {(payload as any).email}</p>
-    </main>
+    <div className="max-w-md mx-auto mt-20 text-center">
+      <h1 className="text-2xl mb-6">Sign in</h1>
+      {/* — your existing credential form — */}
+
+      <div className="mt-4">
+        <Link
+          href="/api/auth/login/microsoft-entra-id"
+          className="px-4 py-2 border rounded hover:bg-gray-100"
+        >
+          Sign in with Microsoft
+        </Link>
+      </div>
+    </div>
   );
 }
 
+
+----
+// middleware.ts
+import { NextRequest, NextResponse } from "next/server";
+import { createRemoteJWKSet, jwtVerify } from "jose";
+
+const PUBLIC_PATHS = ["/login", "/register", "/guest", "/api/auth/guest"];
+const JWKS = createRemoteJWKSet(
+  new URL(`https://login.microsoftonline.com/${process.env.AZURE_AD_TENANT_ID}/discovery/v2.0/keys`)
+);
+
+export async function middleware(req: NextRequest) {
+  const { pathname } = req.nextUrl;
+  if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
+    return NextResponse.next();
+  }
+
+  const token = req.cookies.get("msal_session")?.value;
+  if (token) {
+    try {
+      await jwtVerify(token, JWKS, {
+        issuer:   `https://login.microsoftonline.com/${process.env.AZURE_AD_TENANT_ID}/v2.0`,
+        audience: process.env.AZURE_AD_CLIENT_ID!,
+      });
+      return NextResponse.next();
+    } catch {
+      // invalid or expired token
+    }
+  }
+
+  // Not authenticated → redirect to login
+  const loginUrl = new URL("/login", req.url);
+  return NextResponse.redirect(loginUrl);
+}
+
+export const config = {
+  matcher: ["/((?!_next|static|favicon.ico).*)"],
+};
+
+
+
+  
