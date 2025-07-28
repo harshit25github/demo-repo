@@ -1,3 +1,63 @@
+// lib/getSession.ts
+
+import { getServerSession } from "next-auth/next";
+import { cookies }          from "next/headers";
+import { createRemoteJWKSet, jwtVerify } from "jose";
+import { authOptions }      from "@/app/api/auth/[...nextauth]/route"; 
+// adjust the import path to wherever your NextAuth handler lives
+
+export interface Session {
+  user: {
+    id:    string;
+    name:  string;
+    email: string;
+  };
+  expires?: string;
+}
+
+/**
+ * Try to load a NextAuth session first; if none, fall back to MSAL cookie.
+ * Returns a session-like object or null.
+ */
+export async function getSession(): Promise<Session | null> {
+  // 1️⃣ NextAuth credentials session
+  const nextAuth = await getServerSession(authOptions);
+  if (nextAuth) {
+    return nextAuth as Session;
+  }
+
+  // 2️⃣ MSAL session cookie
+  const token = cookies().get("msal_session")?.value;
+  if (!token) {
+    return null;
+  }
+
+  // 3️⃣ Verify MSAL ID token against Azure AD JWKS
+  const issuer   = `https://login.microsoftonline.com/${process.env.AZURE_AD_TENANT_ID}/v2.0`;
+  const audience = process.env.AZURE_AD_CLIENT_ID!;
+  const jwksUrl  = `${issuer}/discovery/v2.0/keys`;
+  const JWKS     = createRemoteJWKSet(new URL(jwksUrl));
+
+  try {
+    const { payload } = await jwtVerify(token, JWKS, {
+      issuer,
+      audience,
+    });
+
+    return {
+      user: {
+        id:    payload.sub as string,
+        name:  payload.name as string,
+        email: payload.preferred_username as string,
+      },
+      expires: "", // optional
+    };
+  } catch {
+    return null;
+  }
+}
+
+///
 // lib/azureAuthConfig.ts
 import { ConfidentialClientApplication } from "@azure/msal-node";
 
