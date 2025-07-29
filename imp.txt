@@ -1,3 +1,41 @@
+Draw a 16 × 9 landscape architecture diagram using flat‑icon style boxes and pastel colours, similar to an AWS reference sheet.
+Label each functional domain with a light border and title in CAPS.
+Use solid arrows for primary data flow and dashed arrows for control / logs / metrics.
+User (stick‑figure) → arrow ‘1 send message’ → Conversation Service box.
+
+Conversation Service arrow ‘2 → Profanity Sanity’ (small filter box).
+
+A sticky bidirectional curved arrow ‘3’ between Conversation Service and ChatGPT Interaction box (LLM call).
+
+Conversation Service upward arrow to Embedding Generator box with bullet list inside:
+   • turns query to vector
+   • vector DB finds nearest docs
+   • chatbot answers with right context.
+
+Conversation Service downward arrow to Redis / Kafka queue box; note “save & stream tokens”.
+
+Arrow from queue to Postgres DB (pgvector) cylinder labelled “save to DB” and curved arrow back from DB to queue “re‑train model”.
+
+At the bottom centre draw Worker Pool (3 circles) connected to Redis/Kafka.
+
+On the left cluster a Mediator (Next.js backend) box on top of Primary Frontend (Next.js) box; annotate mediator with:
+   1) guest user mgmt
+   2) user CRUD / OAuth
+   3) user chat mgmt.
+
+Mediator reads from Postgres (user, chats, messages) with arrow labelled “read access (authenticated user)”.
+
+Mediator red arrow “user request w/ history chat” to Primary Backend (Node/Python) box annotated:
+   1) prompt mgmt
+   2) context mgmt per user
+   3) node orchestration
+   4) RAG.
+
+Mediator also arrow to Redis for “parallel/bulk updates”.
+
+Under frontend draw Local Storage oval for guest users (note: ‘not stored for training’).
+Use numbered arrows so the execution order is clear, keep the diagram wide (16:9) and leave sufficient spacing between clusters.”
+
 Native vector search (pgvector) – store flight‑doc and FAQ embeddings right in Postgres and run HNSW/IVF nearest‑neighbour queries for RAG chatbots; keeps vectors + booking metadata in one ACID store. 
 GitHub
 Severalnines
