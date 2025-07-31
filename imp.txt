@@ -1,3 +1,4 @@
+profanity-check layer. It masks mild bad words and blocks or flags any hateful or disallowed content before the chat continues, keeping conversations compliant and brand-safe.
 Authenticated read-back
 Once a chat round-trip is finished, the Mediator Backend can pull the complete conversation directly from Postgres (pgvector) for that authenticated user—no need to query Redis again.
 
