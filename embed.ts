@@ -1,3 +1,98 @@
+// scripts/plotSystemPrompts.js
+import fs   from "fs";
+import path from "path";
+import dotenv from "dotenv";
+import { Client } from "pg";
+import PCA  from "ml-pca";
+
+dotenv.config();
+
+async function main() {
+  // 1) Connect and fetch embeddings
+  const pg = new Client({ connectionString: process.env.DATABASE_URL });
+  await pg.connect();
+  const { rows } = await pg.query(`
+    SELECT id, embedding 
+      FROM system_prompts 
+     ORDER BY id
+  `);
+  await pg.end();
+
+  if (!rows.length) {
+    console.error("No prompts found in the DB");
+    process.exit(1);
+  }
+
+  // 2) Build data matrix
+  const ids = rows.map(r => r.id);
+  const X   = rows.map(r => r.embedding);
+
+  // 3) Run PCA → 2 components
+  const pca = new PCA(X);
+  const coords = pca.predict(X, { nComponents: 2 }).to2DArray();
+
+  // 4) Build an HTML page with Plotly
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>System-Prompt Embeddings PCA</title>
+  <script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
+</head>
+<body>
+  <div id="plot" style="width:800px;height:600px;"></div>
+  <script>
+    // Data from Node
+    const ids = ${JSON.stringify(ids)};
+    const coords = ${JSON.stringify(coords)};
+
+    const x = coords.map(p => p[0]);
+    const y = coords.map(p => p[1]);
+    const labels = ids.map(id => id.toString());
+
+    const trace = {
+      x,
+      y,
+      mode: "markers+text",
+      type: "scatter",
+      text: labels,
+      textposition: "top center",
+      marker: { size: 10 }
+    };
+
+    const layout = {
+      title: "System-Prompt Embeddings (PCA → 2D)",
+      xaxis: {
+        title: "PC1",
+        zeroline: true,
+        zerolinecolor: "#999"
+      },
+      yaxis: {
+        title: "PC2",
+        zeroline: true,
+        zerolinecolor: "#999"
+      }
+    };
+
+    Plotly.newPlot("plot", [trace], layout);
+  </script>
+</body>
+</html>
+`;
+
+  // 5) Write out the HTML
+  const outPath = path.resolve(process.cwd(), "system-prompts-pca.html");
+  fs.writeFileSync(outPath, html, "utf8");
+  console.log("✅ Written PCA visualization to", outPath);
+}
+
+main().catch(err => {
+  console.error(err);
+  process.exit(1);
+});
+
+
 // scripts/loadSystemPrompts.js
 // server.js
 import express from "express";
