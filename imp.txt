@@ -1,3 +1,8 @@
+Authenticated read-back
+Once a chat round-trip is finished, the Mediator Backend can pull the complete conversation directly from Postgres (pgvector) for that authenticated user—no need to query Redis again.
+
+Bulk-update safeguard to Redis
+If either the Mediator Backend or Conversation Service loses its live connection, the recovering service performs a bulk sync to Redis—pushing any missed messages or status flags—to ensure cache and stream state stay consistent and secure.
 User → Next.js App
 The traveller types a message in the web/mobile UI. It is sent to the Next.js edge app, which hosts both the React interface and an authenticated API layer.
 
