@@ -1,5 +1,84 @@
 // scripts/loadSystemPrompts.js
+// server.js
+import express from "express";
+import dotenv from "dotenv";
+import { Client } from "pg";
+import OpenAI from "openai";
 
+dotenv.config();
+
+const app = express();
+app.use(express.json());
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+// Simple cosine-similarity
+function cosineSimilarity(a, b) {
+  let dot = 0, magA = 0, magB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot  += a[i] * b[i];
+    magA += a[i] * a[i];
+    magB += b[i] * b[i];
+  }
+  return dot / (Math.sqrt(magA) * Math.sqrt(magB));
+}
+
+app.post("/system-prompt", async (req, res) => {
+  const { userInput } = req.body;
+  if (!userInput) {
+    return res.status(400).json({ error: "userInput is required" });
+  }
+
+  try {
+    // 1) Embed user message
+    const embedRes = await openai.embeddings.create({
+      model: "text-embedding-ada-002",
+      input: userInput,
+    });
+    const userEmb = embedRes.data[0].embedding;
+
+    // 2) Fetch all prompts + embeddings from Postgres
+    const pg = new Client({ connectionString: process.env.DATABASE_URL });
+    await pg.connect();
+    const { rows } = await pg.query(`
+      SELECT id, prompt, embedding
+      FROM system_prompts
+    `);
+    await pg.end();
+
+    if (rows.length === 0) {
+      return res.json({ systemPrompt: null, similarity: 0 });
+    }
+
+    // 3) Find best match
+    let best = rows[0];
+    let bestScore = cosineSimilarity(userEmb, best.embedding);
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      const score = cosineSimilarity(userEmb, row.embedding);
+      if (score > bestScore) {
+        bestScore = score;
+        best = row;
+      }
+    }
+
+    // 4) Return it
+    res.json({
+      systemPrompt: best.prompt,
+      similarity:   bestScore,
+    });
+
+  } catch (err) {
+    console.error("Error in /system-prompt:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+const port = process.env.PORT || 3000;
+app.listen(port, () => {
+  console.log(`> Listening on http://localhost:${port}`);
+});
+-------
 import dotenv from "dotenv";
 import { Client } from "pg";
 import OpenAI from "openai";
