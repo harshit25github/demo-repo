@@ -1,3 +1,41 @@
+User → Next.js App
+The traveller types a message in the web/mobile UI. It is sent to the Next.js edge app, which hosts both the React interface and an authenticated API layer.
+
+Next.js Mediator ↔ Conversation Service
+If the user is logged-in, the Mediator calls the Conversation Service over REST / gRPC and receives a streamed reply on the same connection.
+
+2a. Guest chat saved locally
+For unauthenticated users, the Mediator writes the message to browser LocalStorage so nothing leaves the device.
+
+2b. Promote after login
+When the guest eventually signs in, those cached messages are uploaded to the backend so the chat history is preserved.
+
+Conversation Service ↔ Profanity Filter
+The service sends each user message to a lightweight filter and receives a cleaned (or flagged) version back.
+
+Conversation Service ↔ Embedding Generator
+The cleaned text is converted into a vector, matched against pgvector, and the top context snippets are returned for retrieval-augmented generation.
+
+Conversation Service ↔ ChatGPT Interaction
+With context attached, the service makes a bidirectional call to the LLM, streaming partial tokens as they arrive.
+
+6a. Save + publish to Redis
+Each full assistant message is stored in Redis and simultaneously published on a pub/sub channel.
+
+6b. Stream tokens to frontend
+The Mediator subscribes to that channel and pushes tokens to the browser via SSE or WebSocket for real-time typing effect.
+
+7 / 7b. Persist to Postgres, feedback loop
+Redis batches are flushed to Postgres-pgvector for durable storage; the DB can later feed updated embeddings back to Redis for model retraining.
+
+Worker Pool
+Background workers consume Redis jobs to refresh embeddings, run analytics, or export data—keeping heavy work off the request path.
+
+Mediator direct DB / Redis access
+The Mediator reads user and chat records from Postgres when rendering history, and issues bulk updates to Redis (e.g., mark messages as read).
+
+
+------------
 Draw a 16 × 9 landscape architecture diagram using flat‑icon style boxes and pastel colours, similar to an AWS reference sheet.
 Label each functional domain with a light border and title in CAPS.
 Use solid arrows for primary data flow and dashed arrows for control / logs / metrics.
