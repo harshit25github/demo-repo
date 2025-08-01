@@ -1,3 +1,109 @@
+// rerankExample.js
+import dotenv from "dotenv";
+import { Client } from "pg";
+import OpenAI from "openai";
+import PCA from "ml-pca";             // only if you need PCA elsewhere
+
+dotenv.config();
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+// simple cosine
+function cosine(a, b) {
+  let dot = 0, magA = 0, magB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot  += a[i] * b[i];
+    magA += a[i] * a[i];
+    magB += b[i] * b[i];
+  }
+  return dot / (Math.sqrt(magA) * Math.sqrt(magB));
+}
+
+async function dualEncodeRetrieve(userInput, topK = 5) {
+  // 1) embed the query
+  const embedRes = await openai.embeddings.create({
+    model: "text-embedding-ada-002",
+    input: userInput,
+  });
+  const userEmb = embedRes.data[0].embedding;
+
+  // 2) fetch all prompts
+  const pg = new Client({ connectionString: process.env.DATABASE_URL });
+  await pg.connect();
+  const { rows } = await pg.query(`
+    SELECT id, prompt, embedding
+    FROM system_prompts
+  `);
+  await pg.end();
+
+  // 3) score & sort
+  const scored = rows.map(r => ({
+    id:         r.id,
+    prompt:     r.prompt,
+    score:      cosine(userEmb, r.embedding),
+  }));
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, topK);
+}
+
+async function crossEncoderRescore(userInput, candidates) {
+  // We’ll ask the LLM to give us a numeric relevance score 0–1
+  // Build one big prompt that asks for JSON with {id, score} array:
+  const system = `
+You are a relevance-scoring assistant.  
+Given a user query and a list of candidate system-prompts, assign each prompt a relevance score between 0.0 (not relevant) and 1.0 (perfect match).  
+Respond _only_ with a JSON array of objects: [{"id":..., "score":...}, …].
+`;
+
+  // build user message
+  let content = `User Query:\n"${userInput}"\n\nCandidates:\n`;
+  for (const c of candidates) {
+    content += `\n[${c.id}] ${c.prompt}`;
+  }
+
+  const chatRes = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [
+      { role: "system", content: system.trim() },
+      { role: "user",   content },
+    ],
+    temperature: 0,
+  });
+
+  // parse JSON
+  const text = chatRes.choices[0].message.content.trim();
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    console.error("Failed to parse cross-encoder output:", text);
+    throw e;
+  }
+}
+
+async function main() {
+  const userInput = "I’m planning a surprise romantic weekend in Paris with candlelit dinners";
+  console.log("User Input:", userInput);
+
+  // 1️⃣ Dual-encoder: get top-5
+  const top5 = await dualEncodeRetrieve(userInput, 5);
+  console.log("\nTop-5 candidates by cosine:");
+  top5.forEach(c => console.log(`  [${c.id}] score=${c.score.toFixed(3)} → ${c.prompt}`));
+
+  // 2️⃣ Cross-encoder: re-score those 5
+  const reranked = await crossEncoderRescore(userInput, top5);
+  console.log("\nCross-encoder scores:");
+  reranked.forEach(r => console.log(`  [${r.id}] score=${r.score}`));
+
+  // 3️⃣ Find best
+  const best = reranked.reduce((a, b) => (b.score > a.score ? b : a), reranked[0]);
+  const chosen = top5.find(c => c.id === best.id);
+  console.log("\n🏆 Final selection:");
+  console.log(`  [${best.id}] score=${best.score} → ${chosen.prompt}`);
+}
+
+main().catch(console.error);
+
+-------
 // scripts/plotSystemPrompts.js
 import fs   from "fs";
 import path from "path";
