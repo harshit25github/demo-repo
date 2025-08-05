@@ -1,4 +1,16 @@
-// app.js
+New Messages:
+User: “Actually, I’ll be in Lyon first on July 8, then Paris on July 10.”
+Assistant: “Got it—Lyon on July 8, Paris on July 10.”
+User: “Also, I love jazz music—any clubs you recommend?”
+
+Updated Summary:
+- User is traveling to Lyon on July 8.
+- User is traveling to Paris on July 10.
+- User prefers budget accommodations.
+- User loves jazz music and wants club recommendations.
+  
+  
+  // app.js
 import express from "express";
 import bodyParser from "body-parser";
 import fetch from "node-fetch";
