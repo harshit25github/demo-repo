@@ -1,3 +1,81 @@
+// lib/summarizer.js
+import OpenAI from "openai";
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+/**
+ * updateSummaryWithOpenAI
+ *  - existingSummary: string of bullet points (may be empty)
+ *  - recentTurns:     array of { role: "user"|"assistant", content: string }
+ * Returns: updated bullet-point summary string
+ */
+export async function updateSummaryWithOpenAI(existingSummary, recentTurns) {
+  // 1) Format recent turns as plain text
+  const recentText = recentTurns
+    .map((t) =>
+      t.role === "user"
+        ? `User: ${t.content}`
+        : `Assistant: ${t.content}`
+    )
+    .join("\n");
+
+  // 2) Build your chat messages
+  const messages = [
+    {
+      role: "system",
+      content: `
+You are a Conversation Memory Assistant.
+Your job is to maintain an up-to-date, concise bullet-point summary of the conversation.
+Rules:
+  1. Only include facts or preferences that appear verbatim.
+  2. Do NOT hallucinate or infer anything not explicitly stated.
+  3. Preserve all named entities (places, dates, numbers, etc.).
+  4. Append new bullets for new information; carry forward existing bullets unchanged.
+      `.trim(),
+    },
+    {
+      role: "system",
+      content: `Existing Summary:
+${existingSummary || "[none]"}`
+    },
+    {
+      role: "system",
+      content: `New Messages:
+${recentText}`
+    },
+    {
+      role: "user",
+      content: `Please output exactly:
+
+Updated Summary:
+- Bullet 1...
+- Bullet 2...
+…`
+    },
+  ];
+
+  // 3) Call OpenAI
+  const resp = await openai.chat.completions.create({
+    model: "gpt-3.5-turbo",    // or "gpt-4" if you have access
+    messages,
+    temperature: 0,
+    max_tokens: 512,
+  });
+
+  const text = resp.choices[0].message.content.trim();
+
+  // 4) Extract lines starting with "- "
+  const lines = text
+    .split("\n")
+    .filter((l) => l.trim().startsWith("-"))
+    .map((l) => l.replace(/^- */, "").trim());
+
+  // 5) Rebuild summary
+  return lines.map((l) => `- ${l}`).join("\n");
+}
+
 // lib/db/chatSystemPrompt.js
 import { Pool } from "pg";
 
