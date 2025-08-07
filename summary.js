@@ -1,4 +1,11 @@
-// lib/db/chatMemory.js
+You will see two things:
+
+  1) A second SYSTEM message containing the existing bullet‐point summary.
+     It always starts with “Summary:”.
+
+  2) A USER message whose content is multiple lines beginning with “User:” or “Assistant:”.
+     This is the raw recent chat turns.
+  // lib/db/chatMemory.js
 import { Pool } from "pg";
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
