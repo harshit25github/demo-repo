@@ -1,11 +1,110 @@
-You will see two things:
+// lib/ChatMemory.js
 
-  1) A second SYSTEM message containing the existing bullet‐point summary.
-     It always starts with “Summary:”.
+import OpenAI from "openai";
+import { estimateTokenCount, SUMMARIZATION_TOKEN_THRESHOLD } from "./utils";
+import { updateSummaryWithOpenAI } from "./summarizer";
 
-  2) A USER message whose content is multiple lines beginning with “User:” or “Assistant:”.
-     This is the raw recent chat turns.
-  // lib/db/chatMemory.js
+export class ChatMemory {
+  constructor() {
+    this.memorySummary          = "";
+    this.unsummarizedTurns      = [];  // { role, content }
+    this.unsummarizedTokenCount = 0;
+    this.openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  }
+
+  /** Add a turn (role: "user" | "assistant") */
+  async addTurn(role, content) {
+    // 1) Append
+    this.unsummarizedTurns.push({ role, content });
+    this.unsummarizedTokenCount += estimateTokenCount(content);
+
+    // 2) Maybe summarize
+    if (this.unsummarizedTokenCount > SUMMARIZATION_TOKEN_THRESHOLD) {
+      await this._summarize();
+    }
+  }
+
+  /** Internal: call OpenAI to merge summary + turns */
+  async _summarize() {
+    this.memorySummary = await updateSummaryWithOpenAI(
+      this.memorySummary,
+      this.unsummarizedTurns
+    );
+    this.unsummarizedTurns      = [];
+    this.unsummarizedTokenCount = 0;
+  }
+
+  /** Build the chat.messages array for OpenAI */
+  buildMessages(systemPersona="You are a travel assistant.") {
+    const msgs = [
+      { role: "system", content: systemPersona }
+    ];
+    if (this.memorySummary) {
+      msgs.push({
+        role: "system",
+        content: `Summary so far:\n${this.memorySummary}`
+      });
+    }
+    for (const turn of this.unsummarizedTurns) {
+      msgs.push({ role: turn.role, content: turn.content });
+    }
+    return msgs;
+  }
+}
+// lib/ChatMemory.js
+
+import OpenAI from "openai";
+import { estimateTokenCount, SUMMARIZATION_TOKEN_THRESHOLD } from "./utils";
+import { updateSummaryWithOpenAI } from "./summarizer";
+
+export class ChatMemory {
+  constructor() {
+    this.memorySummary          = "";
+    this.unsummarizedTurns      = [];  // { role, content }
+    this.unsummarizedTokenCount = 0;
+    this.openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  }
+
+  /** Add a turn (role: "user" | "assistant") */
+  async addTurn(role, content) {
+    // 1) Append
+    this.unsummarizedTurns.push({ role, content });
+    this.unsummarizedTokenCount += estimateTokenCount(content);
+
+    // 2) Maybe summarize
+    if (this.unsummarizedTokenCount > SUMMARIZATION_TOKEN_THRESHOLD) {
+      await this._summarize();
+    }
+  }
+
+  /** Internal: call OpenAI to merge summary + turns */
+  async _summarize() {
+    this.memorySummary = await updateSummaryWithOpenAI(
+      this.memorySummary,
+      this.unsummarizedTurns
+    );
+    this.unsummarizedTurns      = [];
+    this.unsummarizedTokenCount = 0;
+  }
+
+  /** Build the chat.messages array for OpenAI */
+  buildMessages(systemPersona="You are a travel assistant.") {
+    const msgs = [
+      { role: "system", content: systemPersona }
+    ];
+    if (this.memorySummary) {
+      msgs.push({
+        role: "system",
+        content: `Summary so far:\n${this.memorySummary}`
+      });
+    }
+    for (const turn of this.unsummarizedTurns) {
+      msgs.push({ role: turn.role, content: turn.content });
+    }
+    return msgs;
+  }
+}
+-----------
 import { Pool } from "pg";
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
