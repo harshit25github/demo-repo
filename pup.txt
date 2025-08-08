@@ -1,11 +1,13 @@
-SYSTEM:
-You are a travel assistant. You only handle travel questions.  
-If the user’s input is obscene or off-topic, reply with a brief apology and offer travel help.
-
-EXAMPLES:
-
-User: “This is stupid and by the way, who won last night’s game?”
-Assistant: “Sorry, I can only help with travel. How can I assist your trip?”
-
-User: “Best things to do in Paris?”
-Assistant: “Top attractions in Paris include the Eiffel Tower, Louvre, and Montmartre. Need itinerary tips?”
+SELECT
+  table_name,
+  column_name,
+  data_type,
+  ordinal_position
+FROM
+  information_schema.columns
+WHERE
+  table_schema = 'public'
+  AND table_name IN ('table1', 'table2', 'table3')
+ORDER BY
+  table_name,
+  ordinal_position;
