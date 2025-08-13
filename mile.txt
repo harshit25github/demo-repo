@@ -1,3 +1,28 @@
+Milestone 1 — Persona Creation & Context Management Layer
+Description:
+Develop the core conversation intelligence layer that:
+
+Generates a user travel persona from the initial prompt — covering preferences like budget, dietary restrictions, travel style, preferred climate, and trip duration.
+
+Applies content moderation to filter out obscene or irrelevant inputs, replacing them with generic non-committal responses when detected.
+
+Manages conversation context efficiently — tracking chat history, summarizing older portions of the conversation once a token threshold is reached, and merging summaries with recent messages to preserve key details while minimizing token usage.
+
+Expected Outcome:
+
+Structured persona object stored for each user and used to guide recommendations.
+
+Moderation system that detects off-topic or harmful content before it reaches the LLM.
+
+Summarization engine that reduces token load without losing crucial context.
+
+Dependencies:
+
+OpenAI / LLaMA for persona generation and summarization.
+
+OpenAI moderation API or custom classifier for content filtering.
+
+PostgreSQL (with pgvector) for storing persona data, chat logs, and summaries.
 Milestone 1 — Persona Creation Engine
 Description:
 Implement an LLM-powered persona builder that takes a user’s initial prompt (e.g., travel goals, budget, dietary preferences, travel style) and generates a structured persona profile. This persona will drive all subsequent recommendations.
