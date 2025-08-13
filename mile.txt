@@ -1,3 +1,34 @@
+Milestone 1 — User Management, Authentication & Session Handling
+Description:
+Set up a dual-mode access system to distinguish between guest and authenticated users.
+
+Authenticated Users: Can log in, have their chat and message history persist across sessions, and retrieve past recommendations.
+
+Guest Users: Can use the system without logging in, but their session is temporary, and history is not retained after expiration.
+
+Shared Features: Both modes can interact with the LLM, but authenticated users will benefit from personalization and history continuity.
+
+Technical Requirements:
+
+Authentication via OAuth (e.g., Microsoft Entra ID) or Email/Password.
+
+PostgreSQL for storing:
+
+User profiles (role, preferences)
+
+Chat history (messages, timestamps, persona context)
+
+System prompt relationships (for context recall)
+
+Session management (JWT or server session store).
+
+Expected Outcome:
+
+Fully functional user identity system.
+
+Chat history tied to user accounts in DB.
+
+Guest mode with auto-expiration after defined inactivity period.
 Milestone 1 — Persona Creation & Context Management Layer
 Description:
 Develop the core conversation intelligence layer that:
