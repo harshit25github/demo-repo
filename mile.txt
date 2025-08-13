@@ -1,0 +1,114 @@
+Milestone 1 — Persona Creation Engine
+Description:
+Implement an LLM-powered persona builder that takes a user’s initial prompt (e.g., travel goals, budget, dietary preferences, travel style) and generates a structured persona profile. This persona will drive all subsequent recommendations.
+
+Expected Outcome:
+
+Given a user prompt, system generates a JSON persona object with attributes such as budget, dietary_preferences, preferred_climate, travel_companion_type, etc.
+
+Persona is stored and re-used in future conversations.
+
+Dependencies:
+
+OpenAI / LLaMA API for prompt processing.
+
+Embedding storage for long-term persona context.
+
+Milestone 2 — Destination Identification & Enrichment
+Description:
+Extract potential travel destinations from user input, then query web sources (SERP API, Google Places API, or similar) to gather relevant travel data.
+Include parameters like weather forecast, local safety advisories, political stability, and travel restrictions.
+
+Expected Outcome:
+
+For each identified location, the system returns a structured recommendation with rating scores based on criteria.
+
+Ability to rank destinations dynamically.
+
+Dependencies:
+
+Entity extraction from LLM output.
+
+SERP API / Google Places API / Weather API integration.
+
+Milestone 3 — Budget-Friendly Package Finder
+Description:
+Using the user’s persona + current conversation context, query multiple data sources (travel APIs, hotel APIs, rental car APIs, flight APIs) to find best-match and budget-friendly travel packages.
+
+Expected Outcome:
+
+Aggregated package list with cost breakdown.
+
+Ranking based on cost, convenience, and persona fit.
+
+Dependencies:
+
+Travel/hotel/car booking API integrations.
+
+Ranking logic for weighted scoring.
+
+Milestone 4 — Chat History Storage & Fine-Tuning
+Description:
+Persist user conversations to a database for later analysis, fine-tuning, and personalization. Include both raw conversation logs and summarized versions to save token cost.
+
+Expected Outcome:
+
+All chats linked to user profiles in DB.
+
+Ability to export chat logs for fine-tuning datasets.
+
+Dependencies:
+
+PostgreSQL with pgvector for embeddings.
+
+Token counting and summarization service.
+
+Milestone 5 — Obscenity & Off-topic Filter
+Description:
+Introduce an LLM + rules-based moderation layer to detect and sanitize off-topic or obscene user inputs before passing them to the main LLM.
+
+Expected Outcome:
+
+If detected, respond with a generic non-committal message.
+
+Maintain logs of filtered inputs for analysis.
+
+Dependencies:
+
+OpenAI moderation API / custom classification model.
+
+Milestone 6 — Context Summarization Engine
+Description:
+When token count exceeds threshold, generate rolling summaries that combine old summary + new unsummarized messages to retain context without losing details.
+
+Expected Outcome:
+
+Conversation remains relevant even after long sessions.
+
+Token usage reduced by at least 40%.
+
+Dependencies:
+
+Summarization prompt tuning for LLM.
+
+DB storage for summaries alongside raw messages.
+
+Milestone 7 — Performance & UX Enhancements
+Description:
+Improve response latency and user experience via:
+
+Pre-fetching potential destinations & data in background.
+
+Caching static travel data.
+
+Real-time progress indicators in UI.
+
+Expected Outcome:
+
+Average API response time < 2 seconds for cached queries.
+
+Dependencies:
+
+Redis for caching.
+
+WebSocket/SSE for streaming updates.
