@@ -1,153 +1,235 @@
-// server.mjs (ESM) or server.js with "type":"module" in package.json
-import express from "express";
-import { Client as McpClient } from "@modelcontextprotocol/sdk/client/mcp.js";
-import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+// 1. Install the MSSQL MCP Server
+// npm install @azure/mssql-mcp-server
 
-/** Adjust these to your layout **/
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const SERVER_ENTRY = path.resolve(__dirname, "../mcp-server/dist/index.js"); // <-- your built MCP server
+// 2. Create MCP Server Configuration (mcp-config.json)
+{
+  "mcpServers": {
+    "mssql": {
+      "command": "node",
+      "args": ["node_modules/@azure/mssql-mcp-server/dist/index.js"],
+      "env": {
+        "MSSQL_CONNECTION_STRING": "Server=localhost;Database=YourDatabase;User Id=youruser;Password=yourpassword;TrustServerCertificate=true"
+      }
+    }
+  }
+}
+
+// 3. Alternative: Direct SQL Server Authentication Configuration
+import { MSSQLMCPServer } from '@azure/mssql-mcp-server';
+
+const server = new MSSQLMCPServer({
+  server: 'localhost', // or your SQL Server instance
+  database: 'YourDatabase',
+  authentication: {
+    type: 'sql-server', // Use SQL Server authentication
+    options: {
+      userName: 'your_username',
+      password: 'your_password'
+    }
+  },
+  // Optional: Connection options
+  options: {
+    encrypt: false, // Set to true if using SSL
+    trustServerCertificate: true, // For local development
+    connectionTimeout: 30000,
+    requestTimeout: 30000
+  }
+});
+
+// 4. Express Client Server Integration
+import express from 'express';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { spawn } from 'child_process';
 
 const app = express();
 app.use(express.json());
 
-// Build the stdio transport that spawns your MCP server process
-async function makeClient() {
-  const transport = new StdioClientTransport({
-    command: "node",
-    args: [SERVER_ENTRY],
-    env: {
-      // REQUIRED by your MCP server (from the code you pasted)
-      SERVER_NAME: "localhost",            // or "host\\INSTANCE" or "host,1433"
-      DATABASE_NAME: "YourDb",
-      TRUST_SERVER_CERTIFICATE: "true",    // dev convenience
-      READONLY: "true",                    // or "false" to enable write tools
-      CONNECTION_TIMEOUT: "30",
+class MCPClient {
+  private client: Client;
+  private transport: StdioClientTransport;
 
-      // No SQL user/pass here because your server uses InteractiveBrowserCredential.
-      // At first run, it will pop a browser sign-in for Azure AD to get a token.
-      // If you want SQL auth instead, see the note at the end.
-    },
-  });
+  async initialize() {
+    // Start the MCP server process
+    const serverProcess = spawn('node', [
+      'node_modules/@azure/mssql-mcp-server/dist/index.js'
+    ], {
+      env: {
+        ...process.env,
+        MSSQL_CONNECTION_STRING: "Server=localhost;Database=YourDatabase;User Id=youruser;Password=yourpassword;TrustServerCertificate=true"
+      }
+    });
 
-  const client = new McpClient({ transport });
-  await client.connect();
-  return client;
+    // Create transport and client
+    this.transport = new StdioClientTransport({
+      stdin: serverProcess.stdin!,
+      stdout: serverProcess.stdout!,
+      stderr: serverProcess.stderr!
+    });
+
+    this.client = new Client({
+      name: "express-mcp-client",
+      version: "1.0.0"
+    }, {
+      capabilities: {
+        tools: {}
+      }
+    });
+
+    await this.client.connect(this.transport);
+    console.log('MCP Client connected to MSSQL server');
+  }
+
+  async listTools() {
+    const response = await this.client.listTools();
+    return response.tools;
+  }
+
+  async callTool(name: string, args: any) {
+    const response = await this.client.callTool({
+      name,
+      arguments: args
+    });
+    return response;
+  }
+
+  async disconnect() {
+    await this.client.close();
+  }
 }
 
-/** Helpers to find tools by their advertised name (case-insensitive) */
-async function findTool(client, nameOrIncludes) {
-  const { tools } = await client.listTools();
-  const lc = (s) => s.toLowerCase();
+// Initialize MCP client
+const mcpClient = new MCPClient();
 
-  // Exact match first
-  let tool = tools.find(t => lc(t.name) === lc(nameOrIncludes));
-  if (tool) return tool;
+app.post('/api/initialize-mcp', async (req, res) => {
+  try {
+    await mcpClient.initialize();
+    res.json({ success: true, message: 'MCP client initialized' });
+  } catch (error) {
+    console.error('Failed to initialize MCP client:', error);
+    res.status(500).json({ error: 'Failed to initialize MCP client' });
+  }
+});
 
-  // Fuzzy includes (e.g., "describe table")
-  const parts = Array.isArray(nameOrIncludes) ? nameOrIncludes.map(lc) : [lc(nameOrIncludes)];
-  tool = tools.find(t => parts.every(p => lc(t.name).includes(p)));
-  return tool || null;
+app.get('/api/tools', async (req, res) => {
+  try {
+    const tools = await mcpClient.listTools();
+    res.json({ tools });
+  } catch (error) {
+    console.error('Failed to list tools:', error);
+    res.status(500).json({ error: 'Failed to list tools' });
+  }
+});
+
+app.post('/api/execute-tool', async (req, res) => {
+  try {
+    const { toolName, args } = req.body;
+    const result = await mcpClient.callTool(toolName, args);
+    res.json({ result });
+  } catch (error) {
+    console.error('Failed to execute tool:', error);
+    res.status(500).json({ error: 'Failed to execute tool' });
+  }
+});
+
+// LLM Integration endpoint
+app.post('/api/llm-query', async (req, res) => {
+  try {
+    const { query, useTools = true } = req.body;
+    
+    let availableTools = [];
+    if (useTools) {
+      availableTools = await mcpClient.listTools();
+    }
+
+    // Here you would integrate with your LLM (OpenAI, etc.)
+    // Example with OpenAI:
+    /*
+    import OpenAI from 'openai';
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    
+    const response = await openai.chat.completions.create({
+      model: "gpt-4",
+      messages: [
+        {
+          role: "system",
+          content: `You have access to the following SQL tools: ${JSON.stringify(availableTools, null, 2)}`
+        },
+        {
+          role: "user", 
+          content: query
+        }
+      ],
+      tools: availableTools.map(tool => ({
+        type: "function",
+        function: {
+          name: tool.name,
+          description: tool.description,
+          parameters: tool.inputSchema
+        }
+      }))
+    });
+
+    // Handle tool calls if LLM wants to use them
+    if (response.choices[0].message.tool_calls) {
+      const toolResults = [];
+      for (const toolCall of response.choices[0].message.tool_calls) {
+        const result = await mcpClient.callTool(
+          toolCall.function.name,
+          JSON.parse(toolCall.function.arguments)
+        );
+        toolResults.push(result);
+      }
+      
+      res.json({
+        llmResponse: response.choices[0].message.content,
+        toolResults
+      });
+    } else {
+      res.json({
+        llmResponse: response.choices[0].message.content
+      });
+    }
+    */
+
+    // Placeholder response for now
+    res.json({
+      query,
+      availableTools,
+      message: "LLM integration placeholder - implement your LLM logic here"
+    });
+
+  } catch (error) {
+    console.error('Failed to process LLM query:', error);
+    res.status(500).json({ error: 'Failed to process LLM query' });
+  }
+});
+
+app.listen(3000, () => {
+  console.log('Express server running on port 3000');
+});
+
+// 5. Environment variables (.env file)
+/*
+MSSQL_SERVER=localhost
+MSSQL_DATABASE=YourDatabase  
+MSSQL_USERNAME=your_username
+MSSQL_PASSWORD=your_password
+OPENAI_API_KEY=your_openai_key
+*/
+
+// 6. Package.json dependencies
+/*
+{
+  "dependencies": {
+    "@azure/mssql-mcp-server": "latest",
+    "@modelcontextprotocol/sdk": "latest", 
+    "express": "^4.18.0",
+    "openai": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
 }
-
-/** 1) List Tools: see what your server exposes */
-app.get("/mcp/tools", async (req, res) => {
-  try {
-    const client = await makeClient();
-    const { tools } = await client.listTools();
-    await client.close();
-    res.json(tools);
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: e.message || "listTools failed" });
-  }
-});
-
-/** 2) Describe Table: calls your server's DescribeTable tool */
-app.get("/mcp/describe/:table", async (req, res) => {
-  try {
-    const client = await makeClient();
-    // Your server requires { tableName: string }
-    const tool = await findTool(client, ["describe", "table"]);  // e.g., "describe_table"
-    if (!tool) throw new Error("Describe Table tool not found");
-
-    const result = await client.callTool({
-      name: tool.name,
-      arguments: { tableName: req.params.table }
-    });
-
-    await client.close();
-
-    // Server returns text content with JSON stringified payload
-    const text = result.content.filter(p => p.type === "text").map(p => p.text).join("\n");
-    let parsed;
-    try { parsed = JSON.parse(text); } catch { parsed = { raw: text }; }
-    res.json(parsed);
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: e.message || "describeTable failed" });
-  }
-});
-
-/** 3) Read Data: calls your server's ReadData tool
- *    We don't know exact arg schema of ReadDataTool; common patterns are:
- *    { tableName, columns?, where?, top? }.
- *    Pass through req.body to the tool so you can experiment.
- */
-app.post("/mcp/read", async (req, res) => {
-  try {
-    const client = await makeClient();
-    const tool = await findTool(client, ["read", "data"]);  // e.g., "read_data"
-    if (!tool) throw new Error("Read Data tool not found");
-
-    const result = await client.callTool({
-      name: tool.name,
-      arguments: req.body || {}
-    });
-
-    await client.close();
-
-    const text = result.content.filter(p => p.type === "text").map(p => p.text).join("\n");
-    let parsed;
-    try { parsed = JSON.parse(text); } catch { parsed = { raw: text }; }
-    res.json(parsed);
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: e.message || "readData failed" });
-  }
-});
-
-/** 4) Generic tool invoker: name + arguments passthrough */
-app.post("/mcp/call", async (req, res) => {
-  try {
-    const { name, args } = req.body || {};
-    if (!name) return res.status(400).json({ error: "name is required" });
-
-    const client = await makeClient();
-    // You can either trust the name directly or resolve via listTools first:
-    const tool = await findTool(client, name);
-    const toolName = tool ? tool.name : name;
-
-    const result = await client.callTool({
-      name: toolName,
-      arguments: args || {}
-    });
-
-    await client.close();
-
-    const text = result.content.filter(p => p.type === "text").map(p => p.text).join("\n");
-    let parsed;
-    try { parsed = JSON.parse(text); } catch { parsed = { raw: text }; }
-    res.json(parsed);
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: e.message || "callTool failed" });
-  }
-});
-
-app.listen(5000, () => {
-  console.log("Express listening on http://localhost:5000");
-});
-
+*/
