@@ -2,6 +2,151 @@
 // npm install @azure/mssql-mcp-server
 
 // 2. Create MCP Server Configuration (mcp-config.json)
+
+// agent.mjs
+import express from "express";
+import { Client as McpClient } from "@modelcontextprotocol/sdk/client/mcp.js";
+import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
+import ollama from "ollama"; // npm i ollama
+
+const MCP_URL   = process.env.MSSQL_MCP_URL || "http://localhost:3333/mcp";
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "llama3.1"; // tool-capable
+const PORT = process.env.PORT || 5000;
+
+const app = express();
+app.use(express.json());
+
+// ---------- 1) Connect to MCP (SSE) and cache tool metadata ----------
+let mcp;
+let mcpTools = [];   // [{ name, description, inputSchema }, ...]
+async function getMcp() {
+  if (mcp) return mcp;
+  const client = new McpClient({ name: "express-ollama-bridge", version: "1.0.0" });
+  await client.connect(new SSEClientTransport(new URL(MCP_URL)));
+  mcp = client;
+
+  const { tools } = await mcp.listTools();
+  mcpTools = tools || [];
+  return mcp;
+}
+
+// Convert MCP tool schema → Ollama tool schema (OpenAI-like)
+function toOllamaTools(tools) {
+  return (tools || []).map(t => {
+    // MCP gives JSON Schema in t.inputSchema (if present)
+    const parameters = t.inputSchema?.schema || t.inputSchema || {
+      type: "object",
+      properties: {},
+      additionalProperties: true
+    };
+    return {
+      type: "function",
+      function: {
+        name: t.name,                // keep original MCP name
+        description: t.description || "MCP tool",
+        parameters                    // JSON Schema
+      }
+    };
+  });
+}
+
+// ---------- 2) The agent loop: Ollama ⇄ MCP tools ----------
+async function runWithTools(question) {
+  await getMcp();
+
+  // Prepare tool list for Ollama
+  const tools = toOllamaTools(mcpTools);
+
+  // Conversation state (OpenAI-like messages format works with Ollama)
+  const messages = [
+    {
+      role: "system",
+      content:
+        "You are a helpful assistant. Use tools to answer questions about a Microsoft SQL Server database. " +
+        "If you need data, call the appropriate tool with correct JSON args. When done, reply to the user."
+    },
+    { role: "user", content: question }
+  ];
+
+  // Loop: ask Ollama → if tool_calls, execute via MCP → append tool responses → ask again
+  for (let step = 0; step < 8; step++) {
+    const resp = await ollama.chat({
+      model: OLLAMA_MODEL,
+      messages,
+      tools,               // <<< advertise tools to the model
+      stream: false
+    });
+
+    const msg = resp.message || resp; // shape varies slightly by sdk
+    // If model wants to call tools, you’ll see msg.tool_calls (array)
+    const toolCalls = msg.tool_calls || msg.toolCalls || [];
+    if (!toolCalls.length) {
+      // No more tool calls → final answer
+      return { final: msg.content };
+    }
+
+    // Execute each requested tool via MCP and add tool results
+    for (const tc of toolCalls) {
+      const toolName = tc.function?.name || tc.name;
+      const rawArgs  = tc.function?.arguments ?? tc.arguments ?? "{}";
+
+      // Parse args (Ollama sends a JSON string often)
+      let argsObj = {};
+      try {
+        argsObj = typeof rawArgs === "string" ? JSON.parse(rawArgs) : rawArgs;
+      } catch {
+        argsObj = {};
+      }
+
+      // Call the MCP tool
+      const result = await mcp.callTool({ name: toolName, arguments: argsObj });
+
+      // The MCP server usually returns text parts with stringified JSON
+      const text = (result.content || [])
+        .filter(p => p.type === "text")
+        .map(p => p.text)
+        .join("\n");
+
+      // Feed the tool result back to the model as a "tool" role message
+      messages.push({
+        role: "tool",
+        tool_call_id: tc.id || undefined, // if provided
+        name: toolName,
+        content: text || "(no result)"
+      });
+    }
+
+    // Also include the assistant’s “tool call request” message in the history
+    messages.push({ role: "assistant", content: msg.content || "", tool_calls: toolCalls });
+  }
+
+  return { final: "I ran out of steps. Try rephrasing your question." };
+}
+
+// ---------- 3) REST endpoint ----------
+app.post("/ask", async (req, res) => {
+  try {
+    const question = String(req.body?.question || "").trim();
+    if (!question) return res.status(400).json({ error: "question is required" });
+    const out = await runWithTools(question);
+    res.json(out);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: e.message || "failed" });
+  }
+});
+
+app.get("/tools", async (_req, res) => {
+  try {
+    await getMcp();
+    res.json(mcpTools);
+  } catch (e) {
+    res.status(500).json({ error: e.message || "listTools failed" });
+  }
+});
+
+app.listen(PORT, () => console.log(`Agent on http://localhost:${PORT}`));
+
 {
   "mcpServers": {
     "mssql": {
