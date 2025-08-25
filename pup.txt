@@ -1,5 +1,51 @@
-I am writing to follow up on my punch-in regularization request that I submitted on [mention the date]. I had sent a reminder on [mention the date of your previous follow-up], but I have not received any response yet.
+// validate-trip-dates.js
 
-I would appreciate it if you could please provide an update on the status of my request or let me know if any further information is required from my end.
+/** Parse "mm-dd-yyyy" or "mm/dd/yyyy" into a Date at 00:00:00 UTC. Throws on invalid. */
+function parseMMDDYYYY(s) {
+  const m = /^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/.exec(String(s).trim());
+  if (!m) throw new Error(`Invalid date format "${s}" (expected mm-dd-yyyy)`);
+  const mm = +m[1], dd = +m[2], yyyy = +m[3];
+  if (mm < 1 || mm > 12) throw new Error(`Month out of range in "${s}"`);
+  if (dd < 1 || dd > 31) throw new Error(`Day out of range in "${s}"`);
 
-Looking forward to your response.
+  const t = Date.UTC(yyyy, mm - 1, dd, 0, 0, 0, 0);
+  const d = new Date(t);
+
+  // Guard against rollovers (e.g., 02-31-2025 -> Mar 3)
+  if (d.getUTCFullYear() !== yyyy || d.getUTCMonth() !== mm - 1 || d.getUTCDate() !== dd) {
+    throw new Error(`Invalid calendar date "${s}"`);
+  }
+  return d;
+}
+
+/**
+ * Validate outbound/inbound dates.
+ * - Throws if inbound < outbound (or <= when allowSameDay === false).
+ * - Returns normalized ISO strings and trip length (days).
+ */
+export function validateTripDates(outboundMMDDYYYY, inboundMMDDYYYY, { allowSameDay = true } = {}) {
+  const out = parseMMDDYYYY(outboundMMDDYYYY);
+  const ret = parseMMDDYYYY(inboundMMDDYYYY);
+
+  const outMs = out.getTime();
+  const retMs = ret.getTime();
+
+  if (allowSameDay === false) {
+    if (retMs <= outMs) {
+      throw new Error(`Return date (${inboundMMDDYYYY}) must be AFTER outbound date (${outboundMMDDYYYY}).`);
+    }
+  } else {
+    if (retMs < outMs) {
+      throw new Error(`Return date (${inboundMMDDYYYY}) cannot be BEFORE outbound date (${outboundMMDDYYYY}).`);
+    }
+  }
+
+  const toISO = (d) =>
+    `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+
+  return {
+    outboundISO: toISO(out),
+    inboundISO: toISO(ret),
+    days: Math.round((retMs - outMs) / (24 * 60 * 60 * 1000)) // exact: both midnight UTC
+  };
+}
