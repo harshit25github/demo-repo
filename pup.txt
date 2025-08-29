@@ -1,12 +1,37 @@
-The Vision
+We are building a Natural Language Business Insights Assistant that allows anyone in the organization to query multiple data sources—like booking databases, Google Analytics, and other logs—using plain English. Instead of just returning SQL results, the system provides end-to-end analysis and context, connecting the dots between operational data and business performance, enabling faster and smarter decision-making.
 
-This is not just a SQL helper.
-It’s the foundation of a self-service data platform:
+Key Areas
 
-Anyone can query business data naturally.
+Business Pain Points
 
-Analysts and engineers are unblocked from low-value tasks.
+Data is fragmented across SQL, GA, and logs.
 
-Leadership gains real-time visibility into metrics.
+Non-technical users depend on analysts for every query.
 
-Future-proof: one assistant layer across all databases and storage systems.
+Time-to-insight is slow, often days instead of minutes.
+
+Resolution
+
+Users ask natural questions → AI maps them to pre-defined safe tools.
+
+Results are not just raw queries, but insightful narratives (e.g., “Success % improved due to fewer GDS failures, but GA shows a drop in traffic which may impact bookings.”).
+
+Strict read-only tools ensure safety and reliability.
+
+Impact
+
+Faster decisions: Reduce insight generation from days → minutes.
+
+Productivity: Analysts/engineers freed from repetitive queries.
+
+Self-service: Empower leadership and business teams to explore data safely.
+
+Future Extensions
+
+Support other DBs (Postgres, MySQL, Snowflake, NoSQL).
+
+Add domain-specific tools for KPIs (conversion, funnel drop-offs).
+
+Create a unified conversational layer for all enterprise data.
+
+⚡This frames the project as more than a tech experiment—it’s a strategic
