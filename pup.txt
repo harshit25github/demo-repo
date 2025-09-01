@@ -1,37 +1,25 @@
-We are building a Natural Language Business Insights Assistant that allows anyone in the organization to query multiple data sources—like booking databases, Google Analytics, and other logs—using plain English. Instead of just returning SQL results, the system provides end-to-end analysis and context, connecting the dots between operational data and business performance, enabling faster and smarter decision-making.
+Key Capabilities
 
-Key Areas
+Conversational AI: Engages with users, understands intent, and collects structured details.
 
-Business Pain Points
+Validation Engine: Ensures all mandatory fields are captured before execution.
 
-Data is fragmented across SQL, GA, and logs.
+Connector Layer: Sends structured tasks as events to external systems such as CRM, booking, ERP, or support tools.
 
-Non-technical users depend on analysts for every query.
+Automation Execution: Performs actions like canceling a booking, issuing a refund, or updating a profile via APIs or bots.
 
-Time-to-insight is slow, often days instead of minutes.
+Feedback and Training: Historical call transcripts and agent interactions improve the model over time.
 
-Resolution
+Minimal Flow (Step-by-Step)
 
-Users ask natural questions → AI maps them to pre-defined safe tools.
+User interacts with the AI agent to request an action.
 
-Results are not just raw queries, but insightful narratives (e.g., “Success % improved due to fewer GDS failures, but GA shows a drop in traffic which may impact bookings.”).
+The agent identifies intent and asks follow-up questions until all required details are provided.
 
-Strict read-only tools ensure safety and reliability.
+Once the information is complete, the agent validates and confirms it with the user.
 
-Impact
+The agent sends a structured task event (JSON payload) to the connector layer.
 
-Faster decisions: Reduce insight generation from days → minutes.
+The connector triggers the appropriate API or system action.
 
-Productivity: Analysts/engineers freed from repetitive queries.
-
-Self-service: Empower leadership and business teams to explore data safely.
-
-Future Extensions
-
-Support other DBs (Postgres, MySQL, Snowflake, NoSQL).
-
-Add domain-specific tools for KPIs (conversion, funnel drop-offs).
-
-Create a unified conversational layer for all enterprise data.
-
-⚡This frames the project as more than a tech experiment—it’s a strategic
+Logs, status, and transcripts are stored for continuous model improvement.
