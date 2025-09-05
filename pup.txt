@@ -1,14 +1,62 @@
-cheapoair.ai — What it is
+A smart chat assistant that plans trips. It remembers key details about a customer (preferences, past choices) so the plan feels personal and accurate—without re-asking the same questions.
 
-A conversational trip-planning assistant built on the OpenAI Agents SDK that produces personalized, low-hallucination travel plans.
+Why it matters:
 
-Dynamic system prompt rebuilt every turn (role + live request + user profile + top-k memories).
+Customers get to a usable itinerary faster and feel understood.
 
-Memory layer: mem0 + Redis/RediSearch (HNSW, cosine) for long-term, semantic recall.
+More people move from “browsing” to booking.
 
-Plans destinations, budgets, flights/hotels/activities with clear trade-offs and day-by-day itineraries.
+We spend less on AI usage because we only pass the most relevant info to the model.
 
-Token-efficient context: thresholded retrieval, dedupe, and concise inserts.
+Fewer “off” answers → fewer escalations and better satisfaction.
+
+Business Impact (what improves)
+
+Conversion: More chats result in itineraries and bookings because suggestions match the customer’s style and budget.
+
+Speed to value: First draft itinerary arrives sooner; less back-and-forth.
+
+Cost efficiency: Slimmer prompts = fewer tokens = lower AI bill per chat.
+
+Customer experience: Higher CSAT/NPS; the assistant “remembers” (e.g., “prefers boutique hotels,” “vegetarian,” “avoids red-eye flights”).
+
+Reliability: “Remind me what we discussed earlier” now works—less frustration and fewer handoffs.
+
+What changed under the hood (non-technical)
+
+We keep a small profile of stable facts (budget level, dietary needs, home airport).
+
+We keep short memory notes from earlier chats (e.g., likes hiking; disliked hostels in Bali).
+
+On every message, we feed the assistant only 3–4 most relevant notes + today’s request.
+
+This keeps answers personal and on-topic while keeping costs low.
+
+Key Metrics to track (plain language)
+
+Conversation → Itinerary rate
+% of chats where the customer gets a proposed plan.
+
+Itinerary → Booking rate
+% of itineraries that become bookings.
+
+Time to First Itinerary (TTFI)
+Minutes from first message to the first plan shared.
+
+Customer Satisfaction (CSAT/NPS)
+Simple thumbs-up score or survey.
+
+Wrong/Off-target Answer Rate
+% of responses flagged by QA or customers.
+
+Cost per Conversation
+Our AI cost per chat (tokens x price).
+
+“Memory Used” Rate
+% of turns where past preferences actually helped the answer.
+
+Response Time (p95)
+How fast replies come back for customers.
 
 My role — What I did
 
