@@ -1,1 +1,17 @@
-cheapoair.ai is a smart trip-planning chat assistant that remembers just the important bits about each customer (budget, style, diet, strong likes/dislikes) and uses them to tailor every reply. By feeding the model only a few, highly relevant notes each turn, it delivers a usable itinerary faster, reduces “off-target” answers, and lowers our AI cost per conversation. We track simple business outcomes—conversion to itinerary/booking, time to first plan, CSAT, error rate, and cost per chat—to show clear lift. I designed and built the backend: the agent logic, the lightweight memory layer (profile + short notes), and the dynamic context pipeline that makes the assistant personal, reliable, and efficient.
+About Cheapoair.ai
+
+Cheapoair.ai is an advanced AI-powered travel assistant platform designed to help users plan and book trips in a personalized, dynamic, and efficient way. It leverages multi-agent orchestration, real-time web search, RAG (retrieval-augmented generation), and contextual guardrails to provide users with highly relevant itineraries, flight and hotel recommendations, safety advisories, and destination insights. The system is built with Next.js, Node.js/TypeScript, Azure AD authentication, Postgres (with pgvector embeddings), and OpenAI’s Agent SDK, ensuring both enterprise-grade reliability and a consumer-friendly experience. The assistant aligns responses with CheapoAir’s travel ecosystem, offering curated, brand-consistent suggestions while maintaining safeguards against misuse through advanced guardrailing.
+
+Your Role
+
+You have been the lead architect and developer driving the design and implementation of Cheapoair.ai’s backend and orchestration layer. Specifically:
+
+Multi-Agent System: You implemented the gateway/orchestrator and specialist agents (trip planner, flight specialist, hotel specialist, local expert, itinerary optimizer) using the OpenAI Agent SDK.
+
+Guardrails: You designed custom input/output guardrail agents to ensure safety, block injections, and classify travel vs. non-travel content while allowing clarification for missing details.
+
+Persistence & Context: You developed the history management pipeline, integrating database persistence so that conversations can seamlessly resume with full agent context.
+
+Streaming & API Integration: You enabled token streaming for real-time responses, integrated web search tools, and prepared the API endpoints for frontend and external system consumption.
+
+Brand Alignment: You ensured the assistant consistently reflects CheapoAir’s tone—warm, helpful, and professional—while also embedding dynamic CTAs for flights, hotels, and travel services.
