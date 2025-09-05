@@ -1,2 +1,23 @@
-ProposedAIUseCase
-We plan to add an AI assistant inside FPCLOUD that works like a smart guide for every team. Instead of searching through menus or asking the RPA team, users can simply type or ask in plain English: “Who owns this service?”, “Help me create a new VM”, or “How do I onboard a new project?”. The AI will instantly answer questions, show related information, and guide users step-by-step through actions like creating, updating, or managing services. This makes FPCLOUD easy to use for everyone, reduces dependency on RPA, and enables true self-service across the organization.
+cheapoair.ai — What it is
+
+A conversational trip-planning assistant built on the OpenAI Agents SDK that produces personalized, low-hallucination travel plans.
+
+Dynamic system prompt rebuilt every turn (role + live request + user profile + top-k memories).
+
+Memory layer: mem0 + Redis/RediSearch (HNSW, cosine) for long-term, semantic recall.
+
+Plans destinations, budgets, flights/hotels/activities with clear trade-offs and day-by-day itineraries.
+
+Token-efficient context: thresholded retrieval, dedupe, and concise inserts.
+
+My role — What I did
+
+Architecture & backend: Designed and implemented the end-to-end agent runtime, context assembly, and APIs.
+
+Memory system: Built PROFILE (KV) + VECTOR (mem0/Redis) with min-score + top-k + recency fallback; added atomic fact writes to avoid noise.
+
+Agent integration: Wired async instructions builder, prompt strategy, and guardrails (temperature, dedupe, truncation).
+
+Infra & diagnostics: Set up RediSearch vector indexes (DIM=1536), persistence, and health checks (module/version + VECTOR capability scripts).
+
+Quality & reliability: Reduced hallucinations and token bloat via retrieval thresholds, rerank by similarity/recency, and deterministic context feeds.
