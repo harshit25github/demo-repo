@@ -1,17 +1,21 @@
-About Cheapoair.ai
+Refactor my old single-agent TripPlanner into a multi-agent system with the OpenAI Agents SDK (TypeScript).
 
-Cheapoair.ai is an advanced AI-powered travel assistant platform designed to help users plan and book trips in a personalized, dynamic, and efficient way. It leverages multi-agent orchestration, real-time web search, RAG (retrieval-augmented generation), and contextual guardrails to provide users with highly relevant itineraries, flight and hotel recommendations, safety advisories, and destination insights. The system is built with Next.js, Node.js/TypeScript, Azure AD authentication, Postgres (with pgvector embeddings), and OpenAI’s Agent SDK, ensuring both enterprise-grade reliability and a consumer-friendly experience. The assistant aligns responses with CheapoAir’s travel ecosystem, offering curated, brand-consistent suggestions while maintaining safeguards against misuse through advanced guardrailing.
+Read first: prompt.js, multiagent.js, and multiagent2.txt. Do not lose any domain rules, tone, slot semantics, or defaults—carry them over.
 
-Your Role
+Agents to create:
 
-You have been the lead architect and developer driving the design and implementation of Cheapoair.ai’s backend and orchestration layer. Specifically:
+Gateway (orchestrator): Routes via handoffs: Destination → Itinerary → Booking. Keep prompts short; routing rules explicit. 
 
-Multi-Agent System: You implemented the gateway/orchestrator and specialist agents (trip planner, flight specialist, hotel specialist, local expert, itinerary optimizer) using the OpenAI Agent SDK.
 
-Guardrails: You designed custom input/output guardrail agents to ensure safety, block injections, and classify travel vs. non-travel content while allowing clarification for missing details.
 
-Persistence & Context: You developed the history management pipeline, integrating database persistence so that conversations can seamlessly resume with full agent context.
+Destination: Validates/disambiguates destination and returns JSON only (visa, safety, entry steps, best time, health/practical, sources).
 
-Streaming & API Integration: You enabled token streaming for real-time responses, integrated web search tools, and prepared the API endpoints for frontend and external system consumption.
+Itinerary: Always call Destination as a tool first; then render a “Destination Brief” (from JSON) and a day-wise itinerary (morning/afternoon/evening). 
+OpenAI GitHub
 
-Brand Alignment: You ensured the assistant consistently reflects CheapoAir’s tone—warm, helpful, and professional—while also embedding dynamic CTAs for flights, hotels, and travel services.
+Booking: Assumes itinerary finalized; outputs a concise ready-to-book checklist; asks for missing info.
+
+Tooling: Expose Destination as check_destination (Zod-typed params). Itinerary consumes it and renders user-visible details (not a one-liner). 
+
+
+State (slots): Preserve previous slots (origin, destination, dates → ISO, pax, currency default INR, budget_type/amount, hotel area, destinationVerified, itineraryFinalized). Store in run context. The agent loop should finish only when no pending tools/handoffs remain. 
