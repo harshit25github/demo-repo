@@ -1,21 +1,71 @@
-Refactor my old single-agent TripPlanner into a multi-agent system with the OpenAI Agents SDK (TypeScript).
-
-Read first: prompt.js, multiagent.js, and multiagent2.txt. Do not lose any domain rules, tone, slot semantics, or defaults—carry them over.
-
-Agents to create:
-
-Gateway (orchestrator): Routes via handoffs: Destination → Itinerary → Booking. Keep prompts short; routing rules explicit. 
 
 
+1. In SQL, which clause filters rows before any grouping happens?
+   A) HAVING
+   B) WHERE
+   C) GROUP BY
+   D) ORDER BY
+   Answer: B
 
-Destination: Validates/disambiguates destination and returns JSON only (visa, safety, entry steps, best time, health/practical, sources).
+2. What does a PRIMARY KEY guarantee?
+   A) Values can repeat
+   B) Values can be NULL
+   C) Values are unique and NOT NULL
+   D) It points to another table
+   Answer: C
 
-Itinerary: Always call Destination as a tool first; then render a “Destination Brief” (from JSON) and a day-wise itinerary (morning/afternoon/evening). 
-OpenAI GitHub
+3. Which SQL join returns only the rows that match in both tables?
+   A) LEFT JOIN
+   B) RIGHT JOIN
+   C) FULL OUTER JOIN
+   D) INNER JOIN
+   Answer: D
 
-Booking: Assumes itinerary finalized; outputs a concise ready-to-book checklist; asks for missing info.
+4. You want rows from table A that have no match in table B on column id. Which is correct?
+   A) SELECT \* FROM A INNER JOIN B ON A.id = B.id;
+   B) SELECT \* FROM A LEFT JOIN B ON A.id = B.id WHERE B.id IS NULL;
+   C) SELECT \* FROM A RIGHT JOIN B ON A.id = B.id WHERE A.id IS NULL;
+   D) SELECT \* FROM A FULL JOIN B ON A.id = B.id;
+   Answer: B
 
-Tooling: Expose Destination as check_destination (Zod-typed params). Itinerary consumes it and renders user-visible details (not a one-liner). 
+5. In a NoSQL document database, which statement is generally true?
+   A) All documents must have identical fields
+   B) Schema is flexible; documents can have different fields
+   C) Cross-collection joins are built-in like SQL
+   D) Only key–value pairs are allowed
+   Answer: B
 
+6. Which protocol is connection-oriented and ensures reliable delivery?
+   A) UDP
+   B) ICMP
+   C) TCP
+   D) ARP
+   Answer: C
 
-State (slots): Preserve previous slots (origin, destination, dates → ISO, pax, currency default INR, budget_type/amount, hotel area, destinationVerified, itineraryFinalized). Store in run context. The agent loop should finish only when no pending tools/handoffs remain. 
+7. What does DNS do on the network?
+   A) Encrypts traffic between client and server
+   B) Maps domain names to IP addresses
+   C) Assigns MAC addresses to devices
+   D) Blocks suspicious packets at the edge
+   Answer: B
+
+8. For IP address 192.168.1.130/26, which range is the correct subnet?
+   A) 192.168.1.0 – 192.168.1.63
+   B) 192.168.1.64 – 192.168.1.127
+   C) 192.168.1.128 – 192.168.1.191
+   D) 192.168.1.192 – 192.168.1.255
+   Answer: C
+
+9. Which statement about processes and threads is correct?
+   A) Threads in a process have separate address spaces
+   B) Threads share the same address space but have their own stacks
+   C) Processes share the same address space by default
+   D) Threads cannot run in parallel on multi-core CPUs
+   Answer: B
+
+10. Which is NOT one of the standard necessary conditions for deadlock?
+    A) Mutual exclusion
+    B) Hold and wait
+    C) No preemption
+    D) Preemption
+    Answer: D
