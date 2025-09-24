@@ -1,71 +1,35 @@
+Details
 
+Device: [Laptop/Desktop model] (Hostname: [your-hostname])
 
-1. In SQL, which clause filters rows before any grouping happens?
-   A) HAVING
-   B) WHERE
-   C) GROUP BY
-   D) ORDER BY
-   Answer: B
+OS: [Windows 10/11 | macOS | Linux]
 
-2. What does a PRIMARY KEY guarantee?
-   A) Values can repeat
-   B) Values can be NULL
-   C) Values are unique and NOT NULL
-   D) It points to another table
-   Answer: C
+Issue started: [Date & time]
 
-3. Which SQL join returns only the rows that match in both tables?
-   A) LEFT JOIN
-   B) RIGHT JOIN
-   C) FULL OUTER JOIN
-   D) INNER JOIN
-   Answer: D
+Symptoms: Frequent “low disk space” warnings, apps crashing/freezing, updates/builds failing.
 
-4. You want rows from table A that have no match in table B on column id. Which is correct?
-   A) SELECT \* FROM A INNER JOIN B ON A.id = B.id;
-   B) SELECT \* FROM A LEFT JOIN B ON A.id = B.id WHERE B.id IS NULL;
-   C) SELECT \* FROM A RIGHT JOIN B ON A.id = B.id WHERE A.id IS NULL;
-   D) SELECT \* FROM A FULL JOIN B ON A.id = B.id;
-   Answer: B
+Notable errors/logs (examples): [paste any exact error messages]
 
-5. In a NoSQL document database, which statement is generally true?
-   A) All documents must have identical fields
-   B) Schema is flexible; documents can have different fields
-   C) Cross-collection joins are built-in like SQL
-   D) Only key–value pairs are allowed
-   Answer: B
+Current free space on system drive: [e.g., 1.2 GB free of 256 GB]
 
-6. Which protocol is connection-oriented and ensures reliable delivery?
-   A) UDP
-   B) ICMP
-   C) TCP
-   D) ARP
-   Answer: C
+What I’ve tried
 
-7. What does DNS do on the network?
-   A) Encrypts traffic between client and server
-   B) Maps domain names to IP addresses
-   C) Assigns MAC addresses to devices
-   D) Blocks suspicious packets at the edge
-   Answer: B
+Cleared temp/cache files and recycle bin.
 
-8. For IP address 192.168.1.130/26, which range is the correct subnet?
-   A) 192.168.1.0 – 192.168.1.63
-   B) 192.168.1.64 – 192.168.1.127
-   C) 192.168.1.128 – 192.168.1.191
-   D) 192.168.1.192 – 192.168.1.255
-   Answer: C
+Removed unused downloads and old build artifacts.
 
-9. Which statement about processes and threads is correct?
-   A) Threads in a process have separate address spaces
-   B) Threads share the same address space but have their own stacks
-   C) Processes share the same address space by default
-   D) Threads cannot run in parallel on multi-core CPUs
-   Answer: B
+Restarted the system.
 
-10. Which is NOT one of the standard necessary conditions for deadlock?
-    A) Mutual exclusion
-    B) Hold and wait
-    C) No preemption
-    D) Preemption
-    Answer: D
+Moved non-critical files to [OneDrive/Drive D:/External/Network Share].
+
+Request
+
+Please help with:
+
+A storage cleanup/assessment and guidance on safely removing large system or cache files.
+
+Increasing my storage quota or expanding the system partition (if possible).
+
+Provisioning a network/share drive or policy exception for larger local builds (if needed).
+
+This is currently blocking tasks; I’d appreciate help at the earliest. I’m available at [your phone/Teams] for any quick checks or remote session.
