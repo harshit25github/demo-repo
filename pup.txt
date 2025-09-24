@@ -1,35 +1,44 @@
-Details
+Here’s a clean, copy-paste email you can send to IT:
 
-Device: [Laptop/Desktop model] (Hostname: [your-hostname])
+---
 
-OS: [Windows 10/11 | macOS | Linux]
+**Subject:** Urgent: Low Disk Space Issue Blocking Work
 
-Issue started: [Date & time]
+Hi IT Team,
 
-Symptoms: Frequent “low disk space” warnings, apps crashing/freezing, updates/builds failing.
+I’m facing a storage/low disk space issue on my machine that’s impacting my work.
 
-Notable errors/logs (examples): [paste any exact error messages]
+**Details**
 
-Current free space on system drive: [e.g., 1.2 GB free of 256 GB]
+* Device: `[Laptop/Desktop model]` (Hostname: `[your-hostname]`)
+* OS: `[Windows 10/11 | macOS | Linux]`
+* Issue started: `[Date & time]`
+* Symptoms: Frequent “low disk space” warnings, apps crashing/freezing, updates/builds failing.
+* Notable errors/logs (examples): `[paste any exact error messages]`
+* Current free space on system drive: `[e.g., 1.2 GB free of 256 GB]`
 
-What I’ve tried
+**What I’ve tried**
 
-Cleared temp/cache files and recycle bin.
+* Cleared temp/cache files and recycle bin.
+* Removed unused downloads and old build artifacts.
+* Restarted the system.
+* Moved non-critical files to `[OneDrive/Drive D:/External/Network Share]`.
 
-Removed unused downloads and old build artifacts.
+**Request**
 
-Restarted the system.
+* Please help with:
 
-Moved non-critical files to [OneDrive/Drive D:/External/Network Share].
+  * A storage cleanup/assessment and guidance on safely removing large system or cache files.
+  * Increasing my storage quota or expanding the system partition (if possible).
+  * Provisioning a network/share drive or policy exception for larger local builds (if needed).
 
-Request
+This is currently blocking tasks; I’d appreciate help at the earliest. I’m available at `[your phone/Teams]` for any quick checks or remote session.
 
-Please help with:
+Thanks,
+Harshit
+`[Your Job Title / Team]`
+`[Your Employee ID (if any)]`
 
-A storage cleanup/assessment and guidance on safely removing large system or cache files.
+---
 
-Increasing my storage quota or expanding the system partition (if possible).
-
-Provisioning a network/share drive or policy exception for larger local builds (if needed).
-
-This is currently blocking tasks; I’d appreciate help at the earliest. I’m available at [your phone/Teams] for any quick checks or remote session.
+If you want, tell me your OS, free space, and any exact errors, and I’ll tailor this further.
