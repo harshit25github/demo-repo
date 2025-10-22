@@ -1,10 +1,1 @@
-services:
-  qdrant:
-    image: qdrant/qdrant:1.15.5
-    ports:
-      - "6333:6333"
-    volumes:
-      - qdrant_data:/qdrant/storage
-
-volumes:
-  qdrant_data:
+We need the DB team to create a PostgreSQL database on one of the existing production servers. Both our Next.js application (which has server-side API routes) and a separate backend service will connect to this database for reading and writing data.
