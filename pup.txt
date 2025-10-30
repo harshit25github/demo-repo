@@ -1,1 +1,10 @@
-We need the DB team to create a PostgreSQL database on one of the existing production servers. Both our Next.js application (which has server-side API routes) and a separate backend service will connect to this database for reading and writing data.
+Hello everyone, I’m Harshit Dwivedi. I began my journey in the organization as a Testing Engineer, where I worked extensively on Compliance Automation, focusing on GDPR and CCPA validation along with UI automation testing. Over time, I transitioned into the RPA automation space, where I’ve been leading and managing several automation initiatives such as QClosed, QFollowUp, Dupe Cancellation, and Ancillary Audit, aimed at improving operational efficiency and reducing manual intervention.
+
+Currently, I’m contributing to our AI-driven initiatives — CheapoAir.ai and FARA.ai — where I’m focused on building intelligent automation and conversational systems to enhance user experience and streamline internal processes. These projects represent our next step toward integrating automation and AI to drive smarter, scalable solutions across the organization.
+
+
+FPCLOUD is our internal cloud management portal designed to bring every part of our technology ecosystem together in one place. It acts as a single window where teams can discover, manage, and deploy all services, APIs, databases, and virtual machines with clear ownership and documentation.
+
+The portal simplifies how teams handle infrastructure by offering a standardized structure for entity creation, updates, and deployments. Instead of relying on multiple tools or manual coordination, FPCLOUD provides complete visibility across systems—showing dependencies, relationships, and usage details in an organized and transparent way.
+
+Already deployed and actively used by the RPA team for managing deployments, FPCLOUD ensures consistency, compliance, and efficiency across environments. It helps reduce operational overhead, improves collaboration between teams, and lays the foundation for a unified, scalable approach to managing infrastructure and services across the organization.
