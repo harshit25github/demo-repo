@@ -1,22 +1,11 @@
--- See your current user
-SELECT current_user;
-
--- Check your role memberships
-SELECT r.rolname as role_name,
-       r.rolsuper as is_superuser,
-       r.rolinherit as can_inherit,
-       r.rolcreaterole as can_create_role,
-       r.rolcreatedb as can_create_db,
-       r.rolcanlogin as can_login,
-       r.rolreplication as can_replicate
-FROM pg_roles r
-WHERE r.rolname = current_user;
-
--- See what privileges you have
-SELECT * FROM information_schema.role_table_grants 
-WHERE grantee = current_user;
-
--- Check database ownership
-SELECT datname, datdba::regrole as owner 
-FROM pg_database 
-WHERE datname = current_database();
+Planned Improvements
+1. Architecture Optimization
+Remove duplicate database queries between Next.js and AI backend. Next.js will fetch data once and pass it to the AI backend, eliminating redundant work.
+2. Parallel Tool Execution
+Enable the AI agent to call multiple tools simultaneously instead of one-by-one. Independent tasks will run at the same time rather than waiting in sequence.
+3. Database Separation of Concerns
+Next.js handles all database operations; AI backend focuses only on AI processing. Add proper indexes and limit chat history to recent messages for faster queries.
+4. Flight API Caching
+Store recent flight search results in cache. Return cached results for duplicate searches instead of calling the API repeatedly.
+5. Smart Context with Vector Store
+Send last 10 messages plus relevant memories from vector database. AI gets recent context and important past information without processing all historical messages.
