@@ -1,3 +1,1 @@
-Built a knowledge-base driven backend for the FERRA project using a custom retrieval tool and content indexing in Pinecone DB, ensuring efficient and accurate responses to user queries.
-
-Developed a robust multi-agent backend system for CheapoAir using the OpenAI Agent SDK, enhancing the overall efficiency and user interaction flow through advanced agent-driven automation.
+In 2025, I applied leadership excellence by guiding the team in leveraging GenAI capabilities within the Cheapo.AI and FERRA projects, ensuring smooth integration and upskilling the team to effectively use AI-driven tools for both platforms.
