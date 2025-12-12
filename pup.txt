@@ -1,18 +1,3 @@
-In this project, you have built a comprehensive backend system using Node.js, Express, PostgreSQL, and the OpenAI Agent SDK to create a set of specialized agents. The system uses a gateway agent to route user queries to different agents—like a Trip Planner, a Flight agent, and a Hotel agent—ensuring smooth and modular handling of travel planning tasks. This gives you a solid framework to address various user needs in a simple, effective way.
+Built a knowledge-base driven backend for the FERRA project using a custom retrieval tool and content indexing in Pinecone DB, ensuring efficient and accurate responses to user queries.
 
-
-Development Points
-
-Tech Stack Selection: Node.js and Express for the backend provide a robust and scalable environment.
-
-Database: PostgreSQL is used for reliable data storage and efficient querying.
-
-OpenAI Agents: Utilized the OpenAI Agent SDK to implement specialized agents that handle different user scenarios seamlessly.
-
-Benefit Points
-
-Modularity: Different agents handle different tasks, making the system easy to maintain and extend.
-
-Flexibility: Easy to add new features or agents in the future as requirements evolve.
-
-User-Centric: Designed to provide a smooth and intuitive user experience by routing queries to the right agent.
+Developed a robust multi-agent backend system for CheapoAir using the OpenAI Agent SDK, enhancing the overall efficiency and user interaction flow through advanced agent-driven automation.
