@@ -1,28 +1,242 @@
-import { z } from 'zod';
+import { z } from "zod";
 
-const ComprehensiveDestinationSchema = z.object({
-  name: z.string().describe("The name of the city or region"),
-  country: z.string().describe("The country where this destination is located"),
-  continent: z.string().describe("The continent where this destination is located"),
-  region: z.string().optional().describe("The specific region or state within the country, if applicable"),
-  countryCode: z.string().describe("The ISO country code"),
-  locationType: z.string().describe("A tag indicating the type of destination, e.g., 'nature', 'historical', 'urban'"),
-  overview: z.string().describe("A detailed summary of the destination including key highlights"),
-  attractions: z.array(z.object({
-    name: z.string().describe("Name of the attraction"),
-    description: z.string().describe("A detailed description of what makes this attraction special"),
-    hours: z.string().optional().describe("Operating hours or best visiting times"),
-    entryFee: z.string().optional().describe("Entry fee if any"),
-    tips: z.string().optional().describe("Any special tips for visiting this attraction")
-  })).describe("Detailed list of attractions with descriptions, hours, fees, and tips"),
-  logistics: z.object({
-    bestTimeToVisit: z.string().describe("Optimal seasons or months to visit for the best experience"),
-    transportTips: z.string().describe("Detailed local transportation advice"),
-    accommodationSuggestions: z.array(z.string()).optional().describe("Recommended neighborhoods or types of accommodation"),
-  }).describe("Logistics including best times, transport, and where to stay"),
-  culturalTips: z.string().optional().describe("Important cultural norms and safety tips"),
-  localEvents: z.array(z.string()).optional().describe("List of any notable local events or festivals"),
-  nearbyPlaces: z.array(z.string()).optional().describe("Other notable places nearby worth visiting"),
-}).describe("A truly comprehensive schema for a detailed and accurate travel itinerary including location, tags, and all relevant details.");
+export const ComprehensiveDestinationSchema = z
+  .object({
+    name: z.string().describe("Destination name (city/region). Example: 'Kashmir', 'Darjeeling'."),
+    country: z.string().describe("Country name where the destination is located. Example: 'India'."),
+    continent: z.string().describe("Continent name. Example: 'Asia'."),
+    region: z
+      .string()
+      .optional()
+      .describe("Sub-region/state/province within the country. Example: 'West Bengal'."),
+    countryCode: z
+      .string()
+      .describe("ISO 3166-1 alpha-2 country code. Example: 'IN'."),
+    locationType: z
+      .array(z.string())
+      .describe(
+        "Multiple tags describing what this destination is best for. Example: ['nature','mountains','relaxation']."
+      ),
+    overview: z
+      .string()
+      .describe(
+        "Concise-but-rich overview: what it is, why it’s popular, what kind of trip it suits."
+      ),
 
-export { ComprehensiveDestinationSchema };
+    attractions: z
+      .array(
+        z.object({
+          name: z.string().describe("Attraction/POI name."),
+          description: z
+            .string()
+            .describe("What it is + why visit + what to do there (practical + experiential)."),
+          hours: z
+            .string()
+            .optional()
+            .describe("Typical visiting hours or best visiting window. Use 'Varies' if uncertain."),
+          entryFee: z
+            .string()
+            .optional()
+            .describe("Typical entry fee info. Use 'Varies' / 'Check official source' if uncertain."),
+          tips: z
+            .string()
+            .optional()
+            .describe("High-signal tips: crowds, tickets, weather, photo spots, local hacks."),
+        })
+      )
+      .describe("Key attractions and experiences inside the destination."),
+
+    logistics: z
+      .object({
+        bestTimeToVisit: z
+          .string()
+          .describe("Best season/months + why (weather, crowd levels, activities)."),
+        transportTips: z
+          .string()
+          .describe("How to get in/out + how to get around locally (modes, typical constraints)."),
+        accommodationSuggestions: z
+          .array(z.string())
+          .optional()
+          .describe("Recommended areas/neighborhoods or stay styles (houseboat, hill-view hotel, etc.)."),
+      })
+      .describe("Operational travel planning information for realistic itineraries."),
+
+    culturalTips: z
+      .string()
+      .optional()
+      .describe("Local etiquette, norms, sensitive topics, dress guidance, permits, etc."),
+
+    localEvents: z
+      .array(z.string())
+      .optional()
+      .describe("Notable festivals/events (or seasonal highlights) that can shape an itinerary."),
+
+    nearbyPlaces: z
+      .array(z.string())
+      .optional()
+      .describe("Good nearby add-ons / day-trips / route-linking places."),
+  })
+  .describe(
+    "Comprehensive destination knowledge object used to ground an itinerary generator with reliable, structured travel facts."
+  );
+
+// -------------------- EXAMPLES (3 locations) --------------------
+
+export const exampleData = [
+  {
+    name: "Kashmir (Srinagar & Valley)",
+    country: "India",
+    continent: "Asia",
+    region: "Jammu and Kashmir",
+    countryCode: "IN",
+    locationType: ["nature", "mountains", "scenic", "relaxation", "photography", "romantic"],
+    overview:
+      "A Himalayan valley region known for alpine landscapes, lakes, gardens, and slow-paced, scenic travel. Best for nature-forward itineraries, boat stays, viewpoints, and day trips into meadows and mountain towns.",
+    attractions: [
+      {
+        name: "Dal Lake (Srinagar)",
+        description:
+          "Iconic lake experience with shikara rides, floating markets (seasonal), and classic houseboat stays. Great for sunrise/sunset, lakeside walks, and a relaxed first/last day in Srinagar.",
+        hours: "All day; best at sunrise/sunset.",
+        entryFee: "Varies (boat rides/houseboats).",
+        tips: "If staying on a houseboat, plan a buffer for check-in + evening shikara; mornings are calmer and more photogenic.",
+      },
+      {
+        name: "Mughal Gardens (Srinagar)",
+        description:
+          "Historic terraced gardens with views over the lake and surrounding hills. Works well as a short, low-effort visit between meals or before airport transfers.",
+        hours: "Varies by season; check official timings.",
+        entryFee: "Varies; check official source.",
+        tips: "Go earlier in the day to avoid crowds; pair with a lakeside café/meal to keep the day light.",
+      },
+      {
+        name: "Gulmarg (day trip / overnight)",
+        description:
+          "Meadow-and-mountain destination popular for viewpoints, winter sports, and gondola rides (season-dependent). Strong fit for an ‘active day’ in a multi-day plan.",
+        hours: "Varies by season; check gondola operating window.",
+        entryFee: "Varies (gondola/activities).",
+        tips: "Weather can change fast—keep a flexible schedule and add a fallback indoor plan in Srinagar.",
+      },
+    ],
+    logistics: {
+      bestTimeToVisit:
+        "Spring to early autumn for gardens and valley scenery; winter for snow-focused trips (conditions vary by year).",
+      transportTips:
+        "Use local taxis for point-to-point travel and day trips; keep extra buffer time for mountain routes and weather-related delays.",
+      accommodationSuggestions: [
+        "Houseboat stay on Dal Lake (relaxation-focused)",
+        "City hotel in Srinagar for easier mobility",
+        "Overnight in Gulmarg if doing early activities",
+      ],
+    },
+    culturalTips:
+      "Dress modestly in local neighborhoods and religious places; ask before photographing people, especially in markets and on boats.",
+    localEvents: ["Seasonal tulip viewing (spring, timing varies)"],
+    nearbyPlaces: ["Pahalgam", "Sonamarg", "Yusmarg"],
+  },
+
+  {
+    name: "Darjeeling",
+    country: "India",
+    continent: "Asia",
+    region: "West Bengal",
+    countryCode: "IN",
+    locationType: ["mountains", "tea", "views", "cool-weather", "heritage", "slow-travel"],
+    overview:
+      "A hill town known for tea estates, colonial-era heritage, and panoramic Himalayan views on clear mornings. Great for relaxed itineraries with viewpoints, short walks, café hopping, and tea experiences.",
+    attractions: [
+      {
+        name: "Tiger Hill (sunrise viewpoint)",
+        description:
+          "Popular sunrise viewpoint for mountain panoramas (visibility depends heavily on weather). Often the anchor activity for an early-morning day plan.",
+        hours: "Early morning (sunrise window).",
+        entryFee: "Varies; check local ticketing/vehicle rules.",
+        tips: "Plan a backup ‘viewpoint day’ if the forecast is cloudy; carry warm layers even outside winter.",
+      },
+      {
+        name: "Tea Estate visit (experience-based)",
+        description:
+          "Tea-country experience: estate views, tasting, and learning about processing (where available). Adds a distinctive local identity to the itinerary beyond generic sightseeing.",
+        hours: "Varies by estate; check ahead.",
+        entryFee: "Varies; some offer tours/tastings.",
+        tips: "Pre-book if you want a guided factory-style tour; otherwise focus on scenic walks + tasting in town.",
+      },
+      {
+        name: "Darjeeling Himalayan Railway (toy train experience)",
+        description:
+          "Heritage rail experience that can be used as a short scenic activity block. Useful for families and heritage-focused trips.",
+        hours: "Varies by route/season; check schedule.",
+        entryFee: "Varies by class/route; check official source.",
+        tips: "Treat it as an ‘experience slot’ (2–4 hours with buffers) rather than a main commute mode.",
+      },
+    ],
+    logistics: {
+      bestTimeToVisit:
+        "Spring and autumn for clearer views and comfortable weather; monsoon months can reduce visibility and disrupt plans.",
+      transportTips:
+        "Local taxis are the default; routes are winding—avoid overpacking your day and keep buffer time for traffic/weather.",
+      accommodationSuggestions: [
+        "Stay near the main town area for walkability",
+        "View-facing hotels if your trip prioritizes mountain panoramas",
+      ],
+    },
+    culturalTips:
+      "Respect local communities and keep noise low in residential lanes; ask permission for photos at monasteries/temples.",
+    localEvents: ["Tea-season experiences (timing varies)", "Seasonal cultural festivals (varies)"],
+    nearbyPlaces: ["Mirik", "Kurseong", "Kalimpong"],
+  },
+
+  {
+    name: "Jaipur",
+    country: "India",
+    continent: "Asia",
+    region: "Rajasthan",
+    countryCode: "IN",
+    locationType: ["heritage", "architecture", "history", "markets", "food", "family-friendly"],
+    overview:
+      "A heritage-rich city known for forts, palaces, stepwells, crafts, and bazaars. Ideal for structured sightseeing days with morning forts, afternoon city landmarks, and evening markets/food experiences.",
+    attractions: [
+      {
+        name: "Amber Fort",
+        description:
+          "Major fort complex with hilltop views and layered courtyards. Works best as a morning block (cooler temperatures, better light).",
+        hours: "Varies by season; check official timings.",
+        entryFee: "Varies; check official ticketing.",
+        tips: "Go early, pre-plan transit time, and keep 2–3 hours minimum; pair with nearby viewpoints/stepwell if time allows.",
+      },
+      {
+        name: "City Palace / Old City landmarks",
+        description:
+          "Central heritage cluster suitable for an afternoon itinerary segment. Helps keep travel time efficient by grouping nearby sights.",
+        hours: "Varies; check official timings.",
+        entryFee: "Varies; check official ticketing.",
+        tips: "Combine with a market walk and a rooftop meal to create a smooth half-day arc.",
+      },
+      {
+        name: "Bazaars & craft shopping (Old City markets)",
+        description:
+          "Markets for textiles, handicrafts, jewelry, and local snacks. Works as an evening slot when temperatures drop and the city feels most alive.",
+        hours: "Typically late morning to evening; varies by shop/day.",
+        entryFee: "No entry fee.",
+        tips: "Set a shopping budget; compare a few shops before buying; keep small cash for street snacks and quick purchases.",
+      },
+    ],
+    logistics: {
+      bestTimeToVisit:
+        "Cooler months are better for walking-heavy plans; in hot months, shift outdoor forts to early morning and use indoor museums/markets midday.",
+      transportTips:
+        "Use app taxis/auto-rickshaws for short hops; cluster attractions by area to reduce transit time and improve itinerary realism.",
+      accommodationSuggestions: [
+        "Stay near Old City / central areas for quick access to forts and markets",
+        "Heritage-style stays if your itinerary leans cultural/photography",
+      ],
+    },
+    culturalTips:
+      "Dress modestly in temples and heritage sites; be mindful of crowds in markets and keep valuables secured.",
+    localEvents: ["Seasonal fairs and cultural festivals (varies by year)"],
+    nearbyPlaces: ["Ajmer", "Pushkar", "Neemrana"],
+  },
+];
+
+// Optional: quick validation (throws if invalid)
+exampleData.forEach((d) => ComprehensiveDestinationSchema.parse(d));
