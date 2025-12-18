@@ -1,1 +1,28 @@
-In leading our GenAI initiatives, I've shown strong leadership by pioneering the integration of OpenAI tools into our Cheapo.AI project from scratch. I dedicated extensive time, including weekends and late nights, to master these technologies and ensure seamless user experiences. Beyond just technical implementation, I’ve been a go-to mentor for my colleagues, helping them understand and navigate these new tools. I also took on additional innovative projects like FP Cloud based on Backstage, always ready to tackle new challenges and deliver results. In short, my commitment to exploring new frontiers and uplifting the team truly showcases my leadership excellence.
+import { z } from 'zod';
+
+const ComprehensiveDestinationSchema = z.object({
+  name: z.string().describe("The name of the city or region"),
+  country: z.string().describe("The country where this destination is located"),
+  continent: z.string().describe("The continent where this destination is located"),
+  region: z.string().optional().describe("The specific region or state within the country, if applicable"),
+  countryCode: z.string().describe("The ISO country code"),
+  locationType: z.string().describe("A tag indicating the type of destination, e.g., 'nature', 'historical', 'urban'"),
+  overview: z.string().describe("A detailed summary of the destination including key highlights"),
+  attractions: z.array(z.object({
+    name: z.string().describe("Name of the attraction"),
+    description: z.string().describe("A detailed description of what makes this attraction special"),
+    hours: z.string().optional().describe("Operating hours or best visiting times"),
+    entryFee: z.string().optional().describe("Entry fee if any"),
+    tips: z.string().optional().describe("Any special tips for visiting this attraction")
+  })).describe("Detailed list of attractions with descriptions, hours, fees, and tips"),
+  logistics: z.object({
+    bestTimeToVisit: z.string().describe("Optimal seasons or months to visit for the best experience"),
+    transportTips: z.string().describe("Detailed local transportation advice"),
+    accommodationSuggestions: z.array(z.string()).optional().describe("Recommended neighborhoods or types of accommodation"),
+  }).describe("Logistics including best times, transport, and where to stay"),
+  culturalTips: z.string().optional().describe("Important cultural norms and safety tips"),
+  localEvents: z.array(z.string()).optional().describe("List of any notable local events or festivals"),
+  nearbyPlaces: z.array(z.string()).optional().describe("Other notable places nearby worth visiting"),
+}).describe("A truly comprehensive schema for a detailed and accurate travel itinerary including location, tags, and all relevant details.");
+
+export { ComprehensiveDestinationSchema };
