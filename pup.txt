@@ -1,9 +1,3 @@
-I hope you're doing well.
+I just wanted to let you know that there was a small format change in the data we received, which made the system unable to recognize it as a proper number. Because of that, it was treated as "not a number," and that caused a few operations to fail.
 
-Thank you for bringing this to my attention. Just to clarify how our process works: our "dupe cancellation" bot operates in batches. Once one batch is completed, it picks up the next batch of TIDs in the queue.
-
-I noticed that some TIDs you mentioned had been waiting for about 20 minutes to an hour. This is expected because they were simply in the queue waiting for the current batch to finish. As soon as the earlier batch wrapped up around 11:30, the bot picked up these TIDs automatically. There's also a small set of TIDs that are meant for manual handling, which might show a longer wait time, but that's by design.
-
-In short, the bot is working as intended, and those TIDs were indeed picked up as soon as the previous batch was done. I appreciate your diligence in checking in, and if you have any other concerns, feel free to let me know!
-
-Best reg
+The good news is I've fixed this by adjusting the parsing so that the system now handles these formats correctly. Everything is back to normal.
