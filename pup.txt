@@ -1,3 +1,12 @@
-I just wanted to let you know that there was a small format change in the data we received, which made the system unable to recognize it as a proper number. Because of that, it was treated as "not a number," and that caused a few operations to fail.
+Subject: Request for Approval to Replace Office Laptop
 
-The good news is I've fixed this by adjusting the parsing so that the system now handles these formats correctly. Everything is back to normal.
+Hi [Manager's Name],
+
+I hope you're doing well. I wanted to bring to your attention that I'm facing a couple of issues with my current office laptop: there's a recurring space shortage and the audio driver seems to be corrupted. Due to these problems, it's becoming a bit challenging to work efficiently.
+
+Could I please request your approval for a replacement laptop? This would really help in maintaining productivity.
+
+Thanks so much for considering this.
+
+Best,
+[Your Name]
