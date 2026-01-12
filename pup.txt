@@ -1,1 +1,16 @@
-I hope you're all doing well! I wanted to suggest that we also explore the Google Custom (Programmable) Search API for our local bus project. This API can provide us with web search functionality and is actually much cheaper than SerpAPI for our needs. Let's give it a look and see if it fits what we're doing.
+Subject: Request to Update Whitelisted IP for New Cluster
+
+Hi [Recipient's Name],
+
+I hope this message finds you well.
+
+We are currently in the process of moving our configuration from our old cluster (K4) to a new cluster (K8). Previously, we had whitelisted the IP addresses associated with the K4 cluster in our PostgreSQL config file. Now, with this migration, we need to update the whitelisted entries to reflect the new cluster’s IP.
+
+Specifically, the previous whitelisted IP was [old IP address], and we now need to add the new IP [new IP address] to the whitelist.
+
+Could you please help us by updating the host entries accordingly? This will ensure continued connectivity and avoid any disruptions.
+
+Thank you for your assistance!
+
+Best regards,
+[Your Name]
