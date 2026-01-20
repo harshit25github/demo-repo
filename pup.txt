@@ -1,13 +1,45 @@
-"Hey Opus, let's update the architecture. Previously, I was only handling conversations using OpenAI’s SDK. Each chat had a chat ID and a conversation ID, and I managed sessions based on that. But now I need to handle the chat IDs and messages more directly in my service.
+Easy (1–6)
 
-In this updated architecture, if a chat ID is null, that means it's a new chat, so we create a new chat record in the database and generate a new UUID for it. If the chat ID exists, we continue the conversation. We'll also store messages in a message table.
+“I’m visiting Paris for the first time. What are the top 10 must-see places?”
 
-So please help me write the code that:
+“Suggest attractions in Dubai that are good for first-time visitors.”
 
-Checks if the chat ID is null and, if so, creates a new chat entry in the database.
+“What are the best places to visit in Goa for a 2-day trip?”
 
-Retrieves or creates the appropriate conversation ID.
+“I’ll be in Delhi for a day. What are the must-see landmarks?”
 
-Stores incoming messages in the message table linked to that chat.
+“Recommend 8 places of interest in Singapore for a solo traveler.”
 
-Continues the chat flow and returns responses as before, but now with the new database-backed structure."
+“I want to visit Tokyo. What are some famous sightseeing spots?”
+
+Medium (7–13)
+
+“I’m going to Rome and I love history. Recommend places focused on ancient architecture.”
+
+“I’ll be in Bangkok with my parents. Suggest calm, less walking-heavy places.”
+
+“I have 6 hours in Istanbul near the city center. Create a short list of places I can realistically cover.”
+
+“Suggest places in New York that are great for photography—street scenes, skyline views, and unique neighborhoods.”
+
+“I’m visiting Barcelona but I want to avoid tourist traps. Give me underrated places locals love.”
+
+“In London, suggest places that combine museums + parks + a nice evening walk route.”
+
+“I’m going to Jaipur in summer. Suggest indoor-friendly places plus 1–2 evening outdoor spots.”
+
+Hard (14–20)
+
+“Plan places of interest in Tokyo for 3 days: Day 1 modern city vibes, Day 2 traditional culture, Day 3 nature/quiet spots. Keep travel time minimal.”
+
+“I’m traveling to Mumbai with a 4-year-old. Suggest places that are kid-friendly, stroller-friendly, and have clean restrooms nearby.”
+
+“I want a ‘food + culture’ itinerary in Istanbul: places near famous food streets, plus historical landmarks. I’m vegetarian and want options.”
+
+“I have a knee injury. For Rome, suggest places of interest that minimize stairs, include rest points, and are still iconic.”
+
+“I’m visiting Iceland in winter. Suggest places of interest that are safe to access, include geothermal experiences, and maximize chances of seeing the Northern Lights.”
+
+“I want a 5-day trip in Japan but I hate crowded places. Recommend places of interest across two cities that are quieter, and explain why each is low-crowd.”
+
+“I’m flexible on destination. Suggest 3 destinations in Southeast Asia for a 7-day trip that fits: beaches + light hiking + strong local culture + budget-friendly + good public transport. Then list top places of interest for each destination.”
