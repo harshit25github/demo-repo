@@ -1,1 +1,194 @@
-I hope you’re doing well. I wanted to inform you that due to unforeseen internal project priorities, I won’t be able to continue with the interview process for the role. I really appreciate the opportunity and the time you’ve already invested. Could you kindly remove my application from consideration? I hope to revisit opportunities in the future. Thanks so much for your understanding!
+import fs from "fs";
+import OpenAI from "openai";
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Extract plain text from an item.
+ * Conversation items can be structured; this is a best-effort extractor.
+ * You may need to tweak based on your exact item shapes.
+ */
+function itemToText(item) {
+  // Common patterns: item.content, item.text, item.message, etc.
+  if (!item) return "";
+  if (typeof item === "string") return item;
+  if (typeof item.text === "string") return item.text;
+
+  // Sometimes content is an array of parts
+  if (Array.isArray(item.content)) {
+    return item.content
+      .map((p) => (typeof p === "string" ? p : p?.text ?? p?.content ?? ""))
+      .join("\n")
+      .trim();
+  }
+
+  if (typeof item.content === "string") return item.content;
+  if (typeof item.message === "string") return item.message;
+
+  // Fallback: stringify
+  return JSON.stringify(item);
+}
+
+async function fetchAllConversationItems(conversationId) {
+  let all = [];
+  let after = undefined;
+
+  while (true) {
+    const page = await openai.conversations.items.list(conversationId, {
+      limit: 100,
+      order: "asc",
+      after,
+    });
+
+    all.push(...(page.data ?? []));
+    if (!page.has_more) break;
+    after = page.last_id;
+  }
+  return all;
+}
+
+function pickLastUserAndAssistant(items) {
+  // We assume items have a "role" or "type". If your schema differs, tweak this.
+  const userItems = items.filter((it) => it.role === "user");
+  const asstItems = items.filter((it) => it.role === "assistant");
+
+  const lastUser = userItems[userItems.length - 1];
+  const lastAsst = asstItems[asstItems.length - 1];
+
+  return {
+    user_text: itemToText(lastUser?.content ?? lastUser),
+    assistant_text: itemToText(lastAsst?.content ?? lastAsst),
+  };
+}
+
+async function buildDatasetFromConversations(conversationIds, outJsonlPath) {
+  const lines = [];
+
+  for (const convId of conversationIds) {
+    const items = await fetchAllConversationItems(convId);
+    const { user_text, assistant_text } = pickLastUserAndAssistant(items);
+
+    // Skip empties
+    if (!user_text || !assistant_text) continue;
+
+    // Each line = one eval sample
+    lines.push(
+      JSON.stringify({
+        item: {
+          conversation_id: convId,
+          user_text,
+          assistant_text,
+        },
+      })
+    );
+  }
+
+  fs.writeFileSync(outJsonlPath, lines.join("\n") + "\n", "utf-8");
+  console.log(`Dataset written: ${outJsonlPath} (rows=${lines.length})`);
+}
+
+async function runEvalOnDataset(jsonlPath) {
+  // 1) Upload dataset
+  const file = await openai.files.create({
+    file: fs.createReadStream(jsonlPath),
+    purpose: "evals",
+  });
+  console.log("Uploaded dataset file:", file.id);
+
+  // 2) Create eval
+  const evalObj = await openai.evals.create({
+    name: "Conversation Quality Eval (from stored conversations)",
+    data_source_config: {
+      type: "custom",
+      item_schema: {
+        type: "object",
+        properties: {
+          conversation_id: { type: "string" },
+          user_text: { type: "string" },
+          assistant_text: { type: "string" },
+        },
+        required: ["conversation_id", "user_text", "assistant_text"],
+      },
+      include_sample_schema: true,
+    },
+    testing_criteria: [
+      {
+        type: "label_model",
+        name: "Helpfulness label",
+        model: "o3-mini",
+        input: [
+          {
+            role: "developer",
+            content:
+              "Label the assistant response quality for the user request. " +
+              "Return only one label: helpful / partially_helpful / not_helpful. " +
+              "Be strict: if response misses key ask, mark partially_helpful or not_helpful.",
+          },
+          {
+            role: "user",
+            content:
+              "User said:\n{{ item.user_text }}\n\nAssistant replied:\n{{ item.assistant_text }}",
+          },
+        ],
+        labels: ["helpful", "partially_helpful", "not_helpful"],
+        passing_labels: ["helpful"],
+      },
+    ],
+  });
+
+  console.log("Created eval:", evalObj.id);
+
+  // 3) Run eval using uploaded file as source
+  let run = await openai.evals.runs.create(evalObj.id, {
+    name: "run-1",
+    data_source: {
+      type: "file_id",
+      id: file.id,
+    },
+  });
+
+  console.log("Run:", run.id, "status:", run.status, "report:", run.report_url);
+
+  // 4) Poll
+  while (["queued", "in_progress"].includes(run.status)) {
+    await sleep(2000);
+    run = await openai.evals.runs.retrieve(evalObj.id, run.id);
+    console.log("status:", run.status);
+  }
+
+  // 5) Fetch first 20 graded items
+  const out = await openai.evals.runs.outputItems.list(evalObj.id, run.id, {
+    limit: 20,
+  });
+
+  console.log("result_counts:", run.result_counts);
+  for (const it of out.data ?? []) {
+    console.log("----");
+    console.log("conv:", it.item?.conversation_id);
+    console.log("label results:", it.results);
+  }
+}
+
+async function main() {
+  // Put your conversation IDs here:
+  const conversationIds = [
+    // "conv_abc...",
+    // "conv_def...",
+  ];
+
+  // Limit to top 20 from your list
+  const top20 = conversationIds.slice(0, 20);
+
+  // 1) Build dataset JSONL
+  await buildDatasetFromConversations(top20, "dataset.jsonl");
+
+  // 2) Run eval
+  await runEvalOnDataset("dataset.jsonl");
+}
+
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});
+
