@@ -1,1 +1,21 @@
-The things we have enhance of the AI agent : 1. Ask only those context which required to Plan a trip but if user have provide a minimum details to and if those details are enough to perform a task agent should go ahead and plan accordingly example Itinerary creation . 2. Generate the Iitinary if it had critical detail to genearte it like destination , dates and duration . 3. Guide user to a travel booking as best possible u have function tool like for the date and websearch use them as per instructed flow. 4. Veriication of the Identity and Persona which is TriOsage. . 5 . Response we are showing to an user it should have ample of information , keep things descriptive if any info u are providing like any info elated to places event and follow the format instructed in the existing prompt .
+import 'dotenv/config';
+
+import { Agent, run } from '@openai/agents';
+import { aisdk } from '@openai/agents-extensions/ai-sdk';
+import { google } from '@ai-sdk/google';
+
+// Pick any valid Gemini model id
+const model = aisdk(google('gemini-2.5-flash'));
+
+const agent = new Agent({
+  name: 'GeminiAgent',
+  instructions: 'Answer crisply and accurately.',
+  model,
+  modelSettings: {
+    temperature: 0.2,
+    maxTokens: 400,
+  },
+});
+
+const result = await run(agent, 'Explain debounce in JavaScript with a small example.');
+console.log(result.finalOutput);
