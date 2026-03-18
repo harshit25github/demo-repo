@@ -1,254 +1,40 @@
-You are working on a URL-based knowledge base for a CheapOair-focused crawler/indexer/retriever system.
+Implement a function that selects 5 flight contracts from the API response.
 
-Your job is to understand and preserve the current architecture, not replace it with a new one.
+Rules:
 
-## Goal
+1. Find all contracts that match the user’s exact search:
+   - same origin
+   - same destination
+   - same travel date
 
-Build and maintain a pipeline that:
+2. Sort these exact-match contracts by price ascending.
 
-1. Crawls a fixed set of CheapOair URLs
-2. Deep-crawls the airline links discovered from the CheapOair baggage page
-3. Indexes the crawled content into Qdrant
-4. Uses mandatory HyDE retrieval for semantic search
-5. Uses row-level retrieval for the CheapOair baggage directory page
-6. Uses an OpenAI Agent only after retrieval to generate a grounded answer with citations
+3. Positions 1, 2, and 3 must always be filled with the 3 cheapest exact-match contracts.
 
-## Fixed URLs to Crawl
+4. For positions 4 and 5, consider only contracts that differ by:
+   - airport code, or
+   - travel date
 
-These are the main seed URLs:
+5. A different-airport / different-date contract can be placed in position 4 or 5 only if its price is strictly lower than the cheapest exact-match contract.
 
-- https://www.cheapoair.com/info/privacy#personal-information
-- https://www.cheapoair.com/info/cookie-policy/
-- https://www.cheapoair.com/info/generaltermsandconditions/
-- https://www.cheapoair.com/travel/baggage-fees/
+6. If 2 such cheaper alternate contracts exist, place them in positions 4 and 5.
 
-## Crawl Strategy
+7. If only 1 such cheaper alternate contract exists, place it in position 4, and fill position 5 with the next cheapest exact-match contract.
 
-### 1. Simple crawl
-Use simple crawl for:
-- privacy policy
-- cookie policy
-- general terms and conditions
+8. If no such cheaper alternate contracts exist, fill positions 4 and 5 with the next cheapest exact-match contracts.
 
-These are standard content pages and should be crawled as standalone documents.
+9. Always return exactly 5 contracts whenever at least 5 contracts are available in the input.
 
-### 2. Deep crawl
-Use deep crawl for:
-- https://www.cheapoair.com/travel/baggage-fees/
+10. Add tags for every returned contract:
+   - `isDifferentAirport`
+   - `isDifferentDate`
+   - `isAlternateContract`
 
-This page is not just a normal article. It is a baggage directory page with airline rows and outbound links to airline baggage policy pages.
-
-Deep crawl behavior:
-- crawl the root CheapOair baggage page
-- extract airline-related outbound links from the baggage directory
-- crawl those linked airline pages as nested/secondary sources
-- keep raw crawl responses so the system can re-index later even if crawler infra is unstable
-
-If crawling is unavailable, the system must support re-indexing from previously saved raw response snapshots.
-
-## Source Types
-
-Every crawled page must be normalized into one of these source types:
-
-- `privacy_policy`
-- `cookie_policy`
-- `terms_conditions`
-- `baggage_directory`
-- `airline_policy`
-
-## Indexing Strategy
-
-### A. Policy-style pages
-For:
-- privacy policy
-- cookie policy
-- terms and conditions
-- official airline policy pages
-
-Use heading-aware semantic chunking.
-
-Procedure:
-1. extract usable cleaned text from crawl output
-2. remove boilerplate/navigation/footer noise
-3. preserve heading hierarchy
-4. split into section-based chunks
-5. store:
-   - section title
-   - section path
-   - text
-   - source type
-   - URL
-   - metadata needed for retrieval
-6. create embeddings
-7. upsert into Qdrant
-
-### B. CheapOair baggage root page
-Do NOT treat this page as only a giant semantic document.
-
-Primary indexing strategy:
-- parse the page as structured airline rows
-- each airline row becomes a first-class record: `baggage_directory_row`
-
-Each row should capture fields like:
-- `airlineName`
-- `routeScope`
-- `carryOnCost`
-- `carryOnWeight`
-- `carryOnSize`
-- `carryOnNotes`
-- `firstBagUrl`
-- `secondBagUrl`
-- `additionalPolicyUrl`
-
-Also build:
-- `rowText` for readable evidence
-- `embeddingText` for better vector retrieval
+Edge cases:
+- If fewer than 3 exact-match contracts exist, use all available exact matches first, then fill remaining slots from the cheapest other contracts.
+- If total input has fewer than 5 contracts, return all available contracts.
 
 Important:
-- index these row records into Qdrant too
-- keep normal fallback page chunks as backup, but row records are the primary retrieval unit for the root baggage page
-
-## Retrieval Strategy
-
-### Mandatory rule
-Use HyDE for all free-text semantic retrieval.
-
-HyDE means:
-1. take the user query
-2. generate a hypothetical source-like passage using the LLM
-3. embed that hypothetical passage
-4. search Qdrant with it
-5. fuse/rerank with other search plans if needed
-
-### Retrieval modes
-
-#### 1. Baggage directory query
-If the query is about the CheapOair baggage directory page:
-- use `baggage_directory_row` mode first
-- retrieve by airline/route/facet at row level
-- do not start with giant page-level chunk retrieval
-
-Examples:
-- “Aegean carry-on weight”
-- “According to CheapOair, what is Air Canada baggage policy?”
-- “Compare Aegean and Air India carry-on size”
-
-#### 2. Linked policy expansion
-If the baggage row only gives a policy URL for `1st bag`, `2nd bag`, or `additional policy`:
-- use that linked URL as a second-hop retrieval target
-- retrieve actual details from the corresponding `airline_policy` page
-- do not stop at returning only the link if the user asked for details
-
-Example:
-If the row has:
-- `firstBagUrl = https://...`
-
-Then:
-- run retrieval on the indexed official airline policy page
-- return the real checked-bag details from that source
-
-#### 3. Policy page query
-For privacy/cookie/terms/official airline policy pages:
-- use HyDE + semantic vector retrieval over heading-based chunks
-
-## Query Understanding
-
-The retriever should detect:
-- airline names
-- baggage facets
-- privacy aspects
-- route-scope hints
-
-Examples of baggage facets:
-- `carry_on`
-- `first_checked_bag`
-- `second_checked_bag`
-- `oversize`
-- `overweight`
-- `special_items`
-- `additional_policy`
-
-Examples of privacy aspects:
-- collect
-- use
-- disclose
-- security
-- retention
-
-This query understanding layer is used only to route and improve retrieval quality.
-
-## OpenAI Agent Role
-
-The OpenAI Agent is NOT the retriever.
-
-Flow:
-1. retrieve relevant rows/chunks first
-2. then pass retrieved context to the OpenAI Agent
-3. agent must answer only from retrieved context
-4. agent must cite sources/chunks
-5. no hallucinated claims
-
-So:
-- HyDE = retrieval enhancement
-- Agent = final grounded answer synthesis
-
-## Storage and Reuse
-
-The system should support 2 input modes:
-1. live crawl results
-2. previously exported raw crawl response snapshots
-
-This is important because crawler infra may be unstable across environments.
-
-Use raw response snapshots as a portable source dataset when needed.
-
-## File Structure Constraint
-
-Keep the runtime flattened into these files only:
-
-- `src/crawler.js`
-- `src/indexing.js`
-- `src/retrivel.js`
-- `src/agents.js`
-
-Do not reintroduce a modular `core/` folder.
-
-## Expected End-to-End Flow
-
-1. Crawl seed URLs
-2. Deep crawl airline links from CheapOair baggage page
-3. Save raw responses
-4. Normalize each page by source type
-5. Chunk policy pages by heading structure
-6. Parse baggage root page into row records
-7. Embed records/chunks
-8. Upsert into Qdrant
-9. On query:
-   - route query
-   - use row-mode first for CheapOair baggage directory questions
-   - use HyDE semantic search for policy documents
-   - expand linked policy pages when row only contains a URL
-10. Send retrieved evidence to OpenAI Agent for final cited answer
-
-## Important Principles
-
-- Qdrant is the active index
-- HyDE is mandatory for semantic retrieval
-- CheapOair baggage root page is row-first, not chunk-first
-- Official airline pages are authoritative for detailed baggage rules
-- Never answer from memory when retrieved evidence is missing
-- Prefer raw snapshot reuse over re-crawling if crawler infra is down
-
-## Deliverable Expectation
-
-When explaining or implementing the system, clearly separate:
-- crawling
-- normalization
-- indexing
-- retrieval
-- answer generation
-
-and always explain which logic applies to:
-- simple policy pages
-- baggage directory root page
-- deep-crawled airline policy pages
+- Positions 1–3 should prioritize exact-match contracts only.
+- Alternate contracts can appear only in positions 4 and 5.
+- Do not move alternate contracts into the top 3.
