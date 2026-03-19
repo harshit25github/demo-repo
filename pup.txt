@@ -1,40 +1,47 @@
-Implement a function that selects 5 flight contracts from the API response.
+You are integrating an existing retrieval workflow into an existing agentic backend.
 
-Rules:
+Important constraints:
+- Do not redesign crawling or indexing.
+- Crawling and indexing are already complete and should be treated as existing infrastructure.
+- Your task is only to understand and integrate the **primary user-facing agent** and its **retrieval-tool workflow**.
 
-1. Find all contracts that match the user’s exact search:
-   - same origin
-   - same destination
-   - same travel date
+## What already exists
 
-2. Sort these exact-match contracts by price ascending.
+There is already a retrieval pipeline that:
+- accepts a user query
+- performs retrieval against an indexed knowledge base
+- returns grounded chunks/results
+- is already wired to support HyDE internally
+- is already capable of handling both:
+  - semantic chunk retrieval for policy-style pages
+  - row-first retrieval for the CheapOair baggage directory
 
-3. Positions 1, 2, and 3 must always be filled with the 3 cheapest exact-match contracts.
+You should not change that retrieval logic unless integration requires a very small adaptation.
 
-4. For positions 4 and 5, consider only contracts that differ by:
-   - airport code, or
-   - travel date
+## What you need to understand
 
-5. A different-airport / different-date contract can be placed in position 4 or 5 only if its price is strictly lower than the cheapest exact-match contract.
+The system has a **primary OpenAI SDK agent** that interacts with the user.
 
-6. If 2 such cheaper alternate contracts exist, place them in positions 4 and 5.
+That agent:
+- is the user-facing agent
+- does **not** answer directly from memory
+- uses a function tool called `retrieve_context`
+- the tool calls the existing retrieval service
+- the retrieved results are returned to the agent
+- the agent then writes the final grounded answer with citations
 
-7. If only 1 such cheaper alternate contract exists, place it in position 4, and fill position 5 with the next cheapest exact-match contract.
+This is not a multi-agent system.
+It is a **single primary agent** with a **single retrieval tool**.
 
-8. If no such cheaper alternate contracts exist, fill positions 4 and 5 with the next cheapest exact-match contracts.
+## Core flow
 
-9. Always return exactly 5 contracts whenever at least 5 contracts are available in the input.
+The exact flow is:
 
-10. Add tags for every returned contract:
-   - `isDifferentAirport`
-   - `isDifferentDate`
-   - `isAlternateContract`
-
-Edge cases:
-- If fewer than 3 exact-match contracts exist, use all available exact matches first, then fill remaining slots from the cheapest other contracts.
-- If total input has fewer than 5 contracts, return all available contracts.
-
-Important:
-- Positions 1–3 should prioritize exact-match contracts only.
-- Alternate contracts can appear only in positions 4 and 5.
-- Do not move alternate contracts into the top 3.
+```text
+User query
+-> primary OpenAI SDK agent
+-> retrieve_context tool call
+-> retrieval service
+-> relevant chunks/results returned
+-> agent reads tool output
+-> agent writes final grounded answer
