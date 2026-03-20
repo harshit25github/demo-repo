@@ -1,47 +1,12 @@
-You are integrating an existing retrieval workflow into an existing agentic backend.
+Dear [Product Owner Name],
 
-Important constraints:
-- Do not redesign crawling or indexing.
-- Crawling and indexing are already complete and should be treated as existing infrastructure.
-- Your task is only to understand and integrate the **primary user-facing agent** and its **retrieval-tool workflow**.
+I hope you are doing well.
 
-## What already exists
+For bookings identified by the Duplicate Cancellation Bot as partially duplicated, but not exact duplicates, we are currently not canceling them automatically. Instead, we notify the customer and proceed with cancellation only if explicit consent is received.
 
-There is already a retrieval pipeline that:
-- accepts a user query
-- performs retrieval against an indexed knowledge base
-- returns grounded chunks/results
-- is already wired to support HyDE internally
-- is already capable of handling both:
-  - semantic chunk retrieval for policy-style pages
-  - row-first retrieval for the CheapOair baggage directory
+This email has been added only for notification and consent purposes.
 
-You should not change that retrieval logic unless integration requires a very small adaptation.
+Could you please advise if we should continue with this approach or make any changes?
 
-## What you need to understand
-
-The system has a **primary OpenAI SDK agent** that interacts with the user.
-
-That agent:
-- is the user-facing agent
-- does **not** answer directly from memory
-- uses a function tool called `retrieve_context`
-- the tool calls the existing retrieval service
-- the retrieved results are returned to the agent
-- the agent then writes the final grounded answer with citations
-
-This is not a multi-agent system.
-It is a **single primary agent** with a **single retrieval tool**.
-
-## Core flow
-
-The exact flow is:
-
-```text
-User query
--> primary OpenAI SDK agent
--> retrieve_context tool call
--> retrieval service
--> relevant chunks/results returned
--> agent reads tool output
--> agent writes final grounded answer
+Best regards,
+[Your Name]
