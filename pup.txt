@@ -1,12 +1,1 @@
-Dear [Product Owner Name],
-
-I hope you are doing well.
-
-For bookings identified by the Duplicate Cancellation Bot as partially duplicated, but not exact duplicates, we are currently not canceling them automatically. Instead, we notify the customer and proceed with cancellation only if explicit consent is received.
-
-This email has been added only for notification and consent purposes.
-
-Could you please advise if we should continue with this approach or make any changes?
-
-Best regards,
-[Your Name]
+These requirements are currently scoped only for the Home page, Flight Listing page, and Checkout Details/Payment Details page; they do not yet cover Passengers, Seats, final Payment entry/submission, post-booking flows, or other app areas.
