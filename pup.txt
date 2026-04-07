@@ -1,1 +1,246 @@
-These requirements are currently scoped only for the Home page, Flight Listing page, and Checkout Details/Payment Details page; they do not yet cover Passengers, Seats, final Payment entry/submission, post-booking flows, or other app areas.
+You are reviewing a retrieval bug and the implemented fix in a baggage-policy knowledge-base system.
+
+Your task is to understand:
+1. what the bug was,
+2. why it happened,
+3. what exact solution was implemented,
+4. what behavior is now expected.
+
+Do not redesign the architecture. Just understand the issue and the current fix.
+
+## Context
+
+This system has a retrieval layer for baggage policy questions.
+
+There are 2 relevant retrieval modes:
+
+1. semantic HyDE-based retrieval
+2. structured baggage directory row retrieval
+
+The CheapOair baggage page is indexed as structured `baggage_directory_row` records.
+Each row contains:
+- airlineName
+- routeScope
+- carryOnCost
+- carryOnWeight
+- carryOnSize
+- carryOnNotes
+- firstBagUrl
+- secondBagUrl
+- additionalPolicyUrl
+
+Example for Aer Lingus:
+- row A: `Anywhere to Anywhere except To/From USA/Canada`
+- row B: `To/From USA/Canada`
+
+The USA/Canada row has actual carry-on details:
+- Cost: Free
+- Weight: 22 lb / 10 kg
+- Size: 46.5" (9.5 x 15.5 x 21.5) / 119 cm (24 x 40 x 55)
+
+## Bug We Faced
+
+A structured query like:
+
+`According to the CheapOair baggage fees page, what is Aer Lingus carry-on policy to/from USA/Canada?`
+
+was returning the wrong structured row:
+- `Anywhere to Anywhere except To/From USA/Canada`
+
+In some cases, `Air Canada` also polluted the result set because the query contained the word `Canada`.
+
+This was especially bad because:
+- the structured directory mode should have been the most reliable path
+- but it was less accurate than the vaguer HyDE path for this case
+
+## Root Cause
+
+The bug had 4 main causes:
+
+### 1. Route matching was token-based, not semantic
+The code extracted route hints like:
+- `to`
+- `from`
+- `usa`
+- `canada`
+
+Then it scored rows by checking whether the row route text contained those tokens.
+
+This caused both of these rows to get nearly the same route score:
+- `To/From USA/Canada`
+- `Anywhere to Anywhere except To/From USA/Canada`
+
+because both contain:
+- `to`
+- `from`
+- `usa`
+- `canada`
+
+So the scorer could not distinguish:
+- requested route
+vs
+- excluded route
+
+### 2. Carry-on detail rows and “View policy” rows were treated too similarly
+For `carry_on`, the old facet completeness logic only checked whether `carryOnText` existed.
+
+That meant:
+- a row with full structured details
+- and a row with only `CarryOn: View policy`
+
+were both considered similarly valid.
+
+That is incorrect.
+
+### 3. Ties fell back to source order
+Once rows had the same score, sorting was effectively determined by source order.
+
+So if the wrong route row appeared first in the source data, it won.
+
+### 4. Airline alias matching was too permissive
+For airlines like:
+- `Air Canada`
+- `Air India`
+- `Air France`
+
+the alias generator could reduce the airline to:
+- `canada`
+- `india`
+- `france`
+
+That caused false airline routing when a query simply contained a country word like `Canada`.
+
+## Solution Implemented
+
+The fix was implemented in:
+- `src/retrivel.js`
+
+A regression test was added in:
+- `tests/retrieval-service.test.js`
+
+### Fix 1: Tightened airline alias generation
+Single-token ambiguous aliases like:
+- `canada`
+- `india`
+- `france`
+- `italia`
+
+are now suppressed.
+
+Also, if an airline starts with a generic airline word such as `Air`, and alias reduction would leave only a single ambiguous token, that alias is not used.
+
+This prevents:
+- `Canada` in a query from routing to `Air Canada`
+
+### Fix 2: Replaced flat route token scoring with semantic route profiling
+Instead of only checking whether route text contains the tokens:
+- `to`
+- `from`
+- `usa`
+- `canada`
+
+the code now builds a route profile with flags like:
+- hasUsa
+- hasCanada
+- hasDomestic
+- hasInternational
+- hasBetween
+- hasExcept
+- hasToFrom
+
+Then scoring rewards or penalizes rows based on the semantic meaning.
+
+Examples:
+- `to/from usa/canada` should strongly prefer rows with `To/From USA/Canada`
+- rows containing `except` are penalized when the query clearly asks for the direct route
+- rows with `except` are rewarded only when the query also asks for an exclusion route
+
+### Fix 3: Prefer structured carry-on detail rows over `View policy` rows
+The carry-on facet scoring now rewards actual detail richness:
+- carryOnCost
+- carryOnWeight
+- carryOnSize
+- carryOnNotes
+
+A row with full details gets a higher score than a row with only:
+- `CarryOn: View policy`
+
+### Fix 4: Added tie-break sorting for directory rows
+Sorting no longer relies only on total score.
+
+Tie-breakers now prefer:
+1. higher main score
+2. more structured detail richness
+3. better route specificity
+
+This prevents wrong rows from winning due to source order alone.
+
+## Expected Behavior After the Fix
+
+The following query should now return the correct structured row:
+
+`According to the CheapOair baggage fees page, what is Aer Lingus carry-on policy to/from USA/Canada?`
+
+Expected top hit:
+- airlineName: `Aer Lingus`
+- routeScope: `To/From USA/Canada`
+- carryOnCost: `Free`
+- carryOnWeight: `22 lb / 10 kg`
+- carryOnSize: `46.5" (9.5 x 15.5 x 21.5) / 119 cm (24 x 40 x 55)`
+
+It should NOT return:
+- `Anywhere to Anywhere except To/From USA/Canada`
+- `Air Canada`
+
+## Actual Verification After the Fix
+
+These real queries were rerun against the local Qdrant collection after the patch:
+
+1. `I am a USA citizen, show Aer Lingus carryon rules ?`
+2. `What are Aer Lingus carry-on rules for USA/Canada flights?`
+3. `According to the CheapOair baggage fees page, what is Aer Lingus carry-on policy to/from USA/Canada?`
+4. `Show Aer Lingus domestic carry-on baggage rules`
+5. `Aer Lingus hand baggage size and weight to Canada`
+
+Observed result:
+- all five now return the correct top hit:
+  - `Aer Lingus`
+  - `To/From USA/Canada`
+- the exact structured query now returns only the correct row
+- the previous wrong-route bug is fixed
+
+## Test Coverage Added
+
+A regression test was added to ensure:
+- exact route-specific structured row retrieval is preferred
+- `Canada` in the query does not falsely route to `Air Canada`
+
+## Constraints
+
+Do not change:
+- crawling
+- indexing
+- overall architecture
+- HyDE design
+- tool-calling agent design
+
+This was a targeted retrieval/scoring fix inside the structured baggage row path.
+
+## Files To Review
+
+Minimum files:
+- `src/retrivel.js`
+- `tests/retrieval-service.test.js`
+
+Optional context:
+- `data/chunks/www-cheapoair-com-travel-baggage-fees-e9af19aee9db.json`
+
+## What You Should Understand
+
+After reviewing the code, you should clearly be able to explain:
+1. why the old route scoring failed,
+2. why `except To/From USA/Canada` wrongly matched,
+3. why `Air Canada` was a false positive,
+4. how the new route profile scoring fixes it,
+5. how detail-aware carry-on scoring improves row selection,
+6. why tie-break sorting was needed.
