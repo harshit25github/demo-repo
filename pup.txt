@@ -1,246 +1,189 @@
-You are reviewing a retrieval bug and the implemented fix in a baggage-policy knowledge-base system.
-
-Your task is to understand:
-1. what the bug was,
-2. why it happened,
-3. what exact solution was implemented,
-4. what behavior is now expected.
-
-Do not redesign the architecture. Just understand the issue and the current fix.
-
-## Context
-
-This system has a retrieval layer for baggage policy questions.
-
-There are 2 relevant retrieval modes:
-
-1. semantic HyDE-based retrieval
-2. structured baggage directory row retrieval
-
-The CheapOair baggage page is indexed as structured `baggage_directory_row` records.
-Each row contains:
-- airlineName
-- routeScope
-- carryOnCost
-- carryOnWeight
-- carryOnSize
-- carryOnNotes
-- firstBagUrl
-- secondBagUrl
-- additionalPolicyUrl
-
-Example for Aer Lingus:
-- row A: `Anywhere to Anywhere except To/From USA/Canada`
-- row B: `To/From USA/Canada`
-
-The USA/Canada row has actual carry-on details:
-- Cost: Free
-- Weight: 22 lb / 10 kg
-- Size: 46.5" (9.5 x 15.5 x 21.5) / 119 cm (24 x 40 x 55)
-
-## Bug We Faced
-
-A structured query like:
-
-`According to the CheapOair baggage fees page, what is Aer Lingus carry-on policy to/from USA/Canada?`
-
-was returning the wrong structured row:
-- `Anywhere to Anywhere except To/From USA/Canada`
-
-In some cases, `Air Canada` also polluted the result set because the query contained the word `Canada`.
-
-This was especially bad because:
-- the structured directory mode should have been the most reliable path
-- but it was less accurate than the vaguer HyDE path for this case
-
-## Root Cause
-
-The bug had 4 main causes:
-
-### 1. Route matching was token-based, not semantic
-The code extracted route hints like:
-- `to`
-- `from`
-- `usa`
-- `canada`
-
-Then it scored rows by checking whether the row route text contained those tokens.
-
-This caused both of these rows to get nearly the same route score:
-- `To/From USA/Canada`
-- `Anywhere to Anywhere except To/From USA/Canada`
-
-because both contain:
-- `to`
-- `from`
-- `usa`
-- `canada`
-
-So the scorer could not distinguish:
-- requested route
-vs
-- excluded route
-
-### 2. Carry-on detail rows and “View policy” rows were treated too similarly
-For `carry_on`, the old facet completeness logic only checked whether `carryOnText` existed.
-
-That meant:
-- a row with full structured details
-- and a row with only `CarryOn: View policy`
-
-were both considered similarly valid.
-
-That is incorrect.
-
-### 3. Ties fell back to source order
-Once rows had the same score, sorting was effectively determined by source order.
-
-So if the wrong route row appeared first in the source data, it won.
-
-### 4. Airline alias matching was too permissive
-For airlines like:
-- `Air Canada`
-- `Air India`
-- `Air France`
-
-the alias generator could reduce the airline to:
-- `canada`
-- `india`
-- `france`
-
-That caused false airline routing when a query simply contained a country word like `Canada`.
-
-## Solution Implemented
-
-The fix was implemented in:
-- `src/retrivel.js`
-
-A regression test was added in:
-- `tests/retrieval-service.test.js`
-
-### Fix 1: Tightened airline alias generation
-Single-token ambiguous aliases like:
-- `canada`
-- `india`
-- `france`
-- `italia`
-
-are now suppressed.
-
-Also, if an airline starts with a generic airline word such as `Air`, and alias reduction would leave only a single ambiguous token, that alias is not used.
-
-This prevents:
-- `Canada` in a query from routing to `Air Canada`
-
-### Fix 2: Replaced flat route token scoring with semantic route profiling
-Instead of only checking whether route text contains the tokens:
-- `to`
-- `from`
-- `usa`
-- `canada`
-
-the code now builds a route profile with flags like:
-- hasUsa
-- hasCanada
-- hasDomestic
-- hasInternational
-- hasBetween
-- hasExcept
-- hasToFrom
-
-Then scoring rewards or penalizes rows based on the semantic meaning.
-
-Examples:
-- `to/from usa/canada` should strongly prefer rows with `To/From USA/Canada`
-- rows containing `except` are penalized when the query clearly asks for the direct route
-- rows with `except` are rewarded only when the query also asks for an exclusion route
-
-### Fix 3: Prefer structured carry-on detail rows over `View policy` rows
-The carry-on facet scoring now rewards actual detail richness:
-- carryOnCost
-- carryOnWeight
-- carryOnSize
-- carryOnNotes
-
-A row with full details gets a higher score than a row with only:
-- `CarryOn: View policy`
-
-### Fix 4: Added tie-break sorting for directory rows
-Sorting no longer relies only on total score.
-
-Tie-breakers now prefer:
-1. higher main score
-2. more structured detail richness
-3. better route specificity
-
-This prevents wrong rows from winning due to source order alone.
-
-## Expected Behavior After the Fix
-
-The following query should now return the correct structured row:
-
-`According to the CheapOair baggage fees page, what is Aer Lingus carry-on policy to/from USA/Canada?`
-
-Expected top hit:
-- airlineName: `Aer Lingus`
-- routeScope: `To/From USA/Canada`
-- carryOnCost: `Free`
-- carryOnWeight: `22 lb / 10 kg`
-- carryOnSize: `46.5" (9.5 x 15.5 x 21.5) / 119 cm (24 x 40 x 55)`
-
-It should NOT return:
-- `Anywhere to Anywhere except To/From USA/Canada`
-- `Air Canada`
-
-## Actual Verification After the Fix
-
-These real queries were rerun against the local Qdrant collection after the patch:
-
-1. `I am a USA citizen, show Aer Lingus carryon rules ?`
-2. `What are Aer Lingus carry-on rules for USA/Canada flights?`
-3. `According to the CheapOair baggage fees page, what is Aer Lingus carry-on policy to/from USA/Canada?`
-4. `Show Aer Lingus domestic carry-on baggage rules`
-5. `Aer Lingus hand baggage size and weight to Canada`
-
-Observed result:
-- all five now return the correct top hit:
-  - `Aer Lingus`
-  - `To/From USA/Canada`
-- the exact structured query now returns only the correct row
-- the previous wrong-route bug is fixed
-
-## Test Coverage Added
-
-A regression test was added to ensure:
-- exact route-specific structured row retrieval is preferred
-- `Canada` in the query does not falsely route to `Air Canada`
-
-## Constraints
-
-Do not change:
-- crawling
-- indexing
-- overall architecture
-- HyDE design
-- tool-calling agent design
-
-This was a targeted retrieval/scoring fix inside the structured baggage row path.
-
-## Files To Review
-
-Minimum files:
-- `src/retrivel.js`
-- `tests/retrieval-service.test.js`
-
-Optional context:
-- `data/chunks/www-cheapoair-com-travel-baggage-fees-e9af19aee9db.json`
-
-## What You Should Understand
-
-After reviewing the code, you should clearly be able to explain:
-1. why the old route scoring failed,
-2. why `except To/From USA/Canada` wrongly matched,
-3. why `Air Canada` was a false positive,
-4. how the new route profile scoring fixes it,
-5. how detail-aware carry-on scoring improves row selection,
-6. why tie-break sorting was needed.
+Question List
+
+1. What is RAG and why is it used?
+2. What is the difference between fine-tuning and RAG?
+3. Why do we use vector databases in GenAI systems?
+4. How would you reduce hallucinations in an LLM-based application?
+5. What is the difference between a system prompt and a user prompt?
+6. How would you evaluate whether a GenAI application is performing well?
+7. What are common challenges while building LLM applications in production?
+8. What is prompt engineering? Improve a weak prompt with a better one.
+9. How would you build a simple document question-answering system using Python and an LLM?
+10. Suppose the model gives inconsistent answers to the same question. How would you troubleshoot that?
+11. You need to build a chatbot that answers questions from company PDFs. How would you design it end to end?
+12. A user asks a question, but the model answers with made-up information. How would you detect and reduce that?
+13. Your GenAI app is becoming expensive because of token usage. What steps would you take?
+14. Users complain that responses are too slow. Where would you investigate first?
+15. You have sensitive business data. What precautions would you take before sending data to an LLM?
+16. When would you choose RAG over fine-tuning?
+17. If retrieved documents are irrelevant, what areas would you debug?
+18. How would you store chat history for a conversational AI assistant?
+19. How would you prevent prompt injection in an LLM application?
+20. How would you explain your GenAI system to a non-technical stakeholder?
+21. What is reranking and what problem does it solve?
+22. How does an LLM work at a high level?
+23. If you need to write a prompt for a dietician agent, how would you approach it?
+24. Why do we use XML tags or structured delimiters in prompts?
+25. What is your approach to creating few-shot or multi-shot prompts?
+26. If a RAG system is not performing well, how would you handle it?
+
+---
+
+You are building a Retrieval-Augmented Generation (RAG) system.
+
+For the same user query, you receive retrieved chunks from multiple retrieval approaches such as:
+- embedding
+- hyde
+- keyword
+
+Each retrieval result contains:
+- chunk_id: unique identifier of the chunk
+- text: content of the chunk
+- score: relevance score returned by that retrieval approach
+- approach: name of the retrieval strategy
+
+The same chunk may appear in results from more than one approach.
+
+You are also given:
+- the original user query
+- a weight for each retrieval approach
+- top_k, the number of final chunks to return
+
+Your task is to write a function that returns the final top_k most relevant unique chunks.
+--- INPUT 
+
+query = "cabin bag allowed"
+
+results = [
+    {"chunk_id": "c1", "text": "Cabin baggage up to 7kg is allowed", "score": 0.91, "approach": "embedding"},
+    {"chunk_id": "c2", "text": "Extra baggage charges apply", "score": 0.87, "approach": "embedding"},
+    {"chunk_id": "c3", "text": "Refund available within 24 hours", "score": 0.82, "approach": "embedding"},
+
+    {"chunk_id": "c2", "text": "Extra baggage charges apply", "score": 0.61, "approach": "hyde"},
+    {"chunk_id": "c4", "text": "Only one cabin bag is permitted", "score": 0.59, "approach": "hyde"},
+    {"chunk_id": "c1", "text": "Cabin baggage up to 7kg is allowed", "score": 0.56, "approach": "hyde"},
+
+    {"chunk_id": "c4", "text": "Only one cabin bag is permitted", "score": 14.2, "approach": "keyword"},
+    {"chunk_id": "c1", "text": "Cabin baggage up to 7kg is allowed", "score": 11.8, "approach": "keyword"},
+    {"chunk_id": "c5", "text": "Sports equipment has separate rules", "score": 10.5, "approach": "keyword"},
+]
+
+approach_weights = {
+    "embedding": 1.0,
+    "hyde": 1.25,
+    "keyword": 1.25
+}
+
+top_k = 3
+
+Answer Key
+
+1) What is RAG and why is it used?
+Answer:
+RAG stands for Retrieval-Augmented Generation. It retrieves relevant information first and then gives that context to the LLM before answering. It is used to ground answers in real data, reduce hallucinations, and work with private or frequently changing knowledge.
+
+2) What is the difference between fine-tuning and RAG?
+Answer:
+Fine-tuning changes the model’s behavior by training it on examples. RAG does not change the model; it gives relevant information at runtime. Fine-tuning is better for behavior and style, while RAG is better for dynamic knowledge.
+
+3) Why do we use vector databases in GenAI systems?
+Answer:
+Vector databases store embeddings and support semantic search. They help retrieve content that is meaningfully similar to the user’s query, even when exact keywords do not match.
+
+4) How would you reduce hallucinations in an LLM-based application?
+Answer:
+Use RAG with trusted sources, write strong grounding prompts, keep temperature low, return citations, add validation checks, and allow the model to say “I don’t know” when context is missing.
+
+5) What is the difference between a system prompt and a user prompt?
+Answer:
+The system prompt defines the assistant’s role, rules, and behavior. The user prompt is the actual request or question from the user.
+
+6) How would you evaluate whether a GenAI application is performing well?
+Answer:
+Check answer correctness, faithfulness to source, retrieval relevance, hallucination rate, latency, cost, and user feedback. For RAG, evaluate retrieval quality and answer quality separately.
+
+7) What are common challenges while building LLM applications in production?
+Answer:
+Common challenges include hallucinations, latency, high token cost, poor retrieval quality, prompt injection, inconsistent outputs, privacy concerns, and difficulty in evaluation and monitoring.
+
+8) What is prompt engineering? Improve a weak prompt with a better one.
+Answer:
+Prompt engineering is the process of writing clearer and more structured prompts to get better outputs.
+
+**Weak prompt:**  
+“Give me a diet plan.”
+
+**Better prompt:**  
+“You are a diet-planning assistant. Create a 7-day vegetarian Indian diet plan for weight loss. Avoid peanuts. Keep it affordable. Return the answer in a table with calories per meal.”
+
+9) How would you build a simple document question-answering system using Python and an LLM?
+Answer:
+Extract text from documents, split it into chunks, create embeddings, store them in a vector database, retrieve relevant chunks for a user query, and pass those chunks to the LLM to generate the final answer.
+
+10) Suppose the model gives inconsistent answers to the same question. How would you troubleshoot that?
+Answer:
+Check if the prompt, retrieval results, chat history, model parameters, or temperature are changing. Log the full pipeline and compare the retrieved context and final prompt across runs.
+
+11) You need to build a chatbot that answers questions from company PDFs. How would you design it end to end?
+Answer:
+Ingest PDFs, extract and clean text, chunk the content, generate embeddings, store them with metadata, retrieve relevant chunks on query, optionally rerank them, and send the best context to the LLM. Return answers with citations.
+
+12) A user asks a question, but the model answers with made-up information. How would you detect and reduce that?
+Answer:
+Detect it by checking whether the answer is supported by retrieved context. Reduce it by improving retrieval, forcing grounded answers, adding citations, lowering temperature, and using fallback responses when evidence is weak.
+
+13) Your GenAI app is becoming expensive because of token usage. What steps would you take?
+Answer:
+Shorten prompts, reduce unnecessary chat history, retrieve fewer but better chunks, cache repeated responses, limit output length, summarize old context, and use a smaller model where possible.
+
+14) Users complain that responses are too slow. Where would you investigate first?
+Answer:
+Break latency into steps: retrieval, reranking, model inference, network time, and frontend rendering. Then identify which stage is slow and optimize that stage first.
+
+15) You have sensitive business data. What precautions would you take before sending data to an LLM?
+Answer:
+Minimize the data sent, mask sensitive fields, use approved secure deployments, encrypt data in transit and at rest, enforce access control, review retention policies, and maintain audit logs.
+
+16) When would you choose RAG over fine-tuning?
+Answer:
+Choose RAG when the answer depends on documents or knowledge that changes often. Choose fine-tuning when you want more consistent behavior, tone, or output format.
+
+17) If retrieved documents are irrelevant, what areas would you debug?
+Answer:
+Check chunking strategy, embedding quality, metadata filters, query rewriting, vector index setup, search settings, and reranking logic.
+
+18) How would you store chat history for a conversational AI assistant?
+Answer:
+Store user messages, assistant messages, timestamps, and session IDs. Keep recent history directly, summarize older history, and apply privacy, retention, and access-control rules.
+
+19) How would you prevent prompt injection in an LLM application?
+Answer:
+Treat user input and retrieved documents as untrusted, separate instructions from context, restrict tool permissions, validate tool inputs, and add guardrails and adversarial testing.
+
+20) How would you explain your GenAI system to a non-technical stakeholder?
+Answer:
+I would say: the system first finds the most relevant company information, then uses that information to draft an answer. It works like an assistant that reads the right documents before replying.
+
+21) What is reranking and what problem does it solve?
+Answer:
+Reranking is a second step after retrieval where the top candidate chunks are reordered using a stronger relevance model. It improves which chunks reach the LLM and increases answer quality.
+
+22) How does an LLM work at a high level?
+Answer:
+An LLM processes text as tokens, uses transformer layers with attention to understand context, and predicts the next token repeatedly until it forms a response.
+
+23) If you need to write a prompt for a dietician agent, how would you approach it?
+Answer:
+Define the role, goal, user details, constraints, safety boundaries, and expected output format. For example: user age, diet preference, allergies, goal, budget, and response structure.
+
+24) Why do we use XML tags or structured delimiters in prompts?
+Answer:
+They separate instructions, context, examples, and user input clearly. This makes the prompt easier to maintain and reduces ambiguity for the model.
+
+25) What is your approach to creating few-shot or multi-shot prompts?
+Answer:
+Start with a clear task, then provide a few high-quality input-output examples that match the format and behavior you want. Keep examples consistent and include edge cases if needed.
+
+26) If a RAG system is not performing well, how would you handle it?
+Answer:
+Debug the pipeline step by step: retrieval quality, chunking, embeddings, reranking, prompt design, and final generation. Create test queries and measure each stage separately before making changes.
