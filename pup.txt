@@ -26,7 +26,7 @@ Question List
 24. Why do we use XML tags or structured delimiters in prompts?
 25. What is your approach to creating few-shot or multi-shot prompts?
 26. If a RAG system is not performing well, how would you handle it?
-
+What is a commonly used way to stream data from server to client in GenAI apps, and how does SSE work?
 ---
 
 You are building a Retrieval-Augmented Generation (RAG) system.
