@@ -1,7 +1,7 @@
-I appreciate your patience. Let me clarify the scenario once more to ensure we’re on the same page.
+Hey! I need a fix for the response formatting. Right now, the agent adds numbered annotations (like "1", "2", "3") in the text, but only one link actually appears, making it super confusing. So here's what I want:
 
-Our bot processes bookings in batches based on fixed times—like the 11:30 AM and 9:30 AM runs. Any TIDs that enter the queue after 9:30 AM will only be picked up in the next batch at 11:30 AM—this is intentional since it's a cron-based schedule.
+Drop the numbered annotations entirely from the main text. No "1", "2", "3" inside the response text itself.
+Instead, if a source link is needed, add it at the end, after a clean spacing gap, like a footer.
+Make sure those links don’t break—give them proper formatting and spacing so they appear as full, clickable URLs without splitting.
 
-Now, the 26 bookings you're referring to are from the previous day and were not picked up today—those got flagged for manual action due to some issue. As of today’s 11:30 batch, 18 bookings have been successfully processed. The bot is working as designed and processing according to the scheduled runs.
-
-If you need any more details (or if there’s something specific you’re concerned about), feel free to let me know!
+In short: No inline numbering. Just clear text. Then, at the end, neatly formatted links if needed.
