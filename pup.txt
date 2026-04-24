@@ -1,144 +1,174 @@
-You are working on a Node.js + Express baggage-retrieval service that uses:
-- OpenAI Agents SDK for chat/tool calling
-- Qdrant for vector retrieval
-- CheapOair baggage directory rows as structured baggage anchors
-- airline policy pages as linked policy evidence
+# Task: Fix Airline Retrieval Agent Comparisons and Simplify Responses
 
-Current retrieval code is mainly in:
-- src/retrieval/service.js
-- src/retrieval/helpers.js
-- src/retrieval/query-routing.js
+We have two problems in our airline retrieval service:
 
-Supporting indexing/vector files:
-- src/indexing/hybrid-documents.js
-- src/indexing/vector-documents.js
-- src/indexing/qdrant-service.js
+1. Comparison answers are inconsistent.
+2. Airline explanations are too complicated for regular users.
 
-Evaluation artifacts:
-- data/evals/baggage-query-20-latest/report.md
-- data/evals/baggage-query-20-url-kb/report.md
-- data/evals/baggage-query-20-compare-latest/summary.md
+## Problem 1: Comparison Queries Are Weak/Inconsistent
 
-Context:
-- We ran 20 baggage-query scenarios against two collections:
-  - url_kb_crawlfix
-  - url_kb
-- Both answered all 20 cases.
-- But quality is still not good enough:
-  - url_kb_crawlfix: 6 strong, 14 partial
-  - url_kb: 4 strong, 16 partial
+Example queries:
 
-I need you to analyze and improve the retrieval quality, especially for baggage-policy queries.
+- Compare Emirates and Qatar Airways
+- Which is better, Delta or United for baggage?
+- Compare Singapore Airlines, Emirates, and Qatar for long-haul economy
+- Is Turkish Airlines better than Lufthansa for cancellation flexibility?
 
-Main problems currently observed:
+Current issue:
 
-1. Directory row is found, but linked policy detail is still incomplete.
-Example:
-- Query: "I have a flight from NYC to LAX on JetBlue in economy class, What will be the baggage policy"
-- Current issue:
-  - route row is found correctly
-  - carry-on info is better now
-  - checked-bag fee/allowance is still not grounded clearly
-  - answer remains partial
+The agent sometimes receives uneven or incomplete data, so it gives inconsistent comparison results.
 
-2. Same airline page URL is reused for multiple facets.
-Example:
-- JetBlue firstBagUrl, secondBagUrl, and additionalPolicyUrl all point to the same baggage page
-- Current issue:
-  - even after facet-first retrieval, the system can still return generic or less useful sections
-  - it is hard to reliably isolate exact checked-bag facts from a single hub page
+## Required Fix: Comparison-Specific Retrieval Flow
 
-3. Some answers still rely on generic baggage pages instead of exact route/cabin-specific facts.
-Examples:
-- Turkish JFK -> IST economy
-- Turkish IST -> DEL business
-- Air France JFK -> CDG economy
-- British Airways JFK -> LHR economy
-- Qatar JFK -> DOH economy
-- Current issue:
-  - route row is found
-  - policy page is linked
-  - but exact checked-bag allowance or class-specific detail is still missing or too generic
+Implement this flow:
 
-4. Fare-brand sensitivity is weak.
-Example:
-- Query: "I have a flight from ATL to SEA on Delta Air Lines in economy class with basic economy brand, What will be the baggage policy"
-- Current issue:
-  - the system recognizes the airline and route
-  - but brand/fare nuance like Basic Economy is not strongly grounded from retrieved evidence
+1. Detect when the user is asking for a comparison.
+2. Extract airline names from the query.
+3. Extract requested comparison topics, such as:
+   - baggage
+   - cancellation
+   - refunds
+   - seat comfort
+   - fees
+   - routes
+   - customer service
+   - loyalty program
+   - on-time performance
+4. Retrieve data separately for each airline.
+5. If topics are mentioned, retrieve separately for each airline and each topic.
+6. Make sure evidence is balanced before calling the agent.
+7. If one airline has weak or missing data, run a fallback retrieval pass.
+8. Pass a structured comparison context to the agent instead of raw chunks.
+9. The agent must not guess when data is missing.
 
-5. Some airlines still return only row-level evidence with weak official expansion.
-Examples:
-- Aer Lingus JFK -> DUB business
-- Aer Lingus DUB -> BOS economy
-- Current issue:
-  - directory row is present
-  - official airline page expansion is weak or blocked/quarantined
-  - result stays partial
+## Example Comparison Context
 
-6. Retrieval is better in url_kb_crawlfix, but still not consistently producing the most useful policy facts.
-Examples of improvement but still partial:
-- JetBlue NYC -> LAX
-- Emirates NYC -> LAX
-- Lufthansa MUC -> DEL business
-- Current issue:
-  - retrieval does not fully fail
-  - but it still often gives “here is what we know, but exact checked-bag detail is missing”
+Use a structure like this:
 
-7. Some answers are too conservative because the retrieved chunks do not expose exact fee tables or baggage facts.
-Examples:
-- JetBlue
-- Turkish
-- some Lufthansa and BA cases
-- Current issue:
-  - answer quality is bounded by what is actually surfaced from retrieved chunks
-  - retrieval should do a better job of surfacing fact-bearing chunks and suppressing generic text
+{
+  "airlines": ["Emirates", "Qatar Airways"],
+  "dimensions": {
+    "baggage_policy": {
+      "Emirates": {
+        "summary": "Economy baggage allowance depends on fare type and route.",
+        "evidence": ["chunk_id_1"],
+        "confidence": "medium"
+      },
+      "Qatar Airways": {
+        "summary": "Economy baggage allowance depends on route and fare family.",
+        "evidence": ["chunk_id_2"],
+        "confidence": "medium"
+      }
+    }
+  },
+  "missing_data": []
+}
 
-8. We still have possible ranking/noise issues inside linked policy retrieval.
-Example:
-- hub pages can still surface less useful sections instead of the most relevant baggage fact sections
-- we need better section/fact ranking for:
-  - carry_on
-  - first_checked_bag
-  - second_checked_bag
-  - additional_policy
+## Problem 2: Responses Are Too Complicated
 
-9. Airline normalization is improved but still needs to be treated as a first-class retrieval constraint.
-Examples:
-- JetBlue vs JetBlue Airways
-- Emirates vs Emirates Airlines
-- Current issue:
-  - canonical airline matching exists now, but retrieval should be audited to ensure every relevant stage uses canonical airline consistently
+Current issue:
 
-10. Retrieval quality is still heavily dependent on corpus quality.
-Examples:
-- some airline pages are generic, blocked, or only partially useful
-- even when retrieval works correctly, answer quality remains partial because fact extraction is weak or source content is shallow
+The agent explains airline details in a technical way that regular travelers may not understand.
 
-What I want you to do:
-1. Audit the current baggage retrieval flow end-to-end.
-2. Identify where quality is lost:
-   - row selection
-   - facet inference
-   - linked policy stage selection
-   - policy_fact extraction quality
-   - generic section fallback ranking
-   - airline canonical matching
-   - route/cabin/brand interpretation
-3. Propose and implement retrieval-focused improvements.
-4. If minimal indexing metadata changes are required to improve retrieval, make them too.
-5. Do not redesign the whole service. Improve the current architecture.
+## Required Fix: Plain-Language Response Layer
 
-Expected outputs:
-- A concrete diagnosis of the current retrieval gaps
-- Code changes
-- Tests covering the regressions
-- Re-run examples for the problem cases above
-- A short evaluation summary showing what improved
+Add a final response layer that converts retrieved/reasoned data into simple traveler-friendly language.
 
-Success criteria:
-- Fewer partial baggage answers
-- Better grounding for checked-bag details
-- Better fare/brand awareness where evidence exists
-- Better section/fact selection from hub pages
-- Fewer generic or weak policy citations
+Final answers should be:
+
+- Simple
+- Short
+- Practical
+- Easy to understand
+- Focused only on what matters to the traveler
+- Free from airline industry jargon
+- Honest when details depend on route, fare type, cabin class, or travel date
+- Clear when data is missing
+
+## Default Format for Comparison Answers
+
+Use this format:
+
+Quick verdict:
+Give a short, clear summary.
+
+Key differences:
+Compare only the most important points.
+
+Best for:
+Mention which airline is better for which traveler need.
+
+Things to double-check before booking:
+Mention fare rules, baggage, cancellation, refunds, and route-specific details if relevant.
+
+## Indexing Improvements
+
+Review and improve the airline index.
+
+Each chunk should be topic-specific and include metadata like:
+
+{
+  "airline_name": "Qatar Airways",
+  "airline_code": "QR",
+  "topic": "baggage_policy",
+  "cabin": "economy",
+  "region": "global",
+  "content": "...",
+  "source_url": "...",
+  "last_updated": "..."
+}
+
+Recommended topics:
+
+- baggage_policy
+- cancellation_policy
+- refund_policy
+- seat_comfort
+- fees
+- routes
+- loyalty_program
+- customer_service
+- on_time_performance
+- economy_experience
+- business_class
+- family_travel
+- accessibility
+
+## Airline Alias Handling
+
+Support aliases such as:
+
+- Qatar = Qatar Airways
+- Emirates = Emirates Airline
+- Singapore = Singapore Airlines
+- Turkish = Turkish Airlines
+- Lufthansa = Lufthansa German Airlines
+- Delta = Delta Air Lines
+- United = United Airlines
+
+## Guardrails
+
+The agent must follow these rules:
+
+- Compare only using retrieved evidence.
+- Do not guess missing details.
+- If data is missing for one airline, say so clearly.
+- Do not over-explain.
+- Do not expose internal chunk IDs, metadata, embeddings, or retrieval logic to the user.
+- Keep final answers simple and useful.
+
+## Acceptance Criteria
+
+The fix is successful when:
+
+- Comparison queries retrieve balanced evidence for each airline.
+- The agent receives structured comparison context, not messy raw chunks.
+- Missing data is clearly reported.
+- Airline aliases work correctly.
+- Final answers are short, simple, and traveler-friendly.
+- The agent does not invent or assume policy details.
+- Tests pass for these queries:
+  - Compare Emirates and Qatar Airways
+  - Which is better, Delta or United for baggage?
+  - Compare Singapore Airlines, Emirates, and Qatar for long-haul economy
+  - Is Turkish Airlines better than Lufthansa for cancellation flexibility?
