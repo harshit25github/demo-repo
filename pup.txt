@@ -1,15 +1,9 @@
-Format the response cleanly.
+BEGIN;
 
-Rules:
-- Do not show raw URLs in the answer.
-- Wrap links using Markdown: `[Readable Name](URL)`.
-- Do not use inline source numbers like `[1]`, `[2]`, `(1)`.
-- Add sources only at the end under `## Sources`.
-- Keep proper spacing so links don’t break.
-- Remove duplicate or irrelevant links.
+ALTER TABLE users
+ADD COLUMN is_activated BOOLEAN NOT NULL DEFAULT TRUE;
 
-Example:
+ALTER TABLE users
+ALTER COLUMN is_activated SET DEFAULT FALSE;
 
-## Sources
-
-- [Emirates Baggage Policy](https://www.emirates.com/in/english/baggage/)
+COMMIT;
