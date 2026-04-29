@@ -1,9 +1,69 @@
-BEGIN;
+I need you to implement message-level user interaction metadata for the existing `messages_v2` table.
 
-ALTER TABLE users
-ADD COLUMN is_activated BOOLEAN NOT NULL DEFAULT TRUE;
+Task 1: Create a new table
 
-ALTER TABLE users
-ALTER COLUMN is_activated SET DEFAULT FALSE;
+Create a new table to store the following details against each message:
 
-COMMIT;
+- like/dislike status
+- remarks
+- isMessageCopied
+- isMessageShared
+
+This data should be stored against a `messageId`, where `messageId` refers to the primary key/id in the existing `messages_v2` table.
+
+Expected relationship:
+- One-to-one relationship with `messages_v2`
+- Each message should have at most one metadata/feedback record
+- Add a unique constraint on `messageId`
+- Add a foreign key constraint referencing `messages_v2(id)`
+
+Suggested table name:
+`message_interactions_v2`
+
+Alternative names:
+- `message_feedback_v2`
+- `message_user_actions_v2`
+- `message_engagement_v2`
+
+Preferred schema idea:
+
+Table: `message_interactions_v2`
+
+Columns:
+- id
+- messageId
+- reactionStatus — values can be `LIKE`, `DISLIKE`, or `NULL`
+- remarks
+- isMessageCopied — boolean, default false
+- isMessageShared — boolean, default false
+- createdAt
+- updatedAt
+
+Please use the project’s existing naming conventions for columns, timestamps, migrations, entities/models, and indexes.
+
+Task 2: Expose update endpoint
+
+Create an API endpoint to update these values against a given `messageId`.
+
+Suggested endpoint:
+
+PATCH `/messages/:messageId/interactions`
+
+Request body example:
+
+{
+  "reactionStatus": "LIKE",
+  "remarks": "Helpful response",
+  "isMessageCopied": true,
+  "isMessageShared": false
+}
+
+Requirements:
+- Validate that the message exists in `messages_v2`
+- If an interaction record already exists for the message, update it
+- If no interaction record exists, create one
+- Allow partial updates, meaning the request body may contain only one or some fields
+- Validate `reactionStatus` to allow only `LIKE`, `DISLIKE`, or null
+- Return the updated interaction record in the response
+- Add proper error handling for invalid `messageId` and validation failures
+- Add migration, model/entity, service/repository logic, controller/route, and tests if this project has test coverage
