@@ -1,21 +1,30 @@
-Profile the airline retrieval flow and find the main latency bottlenecks, especially for slower airlines.
+Profile and optimize the airline retrieval flow, especially for slower airlines.
 
 Check for:
-- Slow/heavy DB queries
-- N+1 patterns
-- Missing indexes
+- Slow/heavy DB queries, N+1 patterns, missing indexes
 - Redundant loops or repeated work
 - Airline-specific slow paths
-- Work that can be safely parallelized
+- Safe parallelization opportunities
 
-Add lightweight timing logs per airline, query, and retrieval step.
+Add lightweight timing logs per airline, query, and major retrieval step.
 
-Then optimize with batching, indexing, caching, loop cleanup, and safe parallelization. Keep API behavior and response shape unchanged.
+Then optimize with batching, indexing, caching, cleanup, and controlled parallelization. Keep API behavior and response shape unchanged.
+
+Also create an MCP server wrapper for the current retrieval tool so it can be used independently in other agentic workflows.
+
+MCP requirements:
+- Expose the retrieval tool as a callable MCP tool
+- Define clear input/output schemas
+- Reuse existing retrieval logic, don’t duplicate core code
+- Add config for env vars, auth, timeouts, and concurrency limits
+- Include error handling and structured responses
+- Add basic README usage examples for another agent/client
 
 Deliver:
-- Slowest airlines + bottleneck summary
+- Bottleneck summary + slowest airlines
 - Code/index changes
+- MCP server implementation
 - Before/after latency results
 - Risks and follow-ups
 
-Goal: make retrieval fast, smooth, and scalable.
+Goal: make retrieval fast, reusable, and agent-friendly.
