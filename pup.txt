@@ -1,30 +1,7 @@
-Profile and optimize the airline retrieval flow, especially for slower airlines.
+Hi team, we are seeing an issue in the Puppeteer cron automation.
 
-Check for:
-- Slow/heavy DB queries, N+1 patterns, missing indexes
-- Redundant loops or repeated work
-- Airline-specific slow paths
-- Safe parallelization opportunities
+Some batches have a high number of bookings, so one cron execution takes longer to complete. Before it finishes, the next cron starts, causing both jobs to run in parallel.
 
-Add lightweight timing logs per airline, query, and major retrieval step.
+This can create booking conflicts, duplicate processing, and Puppeteer crashes.
 
-Then optimize with batching, indexing, caching, cleanup, and controlled parallelization. Keep API behavior and response shape unchanged.
-
-Also create an MCP server wrapper for the current retrieval tool so it can be used independently in other agentic workflows.
-
-MCP requirements:
-- Expose the retrieval tool as a callable MCP tool
-- Define clear input/output schemas
-- Reuse existing retrieval logic, don’t duplicate core code
-- Add config for env vars, auth, timeouts, and concurrency limits
-- Include error handling and structured responses
-- Add basic README usage examples for another agent/client
-
-Deliver:
-- Bottleneck summary + slowest airlines
-- Code/index changes
-- MCP server implementation
-- Before/after latency results
-- Risks and follow-ups
-
-Goal: make retrieval fast, reusable, and agent-friendly.
+Can we please review the cron timing or add a lock mechanism so the next cron does not start until the previous one is completed?
