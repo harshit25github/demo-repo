@@ -1,7 +1,14 @@
-Hi team, we are seeing an issue in the Puppeteer cron automation.
+Hey, the current code is working but it looks a bit messy and hard to maintain.
 
-Some batches have a high number of bookings, so one cron execution takes longer to complete. Before it finishes, the next cron starts, causing both jobs to run in parallel.
+Could you please refactor it with these points in mind:
 
-This can create booking conflicts, duplicate processing, and Puppeteer crashes.
+* Keep the logic clean and readable
+* Break large functions into smaller reusable functions
+* Use meaningful variable and function names
+* Remove duplicate or unused code
+* Add comments only where the logic is not obvious
+* Keep error handling clear
+* Avoid changing the existing behavior unless required
+* Make sure the final code is easy to debug and extend
 
-Can we please review the cron timing or add a lock mechanism so the next cron does not start until the previous one is completed?
+Please also share a short summary of what you changed after refactoring.
