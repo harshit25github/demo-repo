@@ -1,114 +1,25 @@
-Debug this issue in our Node/TypeScript codebase:
+Fix the OpenAI fine-tuned model issue.
 
-We have a fine-tuned OpenAI model that worked with the OpenAI Agents JS SDK for ~5 months, but now it returns `404 model_not_found` when called through the Responses API / Agents SDK.
+Context:
 
-Important context:
+* Fine-tuned model worked with Agents SDK for ~5 months.
+* Now it fails with `404 model_not_found` on Responses API / Agents SDK.
+* Same model still works with Chat Completions.
+* Direct `client.responses.create({ model: "ft:...", input: "test" })` also fails.
 
-* Same API key is being used.
-* The model still works with `client.chat.completions.create(...)`.
-* The model fails with direct `client.responses.create(...)`, even without tools:
+Please implement:
 
-```ts
-await client.responses.create({
-  model: "ft:our-model-id",
-  input: "test",
-});
-```
-
-So this is probably not only an Agents SDK issue.
-
-Please investigate:
-
-1. Confirm the exact `ft:` model ID being used.
-2. Confirm whether the working Chat Completions call and failing Responses call use the exact same:
-
-   * API key source
-   * organization
-   * project
-   * baseURL
-   * OpenAI SDK version
-3. Add logging for:
-
-   * endpoint being called
-   * model ID
-   * org/project/baseURL config
-   * full OpenAI error object
-   * request ID from the failed Responses call
-4. Test the same model with:
-
-   * `client.chat.completions.create(...)`
-   * `client.responses.create(...)`
-   * Agents SDK default flow
-   * Agents SDK forced to `chat_completions` using `setOpenAIAPI("chat_completions")`
-5. Check whether any hosted/built-in tools are being passed in the Responses/Agents flow.
-6. Check package/version changes around the time this started failing:
-
-   * `openai`
-   * `@openai/agents`
-   * lockfile changes
-   * env/config changes
-7. Create a minimal reproducible script that only initializes the OpenAI client and calls both endpoints with the same `ft:` model ID.
-
-Expected output:
-
-* A clear comparison of which endpoint works/fails.
-* The exact error body and request ID for the failing Responses call.
-* Whether this is code/config-related or likely an OpenAI-side Responses API model routing issue.
-* If Responses keeps failing but Chat Completions works, propose a temporary fallback using Chat Completions for the fine-tuned model path.
-Debug this issue in our Node/TypeScript codebase:
-
-We have a fine-tuned OpenAI model that worked with the OpenAI Agents JS SDK for ~5 months, but now it returns `404 model_not_found` when called through the Responses API / Agents SDK.
-
-Important context:
-
-* Same API key is being used.
-* The model still works with `client.chat.completions.create(...)`.
-* The model fails with direct `client.responses.create(...)`, even without tools:
+1. Use one shared OpenAI client config everywhere: `apiKey`, `organization`, `project`, `baseURL`.
+2. Add a check: try Responses first, and if it returns `404 model_not_found`, fallback to Chat Completions.
+3. For Agents SDK, use the shared client and switch to Chat Completions when fallback is needed:
 
 ```ts
-await client.responses.create({
-  model: "ft:our-model-id",
-  input: "test",
-});
+setDefaultOpenAIClient(client);
+setOpenAIAPI("chat_completions");
 ```
 
-So this is probably not only an Agents SDK issue.
+4. Do not silently move hosted-tool flows to Chat Completions. If tools are needed, split the flow: Responses for tools, Chat Completions for the fine-tuned model.
+5. Log the model ID, endpoint used, full error, and OpenAI request ID.
 
-Please investigate:
+Expected result: production works again, and we have enough logs to confirm whether this is an OpenAI-side Responses routing issue.
 
-1. Confirm the exact `ft:` model ID being used.
-2. Confirm whether the working Chat Completions call and failing Responses call use the exact same:
-
-   * API key source
-   * organization
-   * project
-   * baseURL
-   * OpenAI SDK version
-3. Add logging for:
-
-   * endpoint being called
-   * model ID
-   * org/project/baseURL config
-   * full OpenAI error object
-   * request ID from the failed Responses call
-4. Test the same model with:
-
-   * `client.chat.completions.create(...)`
-   * `client.responses.create(...)`
-   * Agents SDK default flow
-   * Agents SDK forced to `chat_completions` using `setOpenAIAPI("chat_completions")`
-5. Check whether any hosted/built-in tools are being passed in the Responses/Agents flow.
-6. Check package/version changes around the time this started failing:
-
-   * `openai`
-   * `@openai/agents`
-   * lockfile changes
-   * env/config changes
-7. Create a minimal reproducible script that only initializes the OpenAI client and calls both endpoints with the same `ft:` model ID.
-
-Expected output:
-
-* A clear comparison of which endpoint works/fails.
-* The exact error body and request ID for the failing Responses call.
-* Whether this is code/config-related or likely an OpenAI-side Responses API model routing issue.
-* If Responses keeps failing but Chat Completions works, propose a temporary fallback using Chat Completions for the fine-tuned model path.
