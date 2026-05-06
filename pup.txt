@@ -1,14 +1,31 @@
-Hey, the current code is working but it looks a bit messy and hard to maintain.
+import OpenAI from "openai";
 
-Could you please refactor it with these points in mind:
+const client = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+  organization: process.env.OPENAI_ORG_ID,
+  project: process.env.OPENAI_PROJECT_ID,
+});
 
-* Keep the logic clean and readable
-* Break large functions into smaller reusable functions
-* Use meaningful variable and function names
-* Remove duplicate or unused code
-* Add comments only where the logic is not obvious
-* Keep error handling clear
-* Avoid changing the existing behavior unless required
-* Make sure the final code is easy to debug and extend
+async function getAccessibleFineTunedModels(): Promise<string[]> {
+  const modelIds = new Set<string>();
 
-Please also share a short summary of what you changed after refactoring.
+  const models = await client.models.list();
+
+  for (const model of models.data) {
+    if (model.id.startsWith("ft:")) {
+      modelIds.add(model.id);
+    }
+  }
+
+  for await (const job of client.fineTuning.jobs.list({ limit: 100 })) {
+    if (job.status === "succeeded" && job.fine_tuned_model) {
+      modelIds.add(job.fine_tuned_model);
+    }
+  }
+
+  return [...modelIds].sort();
+}
+
+const fineTunedModels = await getAccessibleFineTunedModels();
+
+console.log(fineTunedModels);
