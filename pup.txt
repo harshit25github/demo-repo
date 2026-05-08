@@ -1,25 +1,44 @@
-Fix the OpenAI fine-tuned model issue.
+Test both retrieval flows:
 
-Context:
+1. Direct Express injection/retrieval routes
+2. New MCP server using the same retrieval tool via the OpenAI client
 
-* Fine-tuned model worked with Agents SDK for ~5 months.
-* Now it fails with `404 model_not_found` on Responses API / Agents SDK.
-* Same model still works with Chat Completions.
-* Direct `client.responses.create({ model: "ft:...", input: "test" })` also fails.
+Run the servers locally, then compare both paths using the same known test queries.
 
-Please implement:
+Check:
 
-1. Use one shared OpenAI client config everywhere: `apiKey`, `organization`, `project`, `baseURL`.
-2. Add a check: try Responses first, and if it returns `404 model_not_found`, fallback to Chat Completions.
-3. For Agents SDK, use the shared client and switch to Chat Completions when fallback is needed:
+- Express server starts cleanly
+- MCP server starts cleanly
+- OpenAI client connects to MCP correctly
+- MCP calls the same underlying retrieval tool
+- Direct route and MCP retrieval return the same or equivalent chunks
+- topK, filters, namespace, metadata, document IDs, scores, and chunk IDs are preserved
+- No chunks are missing, reordered unexpectedly, truncated, or renamed
+- Payloads are not being reshaped incorrectly between OpenAI → MCP → retrieval tool
+- Final MCP answers are grounded in the retrieved chunks
 
-```ts
-setDefaultOpenAIClient(client);
-setOpenAIAPI("chat_completions");
-```
+Test flow:
 
-4. Do not silently move hosted-tool flows to Chat Completions. If tools are needed, split the flow: Responses for tools, Chat Completions for the fine-tuned model.
-5. Log the model ID, endpoint used, full error, and OpenAI request ID.
+1. Start Express server and MCP server.
+2. Hit the direct retrieval route with 3–5 known queries.
+3. Run the same queries through the OpenAI client using MCP.
+4. Compare logs for both paths:
+   - incoming payload
+   - retrieval tool input
+   - retrieval tool output
+   - final response
+5. Identify any mismatch in chunks, scores, metadata, or final answer quality.
+6. Fix anything that breaks parity.
+7. Add/update tests if useful.
 
-Expected result: production works again, and we have enough logs to confirm whether this is an OpenAI-side Responses routing issue.
+Deliver a short report:
 
+- Commands used
+- Queries tested
+- Direct route results
+- MCP results
+- Differences found
+- Fixes made
+- Remaining issues
+
+Goal: MCP retrieval should match the original Express route retrieval in accuracy, payload shape, and completeness.
