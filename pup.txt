@@ -1,44 +1,52 @@
-Test both retrieval flows:
+You’re working in a separate codebase where we need to integrate an already-built MCP server.
 
-1. Direct Express injection/retrieval routes
-2. New MCP server using the same retrieval tool via the OpenAI client
+Context:
+- The MCP server is already developed and working.
+- It uses our existing retrieval tool.
+- We have already tested retrieval through:
+  1. Direct Express routes
+  2. OpenAI client connected to the MCP server
+- Both flows are working correctly.
 
-Run the servers locally, then compare both paths using the same known test queries.
+Your task:
+Integrate the existing MCP server connection into this current codebase.
 
-Check:
+I will provide:
+- The relevant Express routes
+- The MCP server details
+- Example OpenAI SDK client code showing how to connect to the MCP server
+- Any required env vars/config
 
-- Express server starts cleanly
-- MCP server starts cleanly
-- OpenAI client connects to MCP correctly
-- MCP calls the same underlying retrieval tool
-- Direct route and MCP retrieval return the same or equivalent chunks
-- topK, filters, namespace, metadata, document IDs, scores, and chunk IDs are preserved
-- No chunks are missing, reordered unexpectedly, truncated, or renamed
-- Payloads are not being reshaped incorrectly between OpenAI → MCP → retrieval tool
-- Final MCP answers are grounded in the retrieved chunks
+Please do the following:
 
-Test flow:
+1. Review the provided OpenAI client example.
+2. Understand how it connects to the MCP server.
+3. Reuse the same MCP connection pattern in this codebase.
+4. Wire the current app/routes so they can call the MCP-powered OpenAI client.
+5. Keep the integration clean and consistent with the existing project structure.
+6. Make sure env vars, URLs, ports, and config values are not hardcoded.
+7. Add clear error handling and useful logs around:
+   - OpenAI client initialization
+   - MCP server connection
+   - tool call execution
+   - response handling
 
-1. Start Express server and MCP server.
-2. Hit the direct retrieval route with 3–5 known queries.
-3. Run the same queries through the OpenAI client using MCP.
-4. Compare logs for both paths:
-   - incoming payload
-   - retrieval tool input
-   - retrieval tool output
-   - final response
-5. Identify any mismatch in chunks, scores, metadata, or final answer quality.
-6. Fix anything that breaks parity.
-7. Add/update tests if useful.
+Validation:
+- Start the current codebase.
+- Confirm it connects to the MCP server successfully.
+- Hit the provided route(s).
+- Verify the request reaches the OpenAI client.
+- Verify the OpenAI client calls the MCP server.
+- Verify the MCP server returns the expected retrieval/tool response.
+- Confirm the final response shape matches what the current codebase expects.
 
-Deliver a short report:
+Do not rebuild the MCP server or retrieval logic.
+Do not change the existing retrieval implementation unless required for integration.
+The goal is only to connect this codebase to the already-working MCP server using the provided OpenAI SDK example.
 
-- Commands used
-- Queries tested
-- Direct route results
-- MCP results
-- Differences found
-- Fixes made
-- Remaining issues
-
-Goal: MCP retrieval should match the original Express route retrieval in accuracy, payload shape, and completeness.
+Deliver:
+- Files changed
+- Env vars added/required
+- How to run locally
+- Test route(s) used
+- Any issues or assumptions
