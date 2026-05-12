@@ -1,32 +1,20 @@
-Implement a small update to the existing “new chat creation” flow.
+Hi Team,
 
-Current behavior:
-When a user sends their first request, if there is no `chatId`, we treat it as a new chat. The API creates a new chat, generates a title, and saves it to the chat storage tables.
+We need your input on one design decision for chat history and flight search context.
 
-New requirement:
-We now also need to store an emoji alongside the generated chat title.
+Currently, we have a **chat table** where we store flight-related context at the **chat ID level**. The **messages table** stores all messages, and each message is linked to the chat using `chat_id` as a foreign key.
 
-Context:
-The emoji generation/selection logic is already handled. Your task is to integrate the improved agent/output into the existing API flow so that the emoji is persisted together with the title when a new chat is created.
+Now the question is: should we also store the flight context against each individual `message_id`?
 
-What to implement:
+This means each message would have its own exact flight search context, such as selected filters, search details, and contracts used at that time.
 
-1. Find the API path that handles the first user request when `chatId` is missing.
-2. Locate where the new chat is created, titled, and saved.
-3. Update that flow so the generated emoji is included alongside the title.
-4. Ensure the relevant chat storage tables are updated with the emoji value.
-5. Preserve all existing behavior for title generation, chat creation, and message handling.
-6. Add or update tests to verify:
+If yes, we also need to decide how to refresh that context when loading chat history:
 
-   * A new chat without `chatId` creates a title and emoji.
-   * The emoji is saved in the correct chat storage table/field.
-   * Existing chats with a `chatId` are not accidentally retitled or re-emoji’d.
-   * The flow still works if emoji generation returns empty/null, using the agreed fallback behavior.
+Option 1: Refresh all flight contracts/context when the chat history is loaded.
 
-Acceptance criteria:
+Option 2: Refresh only the contracts/context for messages that are visible, for example when the user scrolls to them.
 
-* New chats store both `title` and `emoji`.
-* Existing chats continue working unchanged.
-* No duplicate chat creation.
-* No breaking changes to the API response shape unless required.
-* Tests cover the new persistence behavior.
+Option 3: Keep the stored context as it was originally, without refreshing, so the old chat remains exactly the same as when it was created.
+
+Please confirm which approach we should follow.
+
