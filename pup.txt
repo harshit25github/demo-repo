@@ -192,3 +192,100 @@ Keep the implementation clean, modular, and easy to extend.
 Do not hardcode contract data into the prompt.
 The generated contracts context must be fetched dynamically through the new tool only when required.
 Agent should be able to Engage with a User during Error or edge cases professionaly without Shareing any internal Logic and data .    
+
+
+## Additional Requirement: Create a Test Suite / Evaluation Suite for the Flight Agent
+
+Also create a proper test suite to validate the new GPT-5.5 flight agent behavior.
+
+The goal of this test suite is not only to check code correctness, but also to verify the agent’s tool-calling behavior, response quality, and handling of generated contracts context.
+
+Create tests for the following areas:
+
+---
+
+## 1. Tool Routing Tests
+
+Verify that the agent calls the correct tool based on user intent.
+
+### Test Case: New Flight Search
+
+User query:
+
+> Find flights from Delhi to Dubai tomorrow.
+
+Expected behavior:
+
+- Agent should call the Flight Search Tool.
+- Agent should NOT call the Generated Contracts Context Tool.
+- Agent should NOT call the Price Prediction Tool unless explicitly needed.
+- Agent should return flight search results grounded in tool output.
+
+---
+
+### Test Case: Price Prediction
+
+User query:
+
+> Should I book the Delhi to Dubai flight now or wait?
+
+Expected behavior:
+
+- Agent should call the Price Prediction Tool.
+- If the query refers to an existing/generated contract, agent should first call Generated Contracts Context Tool.
+- Agent should clearly explain whether booking now or waiting is better, based only on tool output.
+
+---
+
+### Test Case: Generated Contract Question
+
+User query:
+
+> For the third contract, what is the airline?
+
+Expected behavior:
+
+- Agent should call Generated Contracts Context Tool.
+- Agent should read the third contract from returned context.
+- Agent should answer with the correct airline.
+- Agent should NOT call Flight Search Tool.
+- Agent should NOT guess from chat memory.
+
+---
+
+### Test Case: Compare Generated Contracts
+
+User query:
+
+> Compare contract 1 and contract 3.
+
+Expected behavior:
+
+- Agent should call Generated Contracts Context Tool.
+- Agent should compare only contract 1 and contract 3.
+- Agent should mention important differences like:
+  - airline
+  - price
+  - departure time
+  - arrival time
+  - duration
+  - stops
+  - baggage, if available
+- Agent should mention if any field is missing.
+
+---
+
+## 2. Contract Context Edge Case Tests
+
+### Test Case: No Contracts Available
+
+User query:
+
+> What is the airline in contract 2?
+
+Mock tool response:
+
+```json
+{
+  "contracts": []
+}
