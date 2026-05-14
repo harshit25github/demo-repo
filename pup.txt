@@ -1,291 +1,55 @@
-You are working on an existing flight-booking agent implementation.
-
-Goal:
-Migrate the existing GPT-4.1 based agent prompt and behavior to a GPT-5.5 compatible agentic implementation, while preserving the current business logic and improving tool usage discipline.
-
-Context:
-There is already an existing agent built using a GPT-4.1 style prompt. The main task is to convert that agent to GPT-5.5 and rewrite/refactor the prompt so it follows GPT-5.5 agentic best practices:
-
-- Clear role and task definition
-- Clear tool usage rules
-- Minimal context loading
-- No unnecessary large context inside the initial prompt
-- Dynamic tool calls only when required
-- Strong grounding on tool results
-- No hallucination if tool/context data is unavailable
-- Better follow-up handling
-- Better reasoning around when to search flights, predict prices, or answer from already generated contracts
-
-Existing Tools:
-The agent currently needs to support these tools:
-
-1. Flight Search Tool
-   Purpose:
-   - Search available flights based on the user query.
-   - Use this when the user asks to find, compare, book, or search flights.
-   - Example queries:
-     - “Find flights from NYC to LAX tomorrow”
-     - “Show me cheapest flights to London”
-     - “I need a flight from Delhi to Mumbai on Friday”
-
-2. Price Prediction Tool
-   Purpose:
-   - Predict or estimate whether flight prices may increase/decrease.
-   - Use this when the user asks about price trends, whether to book now or wait, or future fare prediction.
-   - Example queries:
-     - “Should I book now or wait?”
-     - “Will this flight price increase?”
-     - “Predict price for this route next week”
-
-New Tool Requirement:
-Add a third tool:
-
-3. Generated Contracts Context Tool
-
-Suggested name:
-`getGeneratedContractsContext`
-
-Purpose:
-This tool should return the current generated flight contracts/offers/context that were already created earlier in the conversation/session when Flight Search Tool called .
-
-Important:
-Do NOT inject all generated contract context into the initial system prompt or agent prompt.
-
-Reason:
-The generated contracts object can become very large, and most user queries do not require it. The agent should fetch this context dynamically only when the user asks something related to the already generated contracts.
-
-The tool should be called only when the user asks follow-up questions about previously generated contracts/offers.
-
-Examples where this tool SHOULD be called:
-- “For the third contract, what is the airline?”
-- “Which airline is in contract 2?”
-- “Compare the first and third contract”
-- “Which of these contracts is cheapest?”
-- “What is the baggage policy for the selected contract?”
-- “Tell me the departure time of the second option”
-- “Among the generated contracts, which one is best?”
-- “What are the details of contract number 3?”
-
-Examples where this tool should NOT be called:
-- User is asking for a completely new flight search
-- User has provided a new route/date/passenger requirement
-- User is only asking for price prediction without referencing existing contracts
-- User is having a generic conversation unrelated to generated contracts
-
-Implementation Expectations:
-
-1. Inspect the current agent implementation
-   - Find the existing GPT-4.1 prompt.
-   - Find where the current agent is initialized.
-   - Find the current Flight Search Tool and Price Prediction Tool implementation.
-   - Preserve existing behavior unless changes are required for GPT-5.5 compatibility.
-
-2. Convert the agent to GPT-5.5
-   - Update model configuration from GPT-4.1 to GPT-5.5.
-   - Refactor the prompt to be GPT-5.5 agent-friendly.
-   - Make tool routing explicit.
-   - Avoid putting large runtime objects directly into the prompt.
-   - Keep instructions clean, structured, and deterministic.
-
-3. Add the new Generated Contracts Context Tool
-   - Create a new tool named `getGeneratedContractsContext` or an equivalent clear name.
-   - This tool should return the latest generated contracts/offers from the current session/application context.
-   - The tool should not mutate anything.
-   - The tool should only return the required current context.
-   - If no contracts exist, it should return a clear empty-state response like:
-     “No generated contracts are currently available.”
-
-4. Update agent tool-routing behavior
-   The agent should decide between tools like this:
-
-   - Use Flight Search Tool when user wants to search/find flights.
-   - Use Price Prediction Tool when user asks about price trends or whether to book/wait.
-   - Use Generated Contracts Context Tool when user asks questions about already generated contracts/options/offers.
-   - Use multiple tools only when needed.
-   - Do not call tools unnecessarily.
-
-5. Update the prompt with rules like this:
-
-   Agent Role:
-   You are a flight-booking assistant that helps users search flights, compare generated flight contracts, and answer questions about pricing and previously generated offers.
-
-   Core Rules:
-   - Always understand whether the user is asking for a new flight search, price prediction, or information about already generated contracts.
-   - If the user asks about existing/generated contracts, call the Generated Contracts Context Tool before answering.
-   - Never assume contract details from memory.
-   - Never hallucinate airline, price, timing, baggage, or route details.
-   - If contract context is unavailable, politely say that no generated contracts are available and ask the user to search flights first.
-   - Do not include the full generated contracts object in the initial prompt.
-   - Keep responses concise, useful, and grounded in tool results.
-
-6. Add examples inside the prompt if useful
-
-   Example 1:
-   User: “For the third contract, what is the airline?”
-   Expected behavior:
-   - Call `getGeneratedContractsContext`
-   - Read the third contract from returned context
-   - Answer with the airline name only, plus any useful minimal detail
-
-   Example 2:
-   User: “Find flights from Delhi to Dubai tomorrow”
-   Expected behavior:
-   - Call Flight Search Tool
-   - Do not call Generated Contracts Context Tool
-
-   Example 3:
-   User: “Should I book this now or wait?”
-   Expected behavior:
-   - If “this” refers to an existing generated contract, first call Generated Contracts Context Tool
-   - Then call Price Prediction Tool if prediction data is required
-   - Answer based on available data
-
-   Example 4:
-   User: “Compare contract 1 and contract 3”
-   Expected behavior:
-   - Call Generated Contracts Context Tool
-   - Compare only using returned contract context
-   - Mention if either contract number does not exist
-
-7. Add validation and edge cases
-
-   Handle:
-   - No generated contracts available
-   - User asks for contract number that does not exist
-   - User says “this one” or “selected one” but no selected contract is stored
-   - Contract context is too large
-   - Missing fields in contract data
-   - Tool errors
-   - Ambiguous user query
-
-8. Testing / Acceptance Criteria
-
-   After implementation, verify:
-
-   - Existing flight search still works.
-   - Existing price prediction still works.
-   - New contract-related questions call the new context tool.
-   - Initial agent prompt does not contain the large generated contracts object.
-   - Agent does not answer contract-specific questions without fetching current context.
-   - Agent gives a safe fallback if no contracts exist.
-   - Agent correctly handles contract indexes like first, second, third, contract 1, contract 2, etc.
-   - Agent does not call the contract context tool for fresh flight searches.
-   - Agent behavior is compatible with GPT-5.5.
-
-Deliverables:
-- Updated agent initialization using GPT-5.5.
-- Refactored GPT-5.5-compatible prompt.
-- New Generated Contracts Context Tool.
-- Updated tool registration.
-- Updated tool-selection instructions.
-- Basic tests or manual test cases for:
-  - New flight search
-  - Price prediction
-  - Asking airline of third contract
-  - Comparing two generated contracts
-  - Asking about unavailable contract
-  - No contracts available case
-
-Important:
-Make minimal changes to the existing architecture unless needed.
-Keep the implementation clean, modular, and easy to extend.
-Do not hardcode contract data into the prompt.
-The generated contracts context must be fetched dynamically through the new tool only when required.
-Agent should be able to Engage with a User during Error or edge cases professionaly without Shareing any internal Logic and data .    
-
-
-## Additional Requirement: Create a Test Suite / Evaluation Suite for the Flight Agent
-
-Also create a proper test suite to validate the new GPT-5.5 flight agent behavior.
-
-The goal of this test suite is not only to check code correctness, but also to verify the agent’s tool-calling behavior, response quality, and handling of generated contracts context.
-
-Create tests for the following areas:
-
----
-
-## 1. Tool Routing Tests
-
-Verify that the agent calls the correct tool based on user intent.
-
-### Test Case: New Flight Search
-
-User query:
-
-> Find flights from Delhi to Dubai tomorrow.
-
-Expected behavior:
-
-- Agent should call the Flight Search Tool.
-- Agent should NOT call the Generated Contracts Context Tool.
-- Agent should NOT call the Price Prediction Tool unless explicitly needed.
-- Agent should return flight search results grounded in tool output.
-
----
-
-### Test Case: Price Prediction
-
-User query:
-
-> Should I book the Delhi to Dubai flight now or wait?
-
-Expected behavior:
-
-- Agent should call the Price Prediction Tool.
-- If the query refers to an existing/generated contract, agent should first call Generated Contracts Context Tool.
-- Agent should clearly explain whether booking now or waiting is better, based only on tool output.
-
----
-
-### Test Case: Generated Contract Question
-
-User query:
-
-> For the third contract, what is the airline?
-
-Expected behavior:
-
-- Agent should call Generated Contracts Context Tool.
-- Agent should read the third contract from returned context.
-- Agent should answer with the correct airline.
-- Agent should NOT call Flight Search Tool.
-- Agent should NOT guess from chat memory.
-
----
-
-### Test Case: Compare Generated Contracts
-
-User query:
-
-> Compare contract 1 and contract 3.
-
-Expected behavior:
-
-- Agent should call Generated Contracts Context Tool.
-- Agent should compare only contract 1 and contract 3.
-- Agent should mention important differences like:
-  - airline
-  - price
-  - departure time
-  - arrival time
-  - duration
-  - stops
-  - baggage, if available
-- Agent should mention if any field is missing.
-
----
-
-## 2. Contract Context Edge Case Tests
-
-### Test Case: No Contracts Available
-
-User query:
-
-> What is the airline in contract 2?
-
-Mock tool response:
-
-```json
-{
-  "contracts": []
-}
+You are working on our generative-AI-powered backend, which contains multiple agents. Please inspect the existing agent configuration, prompts, model declarations, guardrails, and any related tests before making changes.
+
+Tasks:
+
+1. Planner Agent
+- The planner agent model has already been changed to GPT-5.5.
+- Please review the planner agent prompt, schema usage, tool-calling behavior, response format, and any model-specific assumptions.
+- If the current prompt/code is already compatible and stable with GPT-5.5, do not make unnecessary changes.
+- If changes are required for GPT-5.5 compatibility, make the smallest safe updates and document what was changed.
+
+2. Gateway Agent
+- The gateway agent is currently using Sofa 1.1.
+- Migrate this agent to GPT-5.4.
+- Update the model configuration accordingly.
+- Convert/refactor the gateway agent prompt so it is compatible with GPT-5.4.
+- Preserve the existing behavior and responsibilities of the gateway agent unless a change is required for compatibility or stability.
+- Make sure routing, classification, delegation, and tool-selection behavior remain stable.
+
+3. Unified Input Guardrail Agent
+- We recently added a flight agent.
+- Some flight-related queries, especially comparison queries, are incorrectly triggering the unified input guardrail agent.
+- Please update the unified input guardrail prompt so legitimate flight-related requests are not blocked.
+- In particular, flight search, flight comparison, fare comparison, airline comparison, route comparison, booking-preference comparison, and similar travel-planning queries should be treated as valid user intent.
+- The guardrail should still block genuinely unsafe, disallowed, abusive, fraudulent, or policy-violating requests.
+- Please add or update examples in the prompt so the guardrail clearly understands that normal flight comparison queries are allowed.
+
+4. Post-Booking Guardrail Agent
+- The post-booking guardrail agent is currently on GPT-4.1 nano.
+- Migrate this agent to GPT-5.4 nano.
+- Update the model configuration accordingly.
+- Rewrite or adjust the prompt to be stable and understandable for GPT-5.4 nano.
+- Keep the prompt concise, explicit, and deterministic because this is a nano model.
+- Preserve the current guardrail behavior, but improve clarity and reduce false positives.
+
+General requirements:
+- Keep changes minimal and focused.
+- Do not rewrite unrelated logic.
+- Maintain existing API contracts, response formats, JSON schemas, and tool interfaces.
+- Update tests or add targeted regression tests where appropriate.
+- Add test cases for flight comparison queries that should not trigger the unified input guardrail.
+- Add test cases for unsafe or invalid inputs that should still be blocked.
+- After changes, run the relevant test suite and report:
+  - files changed,
+  - models updated,
+  - prompts modified,
+  - tests added/updated,
+  - any compatibility concerns,
+  - and whether any behavior changed intentionally.
+
+Expected outcome:
+- Planner agent verified for GPT-5.5 compatibility.
+- Gateway agent migrated from Sofa 1.1 to GPT-5.4 with a compatible prompt.
+- Unified input guardrail updated so valid flight-agent comparison queries are allowed.
+- Post-booking guardrail migrated from GPT-4.1 nano to GPT-5.4 nano with a stable prompt.
+- All relevant tests passing.
