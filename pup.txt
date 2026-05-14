@@ -1,55 +1,80 @@
-You are working on our generative-AI-powered backend, which contains multiple agents. Please inspect the existing agent configuration, prompts, model declarations, guardrails, and any related tests before making changes.
+We have two workbooks/environments in the backend:
 
-Tasks:
+1. Desktop workbook
+2. Mobile workbook
+
+Until now, the agent enhancement work has been focused on the desktop workbook. After the current desktop enhancement is completed, please analyze and prepare the equivalent changes for the mobile workbook/mobile agent setup.
+
+Your task is to whiteboard the mobile-side implementation plan before code changes are made.
+
+Please review the mobile workbook architecture, mobile agent configuration, prompts, model declarations, guardrails, routing logic, schemas, and tests. Compare them with the updated desktop implementation and identify what needs to be replicated, adapted, or handled differently for mobile.
+
+Scope for mobile workbook:
 
 1. Planner Agent
-- The planner agent model has already been changed to GPT-5.5.
-- Please review the planner agent prompt, schema usage, tool-calling behavior, response format, and any model-specific assumptions.
-- If the current prompt/code is already compatible and stable with GPT-5.5, do not make unnecessary changes.
-- If changes are required for GPT-5.5 compatibility, make the smallest safe updates and document what was changed.
+- Check whether the mobile planner agent uses the same planner prompt/config as desktop or has a separate mobile-specific version.
+- If the planner agent model has also been moved to GPT-5.5, verify compatibility.
+- Identify whether any prompt, schema, tool-calling, or response-format changes are needed for GPT-5.5.
+- If no changes are required, clearly mention that.
 
 2. Gateway Agent
-- The gateway agent is currently using Sofa 1.1.
-- Migrate this agent to GPT-5.4.
-- Update the model configuration accordingly.
-- Convert/refactor the gateway agent prompt so it is compatible with GPT-5.4.
-- Preserve the existing behavior and responsibilities of the gateway agent unless a change is required for compatibility or stability.
-- Make sure routing, classification, delegation, and tool-selection behavior remain stable.
+- Identify the current model used by the mobile gateway agent.
+- If it is still using Sofa 1.1 or an older model, plan its migration to GPT-5.4.
+- Convert or adapt the gateway prompt so it is compatible with GPT-5.4.
+- Preserve mobile-specific routing behavior, classification behavior, and tool-selection logic.
+- Ensure the mobile gateway continues to route correctly between agents, including the new flight agent.
 
 3. Unified Input Guardrail Agent
-- We recently added a flight agent.
-- Some flight-related queries, especially comparison queries, are incorrectly triggering the unified input guardrail agent.
-- Please update the unified input guardrail prompt so legitimate flight-related requests are not blocked.
-- In particular, flight search, flight comparison, fare comparison, airline comparison, route comparison, booking-preference comparison, and similar travel-planning queries should be treated as valid user intent.
-- The guardrail should still block genuinely unsafe, disallowed, abusive, fraudulent, or policy-violating requests.
-- Please add or update examples in the prompt so the guardrail clearly understands that normal flight comparison queries are allowed.
+- Review how the mobile workbook uses the unified input guardrail.
+- Check whether valid flight-agent queries are being incorrectly blocked on mobile, especially:
+  - flight comparison queries,
+  - fare comparison queries,
+  - airline comparison queries,
+  - route comparison queries,
+  - booking-preference comparison queries,
+  - normal travel-planning queries.
+- Plan prompt updates so these legitimate flight-related requests are allowed.
+- The guardrail should still block genuinely unsafe, abusive, fraudulent, disallowed, or policy-violating requests.
+- Include mobile-specific examples if mobile user queries are shorter, more conversational, or more ambiguous.
 
 4. Post-Booking Guardrail Agent
-- The post-booking guardrail agent is currently on GPT-4.1 nano.
-- Migrate this agent to GPT-5.4 nano.
-- Update the model configuration accordingly.
-- Rewrite or adjust the prompt to be stable and understandable for GPT-5.4 nano.
-- Keep the prompt concise, explicit, and deterministic because this is a nano model.
-- Preserve the current guardrail behavior, but improve clarity and reduce false positives.
+- Identify the current model used by the mobile post-booking guardrail.
+- If it is on GPT-4.1 nano, plan migration to GPT-5.4 nano.
+- Adapt the prompt so it is concise, deterministic, and understandable by GPT-5.4 nano.
+- Preserve the existing post-booking safety behavior while reducing false positives.
 
-General requirements:
+5. Desktop-to-Mobile Parity
+- Compare the completed desktop changes with the mobile workbook.
+- Identify which changes can be copied directly.
+- Identify which changes need mobile-specific adaptation.
+- Do not blindly copy desktop prompts if mobile has different routing, UX, response expectations, or schema behavior.
+- Preserve all existing mobile API contracts, schemas, response formats, and tool interfaces.
+
+6. Testing Plan
+Please propose targeted tests for the mobile workbook, including:
+- valid flight search queries,
+- valid flight comparison queries,
+- valid fare/airline/route comparison queries,
+- post-booking safe queries,
+- post-booking unsafe or invalid queries,
+- gateway routing tests,
+- guardrail false-positive regression tests,
+- model compatibility tests for GPT-5.4, GPT-5.4 nano, and GPT-5.5 where applicable.
+
+Expected whiteboard output:
+- Summary of current mobile agent setup.
+- Gap analysis between desktop and mobile.
+- Exact mobile agents that need model changes.
+- Exact prompts that need conversion or cleanup.
+- Risk areas and compatibility concerns.
+- Suggested implementation order.
+- Suggested test cases.
+- Any places where desktop logic should not be copied directly.
+- Final checklist for the microeditor before implementation.
+
+Important:
+- This is a planning/whiteboarding task, not a blind implementation.
 - Keep changes minimal and focused.
-- Do not rewrite unrelated logic.
-- Maintain existing API contracts, response formats, JSON schemas, and tool interfaces.
-- Update tests or add targeted regression tests where appropriate.
-- Add test cases for flight comparison queries that should not trigger the unified input guardrail.
-- Add test cases for unsafe or invalid inputs that should still be blocked.
-- After changes, run the relevant test suite and report:
-  - files changed,
-  - models updated,
-  - prompts modified,
-  - tests added/updated,
-  - any compatibility concerns,
-  - and whether any behavior changed intentionally.
-
-Expected outcome:
-- Planner agent verified for GPT-5.5 compatibility.
-- Gateway agent migrated from Sofa 1.1 to GPT-5.4 with a compatible prompt.
-- Unified input guardrail updated so valid flight-agent comparison queries are allowed.
-- Post-booking guardrail migrated from GPT-4.1 nano to GPT-5.4 nano with a stable prompt.
-- All relevant tests passing.
+- Preserve mobile-specific behavior.
+- Maintain parity with desktop only where appropriate.
+- Make sure the mobile workbook is ready for the same agent/model upgrades after desktop enhancement is completed.
