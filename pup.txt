@@ -1,80 +1,148 @@
-We have two workbooks/environments in the backend:
+Task: Fix the `Get Generated Context` tool for flight search follow-up questions.
 
-1. Desktop workbook
-2. Mobile workbook
+Background:
+We have two tools:
 
-Until now, the agent enhancement work has been focused on the desktop workbook. After the current desktop enhancement is completed, please analyze and prepare the equivalent changes for the mobile workbook/mobile agent setup.
+1. `Flight Search Tool`
+   - Runs the flight search.
+   - Returns flight options to the user.
+   - Saves the generated flight search context.
 
-Your task is to whiteboard the mobile-side implementation plan before code changes are made.
+2. `Get Generated Context`
+   - Used when the user asks follow-up questions.
+   - Examples:
+     - “Compare option 1 and option 4”
+     - “Which flight is cheapest?”
+     - “Which one is fastest?”
+     - “Which option has the shortest layover?”
 
-Please review the mobile workbook architecture, mobile agent configuration, prompts, model declarations, guardrails, routing logic, schemas, and tests. Compare them with the updated desktop implementation and identify what needs to be replicated, adapted, or handled differently for mobile.
+Problem:
+`Get Generated Context` is not passing the complete saved context to the answering agent.
+Some important fields appear to be missing, renamed, flattened, or summarized away.
+Because of this, the agent cannot reliably compare flight options.
 
-Scope for mobile workbook:
+I will provide an example of the saved context below:
 
-1. Planner Agent
-- Check whether the mobile planner agent uses the same planner prompt/config as desktop or has a separate mobile-specific version.
-- If the planner agent model has also been moved to GPT-5.5, verify compatibility.
-- Identify whether any prompt, schema, tool-calling, or response-format changes are needed for GPT-5.5.
-- If no changes are required, clearly mention that.
+[PASTE CONTEXT EXAMPLE HERE]
 
-2. Gateway Agent
-- Identify the current model used by the mobile gateway agent.
-- If it is still using Sofa 1.1 or an older model, plan its migration to GPT-5.4.
-- Convert or adapt the gateway prompt so it is compatible with GPT-5.4.
-- Preserve mobile-specific routing behavior, classification behavior, and tool-selection logic.
-- Ensure the mobile gateway continues to route correctly between agents, including the new flight agent.
+Your job:
+Inspect how the flight context is saved and how `Get Generated Context` retrieves/formats it.
 
-3. Unified Input Guardrail Agent
-- Review how the mobile workbook uses the unified input guardrail.
-- Check whether valid flight-agent queries are being incorrectly blocked on mobile, especially:
-  - flight comparison queries,
-  - fare comparison queries,
-  - airline comparison queries,
-  - route comparison queries,
-  - booking-preference comparison queries,
-  - normal travel-planning queries.
-- Plan prompt updates so these legitimate flight-related requests are allowed.
-- The guardrail should still block genuinely unsafe, abusive, fraudulent, disallowed, or policy-violating requests.
-- Include mobile-specific examples if mobile user queries are shorter, more conversational, or more ambiguous.
+Fix `Get Generated Context` so it returns a complete, structured, agent-friendly context.
 
-4. Post-Booking Guardrail Agent
-- Identify the current model used by the mobile post-booking guardrail.
-- If it is on GPT-4.1 nano, plan migration to GPT-5.4 nano.
-- Adapt the prompt so it is concise, deterministic, and understandable by GPT-5.4 nano.
-- Preserve the existing post-booking safety behavior while reducing false positives.
+Requirements:
 
-5. Desktop-to-Mobile Parity
-- Compare the completed desktop changes with the mobile workbook.
-- Identify which changes can be copied directly.
-- Identify which changes need mobile-specific adaptation.
-- Do not blindly copy desktop prompts if mobile has different routing, UX, response expectations, or schema behavior.
-- Preserve all existing mobile API contracts, schemas, response formats, and tool interfaces.
+1. Preserve important flight data
+Each flight option should include, when available:
+- option number / option ID
+- airline name
+- flight number
+- departure airport
+- arrival airport
+- departure time
+- arrival time
+- total duration
+- number of stops
+- layover airport and duration
+- price and currency
+- cabin / fare class
+- baggage details
+- refund/cancellation details
+- provider/booking metadata
+- warnings or notes
 
-6. Testing Plan
-Please propose targeted tests for the mobile workbook, including:
-- valid flight search queries,
-- valid flight comparison queries,
-- valid fare/airline/route comparison queries,
-- post-booking safe queries,
-- post-booking unsafe or invalid queries,
-- gateway routing tests,
-- guardrail false-positive regression tests,
-- model compatibility tests for GPT-5.4, GPT-5.4 nano, and GPT-5.5 where applicable.
+2. Preserve search-level data
+Include original search details:
+- origin
+- destination
+- departure date
+- return date, if any
+- trip type
+- passenger count
+- cabin class
+- user filters/preferences
 
-Expected whiteboard output:
-- Summary of current mobile agent setup.
-- Gap analysis between desktop and mobile.
-- Exact mobile agents that need model changes.
-- Exact prompts that need conversion or cleanup.
-- Risk areas and compatibility concerns.
-- Suggested implementation order.
-- Suggested test cases.
-- Any places where desktop logic should not be copied directly.
-- Final checklist for the microeditor before implementation.
+3. Avoid lossy summarization
+Do not return only a prose summary.
+The answering agent needs structured data for reasoning.
 
-Important:
-- This is a planning/whiteboarding task, not a blind implementation.
-- Keep changes minimal and focused.
-- Preserve mobile-specific behavior.
-- Maintain parity with desktop only where appropriate.
-- Make sure the mobile workbook is ready for the same agent/model upgrades after desktop enhancement is completed.
+A short summary is fine, but the full structured context must also be included.
+
+4. Keep option references stable
+If the user says “option 1” or “option 4”, the agent must be able to map those references exactly to the correct flight options.
+
+Do not reorder or renumber options unless there is a clear mapping.
+
+5. Preserve raw context
+Return both:
+- normalized context for easy reasoning
+- raw/original context to avoid losing provider-specific fields
+
+Preferred output shape:
+
+{
+  "context_type": "flight_search",
+  "search_summary": {
+    "origin": "...",
+    "destination": "...",
+    "departure_date": "...",
+    "return_date": "...",
+    "trip_type": "...",
+    "passengers": "...",
+    "cabin_class": "...",
+    "filters_or_preferences": []
+  },
+  "flight_options": [
+    {
+      "option_number": 1,
+      "option_id": "...",
+      "price": {
+        "amount": "...",
+        "currency": "..."
+      },
+      "airlines": [],
+      "segments": [
+        {
+          "flight_number": "...",
+          "airline": "...",
+          "departure_airport": "...",
+          "arrival_airport": "...",
+          "departure_time": "...",
+          "arrival_time": "...",
+          "duration": "..."
+        }
+      ],
+      "total_duration": "...",
+      "stops": 0,
+      "layovers": [],
+      "cabin_class": "...",
+      "fare_type": "...",
+      "baggage": "...",
+      "refundability": "...",
+      "provider": "...",
+      "notes": []
+    }
+  ],
+  "raw_context": {}
+}
+
+Fallback behavior:
+- If a field is unavailable, use `null`, `"unknown"`, or omit only that field.
+- Do not hallucinate missing values.
+- If no previous flight context exists, return:
+  "No previous flight search context found."
+
+Validation:
+Add or update tests to verify:
+- all flight options are returned
+- option numbers remain stable
+- nested fields like segments, layovers, fare, baggage, and refund rules are preserved
+- the agent can answer comparisons like “option 1 vs option 4”
+- raw context is still available
+
+Expected response:
+After making changes, explain:
+1. What fields were missing before
+2. What was changed
+3. Why the new structure is better
+4. How to test or verify the fix
