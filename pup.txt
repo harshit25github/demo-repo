@@ -1,148 +1,134 @@
-Task: Fix the `Get Generated Context` tool for flight search follow-up questions.
+Task: Enhance the Flight Search Tool to use sensible defaults instead of asking unnecessary follow-up questions.
 
-Background:
-We have two tools:
+Current behavior:
+The flight search agent asks the user for all required flight details before searching:
+- origin
+- destination
+- travel date
+- return date
+- trip type
+- passengers
+- cabin class
 
-1. `Flight Search Tool`
-   - Runs the flight search.
-   - Returns flight options to the user.
-   - Saves the generated flight search context.
+Required enhancement:
+The agent should ask only for truly missing blocking information.
+For non-critical fields, it should assume sensible defaults and continue with the flight search.
 
-2. `Get Generated Context`
-   - Used when the user asks follow-up questions.
-   - Examples:
-     - “Compare option 1 and option 4”
-     - “Which flight is cheapest?”
-     - “Which one is fastest?”
-     - “Which option has the shortest layover?”
+Core rule:
+Do not block the flight search just because optional details are missing.
 
-Problem:
-`Get Generated Context` is not passing the complete saved context to the answering agent.
-Some important fields appear to be missing, renamed, flattened, or summarized away.
-Because of this, the agent cannot reliably compare flight options.
-
-I will provide an example of the saved context below:
-
-[PASTE CONTEXT EXAMPLE HERE]
-
-Your job:
-Inspect how the flight context is saved and how `Get Generated Context` retrieves/formats it.
-
-Fix `Get Generated Context` so it returns a complete, structured, agent-friendly context.
-
-Requirements:
-
-1. Preserve important flight data
-Each flight option should include, when available:
-- option number / option ID
-- airline name
-- flight number
-- departure airport
-- arrival airport
-- departure time
-- arrival time
-- total duration
-- number of stops
-- layover airport and duration
-- price and currency
-- cabin / fare class
-- baggage details
-- refund/cancellation details
-- provider/booking metadata
-- warnings or notes
-
-2. Preserve search-level data
-Include original search details:
+Blocking details:
+The agent must ask the user only if these are missing:
 - origin
 - destination
 - departure date
-- return date, if any
-- trip type
-- passenger count
-- cabin class
-- user filters/preferences
 
-3. Avoid lossy summarization
-Do not return only a prose summary.
-The answering agent needs structured data for reasoning.
-
-A short summary is fine, but the full structured context must also be included.
-
-4. Keep option references stable
-If the user says “option 1” or “option 4”, the agent must be able to map those references exactly to the correct flight options.
-
-Do not reorder or renumber options unless there is a clear mapping.
-
-5. Preserve raw context
-Return both:
-- normalized context for easy reasoning
-- raw/original context to avoid losing provider-specific fields
-
-Preferred output shape:
+Default assumptions:
+If the user does not provide these fields, assume:
 
 {
-  "context_type": "flight_search",
-  "search_summary": {
-    "origin": "...",
-    "destination": "...",
-    "departure_date": "...",
-    "return_date": "...",
-    "trip_type": "...",
-    "passengers": "...",
-    "cabin_class": "...",
-    "filters_or_preferences": []
+  "trip_type": "one_way",
+  "passengers": {
+    "adults": 1,
+    "children": 0,
+    "infants": 0
   },
-  "flight_options": [
-    {
-      "option_number": 1,
-      "option_id": "...",
-      "price": {
-        "amount": "...",
-        "currency": "..."
-      },
-      "airlines": [],
-      "segments": [
-        {
-          "flight_number": "...",
-          "airline": "...",
-          "departure_airport": "...",
-          "arrival_airport": "...",
-          "departure_time": "...",
-          "arrival_time": "...",
-          "duration": "..."
-        }
-      ],
-      "total_duration": "...",
-      "stops": 0,
-      "layovers": [],
-      "cabin_class": "...",
-      "fare_type": "...",
-      "baggage": "...",
-      "refundability": "...",
-      "provider": "...",
-      "notes": []
-    }
-  ],
-  "raw_context": {}
+  "cabin_class": "economy"
 }
 
-Fallback behavior:
-- If a field is unavailable, use `null`, `"unknown"`, or omit only that field.
-- Do not hallucinate missing values.
-- If no previous flight context exists, return:
-  "No previous flight search context found."
+Round trip handling:
+- If the user provides a return date, treat it as a round trip.
+- If the user explicitly says “round trip” but does not provide a return date, ask only for the return date.
+- If no return date is provided and the user does not mention round trip, assume one-way.
+
+Passenger handling:
+- If passenger count is missing, assume 1 adult.
+- If the user says “we”, “family”, “kids”, or gives unclear passenger info, ask for passenger count only if required for accurate pricing.
+- Otherwise default to 1 adult.
+
+Cabin class handling:
+- If cabin class is missing, assume economy.
+- Only use premium economy/business/first if explicitly mentioned by the user.
+
+Multi-city handling:
+- Only use multi-city if the user explicitly asks for it.
+- Do not assume multi-city from vague wording.
+- If multi-city is requested but segment details are incomplete, ask for the missing segment details.
+
+Agent behavior:
+- Do not ask a long form with all fields.
+- Ask only the minimum missing information.
+- If defaults are used, mention them briefly in the response.
+- Example:
+  “I’ll search one-way economy flights for 1 adult.”
+
+Tool behavior:
+- The Flight Search Tool should accept default values when optional fields are missing.
+- The tool should normalize the final search request before execution.
+- The final normalized request should always include:
+  - origin
+  - destination
+  - departure_date
+  - trip_type
+  - passengers
+  - cabin_class
+  - return_date, only if round trip
+  - segments, only if multi-city
+
+Expected normalized examples:
+
+Example 1:
+User: “Find flights from Delhi to Dubai on 20 June”
+
+Normalized request:
+{
+  "origin": "Delhi",
+  "destination": "Dubai",
+  "departure_date": "2026-06-20",
+  "trip_type": "one_way",
+  "passengers": {
+    "adults": 1,
+    "children": 0,
+    "infants": 0
+  },
+  "cabin_class": "economy"
+}
+
+Example 2:
+User: “Find round trip flights from Mumbai to London on 10 July”
+
+Agent should ask:
+“What is your return date?”
+
+Example 3:
+User: “Find business class flights from Bangalore to Singapore tomorrow for 2 people”
+
+Normalized request:
+{
+  "origin": "Bangalore",
+  "destination": "Singapore",
+  "departure_date": "<resolved tomorrow date>",
+  "trip_type": "one_way",
+  "passengers": {
+    "adults": 2,
+    "children": 0,
+    "infants": 0
+  },
+  "cabin_class": "business"
+}
 
 Validation:
-Add or update tests to verify:
-- all flight options are returned
-- option numbers remain stable
-- nested fields like segments, layovers, fare, baggage, and refund rules are preserved
-- the agent can answer comparisons like “option 1 vs option 4”
-- raw context is still available
+Add tests to verify:
+- missing cabin class defaults to economy
+- missing passenger count defaults to 1 adult
+- missing trip type defaults to one-way
+- round trip without return date asks only for return date
+- flight search does not ask unnecessary questions
+- normalized search request is complete before calling the flight API
 
-Expected response:
-After making changes, explain:
-1. What fields were missing before
-2. What was changed
-3. Why the new structure is better
-4. How to test or verify the fix
+Expected output:
+After implementation, explain:
+1. What default assumptions were added
+2. What fields still require user clarification
+3. How the normalized request is built
+4. What tests were added
