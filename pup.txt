@@ -1,5 +1,19 @@
-Hi, just to clarify — the difference I mentioned earlier between iOS and Android filters was due to a local loading issue on my Android app. The scrollable filters were not showing properly at first, but after refreshing/reopening the app, they started working correctly.
+Please update the agent prompt to support mobile-friendly responses.
 
-So there is no difference between iOS and Android mobile app filters.
+Currently, responses are too long and better suited for desktop/web. For mobile clients, the agent should return compact, scannable responses that fit well on smaller screens.
 
-The actual difference I noticed is between the mobile app and desktop/web filters. For example, price-related filters are available on the mobile app, but I could not find them on the desktop/web version.
+Expected behavior:
+
+* Keep mobile responses short and focused.
+* Avoid long paragraphs, huge tables, or too much detail.
+* Use short bullet points where helpful.
+* Show the most important information first.
+* Keep extra details optional or minimal.
+* Do not change the existing desktop/web response behavior.
+
+Use client type to decide response style:
+
+* Mobile → concise response
+* Desktop/Web → detailed response allowed
+
+Acceptance criteria: mobile responses should be easier to read, shorter than desktop responses, and still preserve the key information.
