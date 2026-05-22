@@ -1,19 +1,34 @@
-Please update the agent prompt to support mobile-friendly responses.
+Create a debugging suite for my existing flight API service to understand the complete flow between:
 
-Currently, responses are too long and better suited for desktop/web. For mobile clients, the agent should return compact, scannable responses that fit well on smaller screens.
+1. Flight Search API
+2. Apply Filter API
 
-Expected behavior:
+Goal:
+Help me debug how cookies, UUIDs, searchId/sessionId/correlationId, headers, and payload values move from the first API call to the next.
 
-* Keep mobile responses short and focused.
-* Avoid long paragraphs, huge tables, or too much detail.
-* Use short bullet points where helpful.
-* Show the most important information first.
-* Keep extra details optional or minimal.
-* Do not change the existing desktop/web response behavior.
+Tasks:
+- Identify where Flight Search API and Apply Filter API are called in the codebase.
+- Create a script: npm run debug:flight-flow
+- Run Flight Search API with a sample payload.
+- Capture request headers, response headers, Set-Cookie, cookies sent, response summary, and IDs/UUIDs returned.
+- Store cookies in a cookie jar and reuse them for Apply Filter API.
+- Run Apply Filter API using the correct cookies and IDs from Flight Search.
+- Log which cookies and IDs are required for the second API.
+- Mask sensitive cookie/token values in logs.
+- Add tests to verify:
+  - Search API returns required IDs.
+  - Cookies are captured after search.
+  - Filter API reuses required cookies and IDs.
+  - Filtered results are returned successfully.
+- Generate a markdown doc: docs/flight-api-flow-debug.md explaining:
+  - API sequence
+  - Cookie flow
+  - UUID/searchId flow
+  - Required dependencies
+  - Failure points
 
-Use client type to decide response style:
-
-* Mobile → concise response
-* Desktop/Web → detailed response allowed
-
-Acceptance criteria: mobile responses should be easier to read, shorter than desktop responses, and still preserve the key information.
+Constraints:
+- Do not hardcode real cookies/tokens.
+- Do not expose full cookie values.
+- Keep cookies/session handling inside backend, not inside the AI agent.
+- Final output should help convert this flow into clean agent tools: searchFlights() and applyFlightFilters().
