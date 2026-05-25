@@ -1,36 +1,73 @@
 Task:
-Standardize agent naming and clean user-facing responses across mobile and desktop agents.
+Update the Digital API flight search service workflow to use UID from context instead of calling the default settings API.
 
 Context:
-We have separate agents/prompts for mobile and desktop.
-Agents currently have different names like `Triposage`, `Cheapo Policy`, etc.
-Some agents are also exposing internal reasoning, tool behavior, workflow steps, or implementation details to users.
+Currently the service uses 3 APIs:
+1. `/default-setting/get` - used to generate/fetch cookies like `UID`
+2. `/validate-search` - used to validate/initiate search and generate `SID`
+3. `/listing` - used with `SID` to start polling and fetch flight contracts
 
-Required Changes:
+Now `/default-setting/get` should be removed from this workflow.
 
-1. Standardize Agent Name
-- Use one consistent public-facing agent name across all trip planner and flight-related agents.
-- Replace all old/random agent names in prompts, configs, responses, and UI-facing text.
-- Do not expose internal agent-specific names to users.
+New Requirement:
+The calling service will already provide `UID` in the request/context.
+We must use this incoming `UID` directly for:
+- `/validate-search`
+- `/listing`
+- `/apply-filter`
 
-Use this public name:
-`Tripana`
+Required Workflow:
+1. Read `UID` from request/context.
+2. Do not call `/default-setting/get`.
+3. Call `/validate-search` using:
+   - user search payload
+   - incoming `UID`
+4. Use the generated `SID` from `/validate-search`.
+5. Call `/listing` using:
+   - `SID`
+   - same `UID`
+6. Start polling `/listing` and collect flight contracts.
+7. Store/use the contract state returned from listing, especially `CNT` key.
+8. For further user filters, call `/apply-filter`.
 
-2. Hide Internal Details
-- Agents must not reveal internal workflow, tool calls, prompt logic, fallback handling, ranking logic, JSON structures, system messages, or debugging details.
-- Responses should be clean, simple, user-friendly, and final-answer focused.
-- The agent should explain only what is useful to the user, not how it internally processed the request.
+Apply Filter Rules:
+- `/apply-filter` must always receive the same `UID`.
+- `UID` is important because it maintains current search/filter state.
+- Each filter must be applied separately.
+- Do not send multiple filter types in one `/apply-filter` call.
+- Example:
+  - baggage filter → one `/apply-filter` call
+  - layover airport filter → another `/apply-filter` call
+  - duration filter → another `/apply-filter` call
+- When a new filter is applied, previous filters should remain active because state is tracked by `UID`.
 
-Expected Behavior:
-- User should always see the assistant as `Tripana`.
-- No internal agent names should appear in any user-facing response.
-- No internal tool/process details should be exposed.
-- Mobile and desktop agents should follow the same naming and privacy rules.
+Supported Filters:
+Use the existing reference code/context file to understand current `/apply-filter` implementations.
+The reference code may only contain 2-3 filters for now.
+First implement the workflow correctly for those existing filters.
+
+Examples of future filters:
+- stops
+- flight timings
+- departure/arrival airport
+- layover airport
+- baggage
+- total duration
+- layover duration
+
+Important:
+- Keep `UID` consistent across validate search, listing, polling, and apply filter.
+- Remove dependency on `/default-setting/get`.
+- Do not regenerate UID anywhere.
+- Do not break existing listing polling behavior.
+- Reuse existing apply-filter reference code and integrate it into the current Digital API service cleanly.
 
 Acceptance Criteria:
-- Search all mobile and desktop agent prompts/configs and replace old public agent names with `Tripana`.
-- Add prompt guardrails to prevent internal details from being shared.
-- Add tests/examples verifying:
-  - Old agent names are not shown.
-  - Tool/internal workflow details are not shown.
-  - Final response stays clean and user-facing.
+- `/default-setting/get` is no longer called.
+- `UID` is read from context/request.
+- `/validate-search` works with incoming `UID`.
+- `/listing` works with same `UID` and generated `SID`.
+- Polling still returns flight contracts correctly.
+- `/apply-filter` works using same `UID`.
+- Multiple filters are applied through multiple sequential `/apply-filter` calls.
+- Existing 2-3 reference filters are implemented and tested.
