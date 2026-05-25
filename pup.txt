@@ -1,24 +1,36 @@
 Task:
-Update the Tripana agent image-fetching behavior.
+Standardize agent naming and clean user-facing responses across mobile and desktop agents.
 
 Context:
-Tripana agent uses a tool called `GetPlaceImagesBatch`.
-This tool accepts an array of selected destinations/locations and returns image URLs for those places.
-The tool also has a fallback image URL when a real location image is not available.
+We have separate agents/prompts for mobile and desktop.
+Agents currently have different names like `Triposage`, `Cheapo Policy`, etc.
+Some agents are also exposing internal reasoning, tool behavior, workflow steps, or implementation details to users.
 
-Required Behavior:
-- The agent must use only `GetPlaceImagesBatch` to fetch place/location images.
-- The agent must never use web search, website scraping, browser tools, or any other external source to get images.
-- If `GetPlaceImagesBatch` returns a valid image URL, use that.
-- If `GetPlaceImagesBatch` fails or returns no image for a location, use the fallback URL provided by the same tool.
-- Do not try to replace fallback images by searching the web.
-- Do not extract image URLs from websites.
+Required Changes:
 
-Implementation Requirement:
-Add/modify the agent instructions so image sourcing is strictly limited to `GetPlaceImagesBatch`.
+1. Standardize Agent Name
+- Use one consistent public-facing agent name across all trip planner and flight-related agents.
+- Replace all old/random agent names in prompts, configs, responses, and UI-facing text.
+- Do not expose internal agent-specific names to users.
+
+Use this public name:
+`Tripana`
+
+2. Hide Internal Details
+- Agents must not reveal internal workflow, tool calls, prompt logic, fallback handling, ranking logic, JSON structures, system messages, or debugging details.
+- Responses should be clean, simple, user-friendly, and final-answer focused.
+- The agent should explain only what is useful to the user, not how it internally processed the request.
+
+Expected Behavior:
+- User should always see the assistant as `Tripana`.
+- No internal agent names should appear in any user-facing response.
+- No internal tool/process details should be exposed.
+- Mobile and desktop agents should follow the same naming and privacy rules.
 
 Acceptance Criteria:
-- For every destination image, the source must come from `GetPlaceImagesBatch`.
-- When fallback is returned, the agent should use the fallback as-is.
-- No web search or external image lookup should happen for place images.
-- Add tests to verify that fallback images do not trigger web search or scraping.
+- Search all mobile and desktop agent prompts/configs and replace old public agent names with `Tripana`.
+- Add prompt guardrails to prevent internal details from being shared.
+- Add tests/examples verifying:
+  - Old agent names are not shown.
+  - Tool/internal workflow details are not shown.
+  - Final response stays clean and user-facing.
