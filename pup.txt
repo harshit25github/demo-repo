@@ -1,34 +1,24 @@
-Create a debugging suite for my existing flight API service to understand the complete flow between:
+Task:
+Update the Tripana agent image-fetching behavior.
 
-1. Flight Search API
-2. Apply Filter API
+Context:
+Tripana agent uses a tool called `GetPlaceImagesBatch`.
+This tool accepts an array of selected destinations/locations and returns image URLs for those places.
+The tool also has a fallback image URL when a real location image is not available.
 
-Goal:
-Help me debug how cookies, UUIDs, searchId/sessionId/correlationId, headers, and payload values move from the first API call to the next.
+Required Behavior:
+- The agent must use only `GetPlaceImagesBatch` to fetch place/location images.
+- The agent must never use web search, website scraping, browser tools, or any other external source to get images.
+- If `GetPlaceImagesBatch` returns a valid image URL, use that.
+- If `GetPlaceImagesBatch` fails or returns no image for a location, use the fallback URL provided by the same tool.
+- Do not try to replace fallback images by searching the web.
+- Do not extract image URLs from websites.
 
-Tasks:
-- Identify where Flight Search API and Apply Filter API are called in the codebase.
-- Create a script: npm run debug:flight-flow
-- Run Flight Search API with a sample payload.
-- Capture request headers, response headers, Set-Cookie, cookies sent, response summary, and IDs/UUIDs returned.
-- Store cookies in a cookie jar and reuse them for Apply Filter API.
-- Run Apply Filter API using the correct cookies and IDs from Flight Search.
-- Log which cookies and IDs are required for the second API.
-- Mask sensitive cookie/token values in logs.
-- Add tests to verify:
-  - Search API returns required IDs.
-  - Cookies are captured after search.
-  - Filter API reuses required cookies and IDs.
-  - Filtered results are returned successfully.
-- Generate a markdown doc: docs/flight-api-flow-debug.md explaining:
-  - API sequence
-  - Cookie flow
-  - UUID/searchId flow
-  - Required dependencies
-  - Failure points
+Implementation Requirement:
+Add/modify the agent instructions so image sourcing is strictly limited to `GetPlaceImagesBatch`.
 
-Constraints:
-- Do not hardcode real cookies/tokens.
-- Do not expose full cookie values.
-- Keep cookies/session handling inside backend, not inside the AI agent.
-- Final output should help convert this flow into clean agent tools: searchFlights() and applyFlightFilters().
+Acceptance Criteria:
+- For every destination image, the source must come from `GetPlaceImagesBatch`.
+- When fallback is returned, the agent should use the fallback as-is.
+- No web search or external image lookup should happen for place images.
+- Add tests to verify that fallback images do not trigger web search or scraping.
