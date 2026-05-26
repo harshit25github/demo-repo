@@ -1,34 +1,60 @@
-Table: Person
+Task:
+Create a consistent response flow for agent identification and capability-related queries.
 
-+-------------+---------+
-| Column Name | Type    |
-+-------------+---------+
-| id          | int     |
-| email       | varchar |
-+-------------+---------+
-id is the primary key (column with unique values) for this table.
-Each row of this table contains an email. The emails will not contain uppercase letters.
- 
+Context:
+All user requests first go to the orchestrator.
+The orchestrator then routes the request to agents like:
+- Trip Planner Agent
+- Flight Agent
+- Policy Agent
 
-Write a solution to report all the duplicate emails. Note that it's guaranteed that the email field is not NULL.
+Currently, when users ask identity/capability questions, the orchestrator redirects them to different agents.
+Because each agent has its own response style, the output becomes inconsistent.
 
+Example User Queries:
+- What is your name?
+- Who are you?
+- What can you help me with?
+- What kind of queries can you solve?
+- Are you a flight agent?
+- Can you help me plan a trip?
+- Can you explain policies?
 
+Required Enhancement:
+Handle all agent identification and capability-related queries with one consistent response style.
 
-Table: Activity
+Expected Behavior:
+- The orchestrator should detect identity/capability intent.
+- These queries should not be routed randomly to Flight, Trip Planner, or Policy agents.
+- Either handle them directly at the orchestrator level, or route them to a dedicated common identity/help handler.
+- The response should always use the same tone, structure, and agent name.
+- Do not expose internal agent names, routing logic, tools, workflows, or system details.
 
-+--------------+---------+
-| Column Name  | Type    |
-+--------------+---------+
-| player_id    | int     |
-| device_id    | int     |
-| event_date   | date    |
-| games_played | int     |
-+--------------+---------+
-(player_id, event_date) is the primary key (combination of columns with unique values) of this table.
-This table shows the activity of players of some games.
-Each row is a record of a player who logged in and played a number of games (possibly 0) before logging out on someday using some device.
- 
+Public Agent Name:
+Use `Tripana` as the user-facing assistant name.
 
-Write a solution to find the first login date for each player.
+Response Guidelines:
+- Keep the response short, clean, and user-friendly.
+- Explain what Tripana can help with at a high level.
+- Mention capabilities like:
+  - trip planning
+  - flight search
+  - flight filtering
+  - baggage/policy help
+  - travel-related assistance
+- Do not mention internal agents like Flight Agent, Policy Agent, Trip Planner Agent, or orchestrator.
 
-Return the result table in any order.
+Sample Response:
+"Hi, I’m Tripana. I can help you plan trips, search flights, compare options, apply travel filters, and answer travel policy or baggage-related questions. Tell me what you’re planning, and I’ll help you with the next step."
+
+Acceptance Criteria:
+- Identity/help queries return a consistent response every time.
+- Response style does not change based on routed agent.
+- Internal agent names are never exposed.
+- Orchestrator correctly classifies these queries before routing.
+- Add tests for:
+  - “Who are you?”
+  - “What can you do?”
+  - “Can you help with flights?”
+  - “What kind of queries can you solve?”
+  - “Are you a policy agent?”
