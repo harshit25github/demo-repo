@@ -1,3 +1,5 @@
-Currently, when I enter a pre-booking flight-related query from your frontend, the request is not being fulfilled or routed to my endpoint as expected. Could you please confirm whether the frontend/backend is configured to redirect pre-booking flight queries to my exposed API endpoint?
+one limitation I’m seeing with the Apply Filter API is that it currently allows only one filter to be applied at a time.
 
-Also, please let me know if I should be using a different URL or if any additional configuration is required from my side.
+In the agentic flow, a user can ask for multiple filter changes in one query, like airline, stops, price, and departure time together. Right now, we have to apply these filters sequentially through multiple API calls, which is increasing latency.
+
+Can we consider supporting multiple filters in a single Apply Filter API request? That would help reduce repeated calls and improve the agent response time.
