@@ -1,4 +1,3 @@
-Description:
-You are given the travel cost for each candidate to go to City A or City B. There are 2N candidates, and exactly N candidates must go to each city. Find the minimum total cost to send everyone while satisfying this condition.
+Currently, when I enter a pre-booking flight-related query from your frontend, the request is not being fulfilled or routed to my endpoint as expected. Could you please confirm whether the frontend/backend is configured to redirect pre-booking flight queries to my exposed API endpoint?
 
-This is a cleaner version of LeetCode’s Two City Scheduling problem.
+Also, please let me know if I should be using a different URL or if any additional configuration is required from my side.
