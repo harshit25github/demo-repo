@@ -1,5 +1,46 @@
-one limitation I’m seeing with the Apply Filter API is that it currently allows only one filter to be applied at a time.
+Task:
+Create a new input guardrail agent to detect explicit human-agent handoff requests.
 
-In the agentic flow, a user can ask for multiple filter changes in one query, like airline, stops, price, and departure time together. Right now, we have to apply these filters sequentially through multiple API calls, which is increasing latency.
+Context:
+We have an agentic workflow with:
+- Orchestrator
+- Multiple downstream agents
+- Existing input guardrails
 
-Can we consider supporting multiple filters in a single Apply Filter API request? That would help reduce repeated calls and improve the agent response time.
+Current guardrails already handle:
+- competitor-related queries
+- illicit/unsafe comments
+- unsupported post-booking queries
+
+New Requirement:
+Add one more guardrail agent that detects when the user explicitly asks to connect with a human agent/support agent.
+
+Example User Queries:
+- "I want to connect to a human agent"
+- "Can I talk to a real person?"
+- "Please connect me with customer support"
+- "I need a human to help me"
+- "Transfer me to an agent"
+- "Can someone from support help me?"
+- "I don’t want AI, connect me to a person"
+
+Expected Behavior:
+- This guardrail should run at the orchestrator/input guardrail level before normal agent routing.
+- If the user explicitly requests a human agent, this guardrail should be triggered.
+- Do not route this request to trip planner, flight, or policy agents.
+- Return a structured guardrail response to the consuming service.
+- The consuming service will use this response to trigger the actual human-agent workflow.
+
+Important:
+- This guardrail should only trigger for explicit human-agent/support requests.
+- Do not trigger it for normal travel help queries.
+- Do not trigger it just because the user is confused or unhappy unless they clearly ask for a human/support agent.
+
+Suggested Guardrail Response:
+```json
+{
+  "guardrail_triggered": true,
+  "guardrail_type": "HUMAN_AGENT_REQUEST",
+  "message": "User requested to connect with a human agent.",
+  "should_continue_agent_flow": false
+}
