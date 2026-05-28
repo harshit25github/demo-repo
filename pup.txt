@@ -1,160 +1,62 @@
-Task:
-Build an end-to-end evaluation + debugging pipeline for the complete mobile agentic workflow.
+Additional Requirement: System Prompt Audit & Refinement
 
 Context:
-We have a mobile agentic workflow where every user request first goes through the Gateway Agent.
+The current system prompt is around 600 lines.
+This may be causing instruction dilution, inconsistent behavior, hallucination, or less refined responses.
 
-Current Workflow:
-1. User sends request from mobile app
-2. Request goes to Gateway Agent
-3. Gateway runs input guardrails
-4. Gateway detects intent
-5. If intent is trip-planning related, request is routed to Trip Planning Agent
-6. Trip Planning Agent processes the request and returns the final response
+Required Work:
+1. Audit the existing system prompt.
+2. Identify:
+   - repeated instructions
+   - conflicting rules
+   - outdated rules
+   - overly verbose sections
+   - unnecessary examples
+   - unclear or weak instructions
+   - instructions that should move to config/tests/docs instead of system prompt
 
-Problem:
-We are seeing inconsistent responses and runtime failures like:
-- desktop/web URLs in mobile responses
-- false incapability messages
-- "Something went wrong"
-- `stream.error`
-- possible routing/guardrail/workflow issues
+Prompt Optimization Goal:
+Refactor the system prompt into a shorter, cleaner, and more precise version without losing the main business logic.
 
 Important:
-Do not test only the Trip Planning Agent directly.
-Test the complete workflow starting from the Gateway Agent API, because the issue may exist in:
-- Gateway Agent
-- input guardrails
-- intent detection
-- routing
-- Trip Planning Agent
-- tool execution
-- streaming layer
-- final response generation
+- Do not remove the core behavior of the agent.
+- Do not remove important guardrails.
+- Do not remove mobile-specific rules.
+- Do not remove routing/tool usage rules.
+- Reduce duplication and rewrite instructions in plain, direct language.
+- Prefer crisp rules over long explanations.
 
-Goal:
-Create a full workflow test pipeline that sends test conversations to the same Gateway API used by the mobile app.
+Target:
+- Try to reduce the prompt from ~600 lines to around 150-250 well-structured lines if possible.
+- Keep the prompt modular with sections like:
+  - Role
+  - Scope
+  - Workflow
+  - Tool Rules
+  - Mobile Response Rules
+  - Guardrails
+  - Fallback Behavior
+  - Response Style
+  - Do Not Rules
 
-Required Pipeline:
+Evaluation Requirement:
+After refactoring, run the same end-to-end test pipeline again and compare:
 
-Step 1: Test Scenario Generator
-Create 10-20 complex multi-turn mobile travel conversations.
-
-Cover cases like:
-- trip planning
-- weather queries
-- itinerary planning
-- budget travel
-- flight/travel suggestions
-- unclear user query
-- follow-up questions
-- mobile-specific behavior
-- guardrail-safe queries
-- routing-sensitive queries
-- cases where web URLs must not appear
-- cases where false incapability must not appear
-
-Step 2: End-to-End Workflow Runner
-For each multi-turn conversation:
-- Send each user message to the Gateway Agent API.
-- Preserve session/conversation context.
-- Do not bypass the gateway.
-- Do not directly call the Trip Planning Agent.
-- Capture the complete workflow response.
-
-Capture logs for:
-- request ID
-- session ID
-- input guardrail result
-- detected intent
-- selected route/agent
-- downstream agent response
-- tool calls
-- streaming events
-- final response
-- error stack if any
-
-Step 3: Response Grader
-Grade each response from 0 to 10 based on:
-- correct gateway routing
-- guardrail correctness
-- mobile correctness
-- no desktop/web URLs
-- no false incapability message
-- helpfulness
-- trip planning quality
+Before vs After:
+- average response score
+- hallucination rate
+- false incapability rate
+- web URL leakage
+- routing accuracy
+- stream.error frequency
 - response clarity
-- conversation continuity
-- no internal workflow/tool details exposed
-- runtime stability
-
-Step 4: Failure Classification
-Classify failures as:
-- `GATEWAY_ROUTING_ERROR`
-- `GUARDRAIL_ERROR`
-- `WEB_URL_IN_MOBILE_RESPONSE`
-- `FALSE_INCAPABILITY_MESSAGE`
-- `STREAM_ERROR`
-- `TOOL_FAILURE`
-- `TRIP_AGENT_FAILURE`
-- `BROKEN_CONTEXT`
-- `INTERNAL_DETAILS_EXPOSED`
-- `LOW_HELPFULNESS`
-- `OTHER`
-
-Step 5: Runtime Error Debugging
-Specifically detect and log:
-- `stream.error`
-- timeout
-- malformed response
-- missing final response
-- failed downstream agent call
-- failed tool call
-- wrong route selected by gateway
-
-The report should clearly show at which stage the failure happened:
-- Gateway
-- Guardrail
-- Intent detection
-- Routing
-- Trip Planning Agent
-- Tool execution
-- Streaming layer
-- Final response formatting
-
-Step 6: Prompt Improvement Suggestions
-For every failed case, provide:
-- user input
-- full workflow output
-- score
-- failure category
-- failed stage
-- suggested prompt/config/code fix
-
-Example:
-If Gateway routes a trip-planning query incorrectly:
-"Improve gateway intent detection for travel/weather/destination-planning queries."
-
-If final response includes `cheapoair.com/flights`:
-"Add mobile response guardrail: never include desktop/web URLs in mobile app responses."
+- internal detail leakage
 
 Expected Output:
-Generate an evaluation report with:
-- total test cases
-- passed cases
-- failed cases
-- average score
-- failures by category
-- failures by workflow stage
-- recurring issues
-- runtime errors with logs
-- exact prompt/config/code improvement suggestions
-
-Acceptance Criteria:
-- Tests start from the Gateway Agent API.
-- Full mobile workflow is tested end-to-end.
-- Trip Planning Agent is not tested in isolation.
-- Gateway routing and guardrails are evaluated.
-- Runtime errors like `stream.error` are captured with stage-level logs.
-- Final report identifies where the issue occurred.
-- Prompt improvement suggestions are generated from failed cases.
+Provide:
+1. Original prompt issues summary
+2. Refactored shorter system prompt
+3. List of removed/merged instructions
+4. List of preserved critical rules
+5. Before vs after evaluation report
+6. Final recommendation on whether to use the refined prompt
