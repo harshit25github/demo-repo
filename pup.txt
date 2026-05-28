@@ -1,46 +1,160 @@
 Task:
-Create a new input guardrail agent to detect explicit human-agent handoff requests.
+Build an end-to-end evaluation + debugging pipeline for the complete mobile agentic workflow.
 
 Context:
-We have an agentic workflow with:
-- Orchestrator
-- Multiple downstream agents
-- Existing input guardrails
+We have a mobile agentic workflow where every user request first goes through the Gateway Agent.
 
-Current guardrails already handle:
-- competitor-related queries
-- illicit/unsafe comments
-- unsupported post-booking queries
+Current Workflow:
+1. User sends request from mobile app
+2. Request goes to Gateway Agent
+3. Gateway runs input guardrails
+4. Gateway detects intent
+5. If intent is trip-planning related, request is routed to Trip Planning Agent
+6. Trip Planning Agent processes the request and returns the final response
 
-New Requirement:
-Add one more guardrail agent that detects when the user explicitly asks to connect with a human agent/support agent.
-
-Example User Queries:
-- "I want to connect to a human agent"
-- "Can I talk to a real person?"
-- "Please connect me with customer support"
-- "I need a human to help me"
-- "Transfer me to an agent"
-- "Can someone from support help me?"
-- "I don’t want AI, connect me to a person"
-
-Expected Behavior:
-- This guardrail should run at the orchestrator/input guardrail level before normal agent routing.
-- If the user explicitly requests a human agent, this guardrail should be triggered.
-- Do not route this request to trip planner, flight, or policy agents.
-- Return a structured guardrail response to the consuming service.
-- The consuming service will use this response to trigger the actual human-agent workflow.
+Problem:
+We are seeing inconsistent responses and runtime failures like:
+- desktop/web URLs in mobile responses
+- false incapability messages
+- "Something went wrong"
+- `stream.error`
+- possible routing/guardrail/workflow issues
 
 Important:
-- This guardrail should only trigger for explicit human-agent/support requests.
-- Do not trigger it for normal travel help queries.
-- Do not trigger it just because the user is confused or unhappy unless they clearly ask for a human/support agent.
+Do not test only the Trip Planning Agent directly.
+Test the complete workflow starting from the Gateway Agent API, because the issue may exist in:
+- Gateway Agent
+- input guardrails
+- intent detection
+- routing
+- Trip Planning Agent
+- tool execution
+- streaming layer
+- final response generation
 
-Suggested Guardrail Response:
-```json
-{
-  "guardrail_triggered": true,
-  "guardrail_type": "HUMAN_AGENT_REQUEST",
-  "message": "User requested to connect with a human agent.",
-  "should_continue_agent_flow": false
-}
+Goal:
+Create a full workflow test pipeline that sends test conversations to the same Gateway API used by the mobile app.
+
+Required Pipeline:
+
+Step 1: Test Scenario Generator
+Create 10-20 complex multi-turn mobile travel conversations.
+
+Cover cases like:
+- trip planning
+- weather queries
+- itinerary planning
+- budget travel
+- flight/travel suggestions
+- unclear user query
+- follow-up questions
+- mobile-specific behavior
+- guardrail-safe queries
+- routing-sensitive queries
+- cases where web URLs must not appear
+- cases where false incapability must not appear
+
+Step 2: End-to-End Workflow Runner
+For each multi-turn conversation:
+- Send each user message to the Gateway Agent API.
+- Preserve session/conversation context.
+- Do not bypass the gateway.
+- Do not directly call the Trip Planning Agent.
+- Capture the complete workflow response.
+
+Capture logs for:
+- request ID
+- session ID
+- input guardrail result
+- detected intent
+- selected route/agent
+- downstream agent response
+- tool calls
+- streaming events
+- final response
+- error stack if any
+
+Step 3: Response Grader
+Grade each response from 0 to 10 based on:
+- correct gateway routing
+- guardrail correctness
+- mobile correctness
+- no desktop/web URLs
+- no false incapability message
+- helpfulness
+- trip planning quality
+- response clarity
+- conversation continuity
+- no internal workflow/tool details exposed
+- runtime stability
+
+Step 4: Failure Classification
+Classify failures as:
+- `GATEWAY_ROUTING_ERROR`
+- `GUARDRAIL_ERROR`
+- `WEB_URL_IN_MOBILE_RESPONSE`
+- `FALSE_INCAPABILITY_MESSAGE`
+- `STREAM_ERROR`
+- `TOOL_FAILURE`
+- `TRIP_AGENT_FAILURE`
+- `BROKEN_CONTEXT`
+- `INTERNAL_DETAILS_EXPOSED`
+- `LOW_HELPFULNESS`
+- `OTHER`
+
+Step 5: Runtime Error Debugging
+Specifically detect and log:
+- `stream.error`
+- timeout
+- malformed response
+- missing final response
+- failed downstream agent call
+- failed tool call
+- wrong route selected by gateway
+
+The report should clearly show at which stage the failure happened:
+- Gateway
+- Guardrail
+- Intent detection
+- Routing
+- Trip Planning Agent
+- Tool execution
+- Streaming layer
+- Final response formatting
+
+Step 6: Prompt Improvement Suggestions
+For every failed case, provide:
+- user input
+- full workflow output
+- score
+- failure category
+- failed stage
+- suggested prompt/config/code fix
+
+Example:
+If Gateway routes a trip-planning query incorrectly:
+"Improve gateway intent detection for travel/weather/destination-planning queries."
+
+If final response includes `cheapoair.com/flights`:
+"Add mobile response guardrail: never include desktop/web URLs in mobile app responses."
+
+Expected Output:
+Generate an evaluation report with:
+- total test cases
+- passed cases
+- failed cases
+- average score
+- failures by category
+- failures by workflow stage
+- recurring issues
+- runtime errors with logs
+- exact prompt/config/code improvement suggestions
+
+Acceptance Criteria:
+- Tests start from the Gateway Agent API.
+- Full mobile workflow is tested end-to-end.
+- Trip Planning Agent is not tested in isolation.
+- Gateway routing and guardrails are evaluated.
+- Runtime errors like `stream.error` are captured with stage-level logs.
+- Final report identifies where the issue occurred.
+- Prompt improvement suggestions are generated from failed cases.
