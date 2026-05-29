@@ -1,8 +1,76 @@
-The idea is:
-- one agent generates realistic test inputs
-- our main service runs those inputs
-- a grader reviews the output and highlights edge cases/prompt improvements
+Task:
+Fix card/image response formatting consistency in Trip Planner Agent.
 
-This should help us improve response quality and catch issues early. Since this involves multiple model calls, it may add some cost.
+Context:
+Trip Planner Agent uses a strict card block format for rendering destination cards/images on the client side.
 
-Do you think we should go ahead with this, maybe starting with a smaller test run first to estimate cost?
+Required card format:
+
+:::cards
+<all destination/place cards here>
+:::cards
+
+The client detects `:::cards` as the start and end marker, then parses and renders the cards in the UI.
+
+Problem:
+Sometimes the agent does not follow this required format.
+It may:
+- return images using markdown
+- share raw image URLs
+- create a custom/hallucinated card format
+- miss the opening `:::cards`
+- miss the closing `:::cards`
+- mix card content with normal text
+- skip cards even when the user explicitly asks for photos/images
+
+This breaks client-side rendering.
+
+Required Behavior:
+- Whenever the response includes destination images, photos, visuals, or place cards, the agent must always use the exact `:::cards ... :::cards` format.
+- Do not use markdown image syntax.
+- Do not share raw image URLs in normal text.
+- Do not invent any other card format.
+- Do not skip the opening or closing `:::cards` marker.
+- If there are multiple destinations/places, include all cards inside one single `:::cards` block.
+- Normal text can appear before or after the cards, but the cards themselves must only be inside the card block.
+
+Agent Rule to Add:
+If the user asks for photos, images, destination visuals, or place cards, always return the card output using this exact structure:
+
+:::cards
+<card 1>
+<card 2>
+<card 3>
+:::cards
+
+Never use markdown, raw URLs, or any alternate format for image/card output.
+
+Implementation Requirements:
+1. Strengthen the system prompt instruction for card formatting.
+2. Add a response validator before sending the final response.
+3. Validator should check:
+   - if response contains images/photos/cards
+   - opening `:::cards` exists
+   - closing `:::cards` exists
+   - card content is inside the block
+   - no markdown image syntax is used
+   - no raw image URLs are leaked outside the card block
+4. If validation fails, regenerate or repair the response before sending it to the client.
+
+Acceptance Criteria:
+- Photo/image requests always return valid `:::cards` blocks.
+- Agent never uses markdown images for destination photos.
+- Agent never sends raw image URLs outside cards.
+- Opening and closing `:::cards` markers are always present.
+- Multiple cards are wrapped inside one card block.
+- Client parser can reliably detect and render cards.
+
+Test Cases:
+- “Show me photos of Spiti”
+- “Share images of Manali”
+- “Can I see pictures of this destination?”
+- “Show cards for these destinations”
+- “Give me photos for Delhi, Jaipur, and Udaipur”
+- fallback image case
+- multiple destination cards case
+- response with normal text before and after cards
