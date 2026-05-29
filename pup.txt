@@ -74,3 +74,109 @@ Test Cases:
 - fallback image case
 - multiple destination cards case
 - response with normal text before and after cards
+
+____________________________________
+
+
+Task:
+Enhance the Human Handoff Guardrail to ask for confirmation before triggering the final human-agent handoff.
+
+Context:
+All user requests first go to the Gateway Agent.
+Gateway has multiple guardrails, including the Human Handoff Guardrail.
+This guardrail detects when the user wants to connect with a real human agent.
+
+Current Issue:
+The Human Handoff Guardrail triggers immediately when the user says:
+- "Connect me to a human agent"
+- "I want to talk to a real person"
+- "Transfer me to support"
+
+Required Behavior:
+The system should ask for confirmation once before triggering the final handoff.
+
+Workflow:
+
+1. First Human Handoff Request
+If the user asks to connect with a human for the first time:
+- Detect the human handoff intent.
+- Do not trigger the final tripwire yet.
+- Store pending confirmation in `ctx`.
+- Send a normal confirmation message to the user.
+
+Example response:
+"Sure, I can connect you to a human agent. Please confirm if you want me to proceed."
+
+2. User Confirms
+If confirmation is already pending and user replies with:
+- "yes"
+- "haan"
+- "ok"
+- "go ahead"
+- "please connect"
+- "sure"
+
+Then:
+- Trigger the final human handoff tripwire.
+- Send the existing structured handoff object through the current tripwire / `stream.error` flow.
+- Do not ask for confirmation again.
+
+3. User Cancels
+If confirmation is pending and user replies with:
+- "no"
+- "not now"
+- "cancel"
+- "leave it"
+- "no need"
+
+Then:
+- Reset the pending confirmation state in `ctx`.
+- Do not trigger handoff.
+- Continue normal flow.
+
+Suggested `ctx` State:
+Use the shared workflow context object.
+
+Example:
+ctx.humanHandoff = {
+  confirmationRequested: false,
+  confirmationCount: 0
+}
+
+Rules:
+- First human-agent request should only ask for confirmation.
+- Final handoff should happen only after user confirms.
+- Confirmation must work for short replies like "yes", "haan", "ok".
+- Cancellation must reset the handoff state.
+- Do not route handoff requests to Trip Planner, Flight, or Policy agents.
+- Do not expose guardrail, tripwire, stream.error, or ctx details to the user.
+- Keep the user-facing message clean and simple.
+- Keep existing guardrails working as-is.
+
+Expected Final Handoff Object:
+Use the existing handoff object format.
+
+Example:
+{
+  "guardrail_triggered": true,
+  "guardrail_type": "HUMAN_AGENT_HANDOFF_CONFIRMED",
+  "message": "User confirmed human agent handoff.",
+  "should_continue_agent_flow": false
+}
+
+Acceptance Criteria:
+- First human handoff request asks for confirmation.
+- `ctx` stores the pending confirmation state.
+- User confirmation triggers the final handoff.
+- User cancellation resets the confirmation state.
+- Unrelated follow-up does not accidentally trigger handoff.
+- Existing tripwire / `stream.error` flow is used only after confirmation.
+
+Test Cases:
+- "Connect me to a human agent" → ask for confirmation
+- "I want to talk to a real person" → ask for confirmation
+- "yes" after confirmation → trigger final handoff
+- "haan connect karo" after confirmation → trigger final handoff
+- "no" after confirmation → cancel handoff
+- "not now" after confirmation → cancel handoff
+- "Can you help me plan a trip?" → no handoff
