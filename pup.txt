@@ -1,182 +1,51 @@
 Task:
-Fix card/image response formatting consistency in Trip Planner Agent.
+Analyze the current codebase and propose the best implementation plan for Human Handoff confirmation flow.
 
 Context:
-Trip Planner Agent uses a strict card block format for rendering destination cards/images on the client side.
+We already have a Gateway Agent with multiple guardrails.
+One guardrail is the Human Handoff Guardrail, which triggers when the user asks to connect with a real human agent.
 
-Required card format:
+New Requirement:
+Before triggering the final human handoff tripwire, we need to ask the user for confirmation once.
 
-:::cards
-<all destination/place cards here>
-:::cards
+Expected Flow:
+1. User asks: "Connect me to a human agent"
+2. System should NOT trigger final tripwire immediately.
+3. System should ask confirmation:
+   "Sure, I can connect you to a human agent. Please confirm if you want me to proceed."
+4. Store confirmation pending state in shared `ctx`.
+5. If user confirms in the next message:
+   - trigger final human handoff tripwire
+   - return the existing handoff object through current tripwire / stream.error flow
+6. If user cancels:
+   - reset confirmation state
+   - continue normal workflow
 
-The client detects `:::cards` as the start and end marker, then parses and renders the cards in the UI.
+Your Task:
+Go through the codebase and suggest the best implementation approach.
 
-Problem:
-Sometimes the agent does not follow this required format.
-It may:
-- return images using markdown
-- share raw image URLs
-- create a custom/hallucinated card format
-- miss the opening `:::cards`
-- miss the closing `:::cards`
-- mix card content with normal text
-- skip cards even when the user explicitly asks for photos/images
+Please analyze:
+- where Human Handoff Guardrail is currently implemented
+- how tripwire is currently triggered
+- how `ctx` flows across Gateway, guardrails, and agents
+- where confirmation pending state should be stored
+- how to detect confirmation replies like "yes", "haan", "ok", "go ahead"
+- how to detect cancellation replies like "no", "cancel", "not now"
+- how to avoid breaking existing guardrails
+- how to avoid routing handoff requests to Trip Planner, Flight, or Policy agents
 
-This breaks client-side rendering.
+Expected Output:
+Provide an implementation plan before coding.
 
-Required Behavior:
-- Whenever the response includes destination images, photos, visuals, or place cards, the agent must always use the exact `:::cards ... :::cards` format.
-- Do not use markdown image syntax.
-- Do not share raw image URLs in normal text.
-- Do not invent any other card format.
-- Do not skip the opening or closing `:::cards` marker.
-- If there are multiple destinations/places, include all cards inside one single `:::cards` block.
-- Normal text can appear before or after the cards, but the cards themselves must only be inside the card block.
+Plan should include:
+- files/functions that need changes
+- proposed `ctx` structure
+- step-by-step workflow
+- edge cases
+- risks
+- test cases
+- final recommended approach
 
-Agent Rule to Add:
-If the user asks for photos, images, destination visuals, or place cards, always return the card output using this exact structure:
-
-:::cards
-<card 1>
-<card 2>
-<card 3>
-:::cards
-
-Never use markdown, raw URLs, or any alternate format for image/card output.
-
-Implementation Requirements:
-1. Strengthen the system prompt instruction for card formatting.
-2. Add a response validator before sending the final response.
-3. Validator should check:
-   - if response contains images/photos/cards
-   - opening `:::cards` exists
-   - closing `:::cards` exists
-   - card content is inside the block
-   - no markdown image syntax is used
-   - no raw image URLs are leaked outside the card block
-4. If validation fails, regenerate or repair the response before sending it to the client.
-
-Acceptance Criteria:
-- Photo/image requests always return valid `:::cards` blocks.
-- Agent never uses markdown images for destination photos.
-- Agent never sends raw image URLs outside cards.
-- Opening and closing `:::cards` markers are always present.
-- Multiple cards are wrapped inside one card block.
-- Client parser can reliably detect and render cards.
-
-Test Cases:
-- “Show me photos of Spiti”
-- “Share images of Manali”
-- “Can I see pictures of this destination?”
-- “Show cards for these destinations”
-- “Give me photos for Delhi, Jaipur, and Udaipur”
-- fallback image case
-- multiple destination cards case
-- response with normal text before and after cards
-
-____________________________________
-
-
-Task:
-Enhance the Human Handoff Guardrail to ask for confirmation before triggering the final human-agent handoff.
-
-Context:
-All user requests first go to the Gateway Agent.
-Gateway has multiple guardrails, including the Human Handoff Guardrail.
-This guardrail detects when the user wants to connect with a real human agent.
-
-Current Issue:
-The Human Handoff Guardrail triggers immediately when the user says:
-- "Connect me to a human agent"
-- "I want to talk to a real person"
-- "Transfer me to support"
-
-Required Behavior:
-The system should ask for confirmation once before triggering the final handoff.
-
-Workflow:
-
-1. First Human Handoff Request
-If the user asks to connect with a human for the first time:
-- Detect the human handoff intent.
-- Do not trigger the final tripwire yet.
-- Store pending confirmation in `ctx`.
-- Send a normal confirmation message to the user.
-
-Example response:
-"Sure, I can connect you to a human agent. Please confirm if you want me to proceed."
-
-2. User Confirms
-If confirmation is already pending and user replies with:
-- "yes"
-- "haan"
-- "ok"
-- "go ahead"
-- "please connect"
-- "sure"
-
-Then:
-- Trigger the final human handoff tripwire.
-- Send the existing structured handoff object through the current tripwire / `stream.error` flow.
-- Do not ask for confirmation again.
-
-3. User Cancels
-If confirmation is pending and user replies with:
-- "no"
-- "not now"
-- "cancel"
-- "leave it"
-- "no need"
-
-Then:
-- Reset the pending confirmation state in `ctx`.
-- Do not trigger handoff.
-- Continue normal flow.
-
-Suggested `ctx` State:
-Use the shared workflow context object.
-
-Example:
-ctx.humanHandoff = {
-  confirmationRequested: false,
-  confirmationCount: 0
-}
-
-Rules:
-- First human-agent request should only ask for confirmation.
-- Final handoff should happen only after user confirms.
-- Confirmation must work for short replies like "yes", "haan", "ok".
-- Cancellation must reset the handoff state.
-- Do not route handoff requests to Trip Planner, Flight, or Policy agents.
-- Do not expose guardrail, tripwire, stream.error, or ctx details to the user.
-- Keep the user-facing message clean and simple.
-- Keep existing guardrails working as-is.
-
-Expected Final Handoff Object:
-Use the existing handoff object format.
-
-Example:
-{
-  "guardrail_triggered": true,
-  "guardrail_type": "HUMAN_AGENT_HANDOFF_CONFIRMED",
-  "message": "User confirmed human agent handoff.",
-  "should_continue_agent_flow": false
-}
-
-Acceptance Criteria:
-- First human handoff request asks for confirmation.
-- `ctx` stores the pending confirmation state.
-- User confirmation triggers the final handoff.
-- User cancellation resets the confirmation state.
-- Unrelated follow-up does not accidentally trigger handoff.
-- Existing tripwire / `stream.error` flow is used only after confirmation.
-
-Test Cases:
-- "Connect me to a human agent" → ask for confirmation
-- "I want to talk to a real person" → ask for confirmation
-- "yes" after confirmation → trigger final handoff
-- "haan connect karo" after confirmation → trigger final handoff
-- "no" after confirmation → cancel handoff
-- "not now" after confirmation → cancel handoff
-- "Can you help me plan a trip?" → no handoff
+Important:
+Do not implement directly first.
+First inspect the codebase and give the best solution plan for this confirmation-based Human Handoff Guardrail.
