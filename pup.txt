@@ -1,22 +1,35 @@
 Task:
-Remove `status guardrail triggered` chunk from the first human handoff request.
+Test the Human Handoff confirmation flow using complex multi-turn user examples.
 
-Context:
-Human handoff confirmation flow is already working.
-On the first request, we only ask user for confirmation.
-On the second confirmed request, we trigger the actual handoff.
+Goal:
+Verify that:
+- First human handoff request only asks for confirmation.
+- First request does not send `status guardrail triggered`.
+- Second confirmation triggers actual handoff.
+- Cancellation resets the flow.
+- Weird/unclear user replies are handled safely.
 
-Issue:
-Currently, the first request also streams a chunk like `status guardrail triggered`.
-This can confuse the client because first request is not the final handoff trigger.
+Test Examples:
 
-Required Change:
-- Do not send `status guardrail triggered` on the first human handoff request.
-- First request should only stream the confirmation message.
-- Keep second request behavior unchanged.
-- On second confirmation, existing guardrail/tripwire status can be sent.
+Example 1: Direct confirmation
+User: "I want to talk to a human agent."
+Expected: Ask for confirmation only. No guardrail status chunk.
+User: "Yes, connect me."
+Expected: Trigger final handoff and send existing guardrail/tripwire status.
+
+Example 2: User cancels
+User: "Can I speak with a real person?"
+Expected: Ask for confirmation only. No guardrail status chunk.
+User: "No, leave it."
+Expected: Cancel handoff and continue normal flow. No guardrail status.
+
+Example 3: Weird user behavior
+User: "This bot is not helping, maybe human?"
+Expected: Ask for confirmation only if intent is clear enough.
+User: "haan bhai kar do"
+Expected: Trigger final handoff.
+User: "actually wait"
+Expected: Should not matter if handoff already triggered; otherwise cancel if still pending.
 
 Acceptance Criteria:
-- First request has no `status guardrail triggered` chunk.
-- Confirmation message still works.
-- Second request still triggers handoff correctly.
+All examples should work without sending `status guardrail triggered` on the first request.
