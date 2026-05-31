@@ -1,51 +1,22 @@
 Task:
-Analyze the current codebase and propose the best implementation plan for Human Handoff confirmation flow.
+Remove `status guardrail triggered` chunk from the first human handoff request.
 
 Context:
-We already have a Gateway Agent with multiple guardrails.
-One guardrail is the Human Handoff Guardrail, which triggers when the user asks to connect with a real human agent.
+Human handoff confirmation flow is already working.
+On the first request, we only ask user for confirmation.
+On the second confirmed request, we trigger the actual handoff.
 
-New Requirement:
-Before triggering the final human handoff tripwire, we need to ask the user for confirmation once.
+Issue:
+Currently, the first request also streams a chunk like `status guardrail triggered`.
+This can confuse the client because first request is not the final handoff trigger.
 
-Expected Flow:
-1. User asks: "Connect me to a human agent"
-2. System should NOT trigger final tripwire immediately.
-3. System should ask confirmation:
-   "Sure, I can connect you to a human agent. Please confirm if you want me to proceed."
-4. Store confirmation pending state in shared `ctx`.
-5. If user confirms in the next message:
-   - trigger final human handoff tripwire
-   - return the existing handoff object through current tripwire / stream.error flow
-6. If user cancels:
-   - reset confirmation state
-   - continue normal workflow
+Required Change:
+- Do not send `status guardrail triggered` on the first human handoff request.
+- First request should only stream the confirmation message.
+- Keep second request behavior unchanged.
+- On second confirmation, existing guardrail/tripwire status can be sent.
 
-Your Task:
-Go through the codebase and suggest the best implementation approach.
-
-Please analyze:
-- where Human Handoff Guardrail is currently implemented
-- how tripwire is currently triggered
-- how `ctx` flows across Gateway, guardrails, and agents
-- where confirmation pending state should be stored
-- how to detect confirmation replies like "yes", "haan", "ok", "go ahead"
-- how to detect cancellation replies like "no", "cancel", "not now"
-- how to avoid breaking existing guardrails
-- how to avoid routing handoff requests to Trip Planner, Flight, or Policy agents
-
-Expected Output:
-Provide an implementation plan before coding.
-
-Plan should include:
-- files/functions that need changes
-- proposed `ctx` structure
-- step-by-step workflow
-- edge cases
-- risks
-- test cases
-- final recommended approach
-
-Important:
-Do not implement directly first.
-First inspect the codebase and give the best solution plan for this confirmation-based Human Handoff Guardrail.
+Acceptance Criteria:
+- First request has no `status guardrail triggered` chunk.
+- Confirmation message still works.
+- Second request still triggers handoff correctly.
