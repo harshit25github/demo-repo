@@ -1,58 +1,42 @@
 Task:
-Investigate and fix downstream agents using Human Handoff soft-denial message as context.
+Debug and remove chunk-level `:::cards` marker manipulation.
 
 Context:
-Human Handoff flow is handled by Gateway/Human Handoff Guardrail.
+We use this card format:
 
-Soft-denial message example:
-"I can help you plan this right here once your destination is finalized, and I can connect you with an expert for the booking."
+:::cards
+<cards content>
+:::cards
 
-This message is saved in:
-- messages DB
-- conversation / conversationId history
+Recently, explicit chunk-level handling was added to manage `:::cards` during streaming.
+
+Issue:
+Sometimes the card marker is getting corrupted with extra colons, like:
+- `::::cards`
+- `:::::cards`
+- `::::::cards`
+
+This seems to be caused by custom chunk-level handling/merging logic.
+
+Required Work:
+- Find where `:::cards` is being handled or modified at the streaming/chunk level.
+- Debug why extra colons are being added.
+- Remove or simplify the chunk-level logic that mutates card markers.
+- Do not manually add/repair colons while streaming chunks.
+- Preserve the original agent output as much as possible.
 
 Important:
-Messages DB is fine because it is not injected into the agent.
-But conversationId history is injected into the agent workflow, so downstream agents may be reading this soft-denial message as context.
+We only want structure validation/repair on the complete final response/full chat output.
+We do not want card marker repair/manipulation at individual chunk level.
 
-Current Issue:
-After this soft-denial message is saved in conversation history, Trip Planner or other agents sometimes respond with human-agent related text like:
-- "I can connect you with an expert"
-- "I will connect you to an agent"
-- "An expert can help with booking"
-
-This is wrong.
-
-Required Analysis:
-Inspect how conversation history/context is injected into agents.
-
-Check:
-- where soft-denial message is saved
-- whether it is saved into OpenAI conversation/session history
-- how conversationId context is passed to Trip Planner/Flight/Policy agents
-- whether downstream agents are copying or continuing the soft-denial wording
-- whether handoff/soft-denial messages should be excluded from agent context
-
-Expected Fix Options:
-Suggest the safest approach before implementing.
-
-Possible fixes:
-1. Do not inject Human Handoff soft-denial messages into downstream agent context.
-2. Mark soft-denial messages with metadata like `non_agent_context: true`.
-3. Filter handoff/soft-denial messages before passing conversation history to agents.
-4. Keep message in DB for UI/history, but exclude it from agent reasoning context.
-5. Add prompt rule that downstream agents must not continue or reuse human handoff messaging.
-
-Important Rules:
-- Only Gateway/Human Handoff Guardrail can talk about human agent/expert connection.
-- Trip Planner, Flight Agent, and Policy Agent must not mention connecting to human/expert.
-- Soft-denial message should not influence normal trip planning responses.
-- Do not break conversation history shown to the user.
-- Do not break normal context memory for trip planning.
+Expected Behavior:
+- Streaming should not corrupt `:::cards`.
+- Card markers should remain exactly `:::cards`.
+- No extra colons should be added.
+- Full-response validation can still check/fix malformed card structure after complete response is available.
 
 Acceptance Criteria:
-- Soft-denial message remains visible in user chat/history if needed.
-- Downstream agents do not reuse or continue human-agent wording.
-- Trip Planner does not say "connect you with an expert/agent".
-- Human handoff messaging stays centralized in Gateway/Guardrail.
-- Normal trip planning context still works correctly.
+- No chunk-level code adds extra `:` to card markers.
+- `:::cards` markers are streamed or buffered without mutation.
+- Full-response card validation remains intact.
+- Add tests for split chunks and ensure final output still has exactly `:::cards`.
