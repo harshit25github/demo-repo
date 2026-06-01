@@ -1,43 +1,58 @@
 Task:
-Analyze and plan the best approach for updating the Human Handoff flow.
+Investigate and fix downstream agents using Human Handoff soft-denial message as context.
 
 Context:
-We currently have a Human Handoff Guardrail in the Gateway workflow.
-Earlier, this flow was confirmation-based:
-- user asks for human agent
-- system asks for confirmation
-- later confirmation triggers handoff
+Human Handoff flow is handled by Gateway/Human Handoff Guardrail.
 
-Now the requirement has changed:
-- we should not ask for confirmation
-- we should show a soft denial message instead
-- if the user asks for a human agent again later, we should show the same soft denial again
+Soft-denial message example:
+"I can help you plan this right here once your destination is finalized, and I can connect you with an expert for the booking."
 
-The soft denial message already exists in the code.
+This message is saved in:
+- messages DB
+- conversation / conversationId history
 
-Your Task:
-Do not implement directly.
+Important:
+Messages DB is fine because it is not injected into the agent.
+But conversationId history is injected into the agent workflow, so downstream agents may be reading this soft-denial message as context.
 
-First, inspect the codebase and provide the best plan to handle this change.
+Current Issue:
+After this soft-denial message is saved in conversation history, Trip Planner or other agents sometimes respond with human-agent related text like:
+- "I can connect you with an expert"
+- "I will connect you to an agent"
+- "An expert can help with booking"
 
-Please analyze:
-- where Human Handoff Guardrail is implemented
-- where confirmation state is stored
-- where approval-check logic runs before runner
-- where final handoff/tripwire is triggered
-- where soft denial message should be returned
-- how to safely remove/disable old confirmation logic
-- how to make repeated human-agent requests return soft denial
-- how to avoid breaking existing guardrails and routing
+This is wrong.
 
-Expected Output:
-Provide a simple implementation plan with:
-- files/functions to update
-- old logic to remove/disable
-- new flow proposal
-- edge cases
-- test cases
-- risks
+Required Analysis:
+Inspect how conversation history/context is injected into agents.
 
-Goal:
-Find the cleanest and safest way to move from confirmation-based human handoff to soft-denial-based human handoff.
+Check:
+- where soft-denial message is saved
+- whether it is saved into OpenAI conversation/session history
+- how conversationId context is passed to Trip Planner/Flight/Policy agents
+- whether downstream agents are copying or continuing the soft-denial wording
+- whether handoff/soft-denial messages should be excluded from agent context
+
+Expected Fix Options:
+Suggest the safest approach before implementing.
+
+Possible fixes:
+1. Do not inject Human Handoff soft-denial messages into downstream agent context.
+2. Mark soft-denial messages with metadata like `non_agent_context: true`.
+3. Filter handoff/soft-denial messages before passing conversation history to agents.
+4. Keep message in DB for UI/history, but exclude it from agent reasoning context.
+5. Add prompt rule that downstream agents must not continue or reuse human handoff messaging.
+
+Important Rules:
+- Only Gateway/Human Handoff Guardrail can talk about human agent/expert connection.
+- Trip Planner, Flight Agent, and Policy Agent must not mention connecting to human/expert.
+- Soft-denial message should not influence normal trip planning responses.
+- Do not break conversation history shown to the user.
+- Do not break normal context memory for trip planning.
+
+Acceptance Criteria:
+- Soft-denial message remains visible in user chat/history if needed.
+- Downstream agents do not reuse or continue human-agent wording.
+- Trip Planner does not say "connect you with an expert/agent".
+- Human handoff messaging stays centralized in Gateway/Guardrail.
+- Normal trip planning context still works correctly.
