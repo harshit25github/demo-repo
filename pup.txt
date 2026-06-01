@@ -1,40 +1,36 @@
 Task:
-Enhance Human Handoff confirmation flow to support delayed confirmation.
+Update Human Handoff flow from confirmation-based flow to soft-denial flow.
 
 Context:
-Currently, when Human Handoff Guardrail triggers for the first time, we save a DB attribute and ask user for confirmation.
-Before the next runner call, we run a checker agent to verify if the user approved human handoff.
+Previously, when Human Handoff Guardrail triggered, we asked the user for confirmation and saved a DB/context attribute to check if the user approved handoff later.
 
-Change Required:
-The user may not confirm in the immediate next turn.
-They may continue normal conversation and confirm human handoff later at any point.
+New Change:
+We are no longer taking confirmation from the user.
+Instead, when the user asks to connect with a human agent, we show a soft denial message.
+
+Note:
+The soft denial message is already added in the code. Use that existing message.
 
 Required Behavior:
-- When human handoff is requested first time, save pending handoff state in DB/context.
-- Continue normal workflow after asking confirmation.
-- Do not assume confirmation must come in the next message.
-- On every future user message, check if human handoff confirmation is pending.
-- If user clearly confirms human handoff later, trigger final handoff.
-- If user cancels, clear pending handoff state.
-- If user asks unrelated queries, continue normal workflow but keep pending state active.
+- If user asks for a human agent/support/real person, trigger Human Handoff Guardrail.
+- Do not ask for confirmation.
+- Do not wait for user approval in the next turn.
+- Do not run approval-check logic before runner.
+- Return the existing soft denial message.
+- If the user asks for a human agent again at any later point in the conversation, return the same soft denial response again.
+- Do not route this request to Trip Planner, Flight, or Policy agents.
+- Do not expose guardrail, tripwire, DB, or internal workflow details to the user.
 
-Important Rule:
-Avoid accidental confirmation.
-- If confirmation is immediate next reply, short replies like “yes”, “haan”, “ok” can confirm.
-- If confirmation comes after unrelated turns, require clear intent like:
-  - “yes connect me to human”
-  - “connect me to agent”
-  - “I still want human support”
-  - “talk to real person”
-
-DB/Context State:
-Use something like:
-humanHandoffStatus = "pending" | "confirmed" | "cancelled" | null
+Remove/Disable:
+- confirmation pending logic
+- confirmation approval checker agent
+- “yes/haan/ok” confirmation handling
+- delayed confirmation logic
+- final handoff trigger based on user confirmation
 
 Acceptance Criteria:
-- Pending handoff remains active across multiple turns.
-- Confirmation can happen anytime later in the flow.
-- Unrelated messages do not clear pending state.
-- Generic “yes” does not accidentally trigger handoff after unrelated turns.
-- Cancel messages clear pending state.
-- Final handoff triggers only after clear confirmation.
+- First human agent request returns soft denial message.
+- Later human agent requests also return soft denial message.
+- No confirmation is asked.
+- No final handoff is triggered from confirmation.
+- Existing non-human queries continue normal routing.
