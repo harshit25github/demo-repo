@@ -1,5 +1,43 @@
-Hi [Name], quick question on the human handoff flow: once the handoff tripwire has already been triggered, can the chat continue in the pre-trip planning state?
+Task:
+Review and improve the Gateway Agent setup.
 
-If yes, should we repeat the same soft-deny → handoff cycle for future requests, or should all subsequent handoff requests directly trigger the tripwire?
+Context:
+We are using OpenAI as the agent engine.
+We have a Gateway Agent whose main responsibility is to receive every user request and hand it off to the correct downstream agent.
 
-Also, we’ve removed the CTAs for the mobile agent and deployed all changes to dev.
+Downstream agents may include:
+- Trip Planner Agent
+- Flight Agent
+- Policy Agent
+- Human Handoff / Guardrail flows
+
+I will provide documentation/context separately.
+
+Your Task:
+Go through the provided documentation and current codebase setup.
+
+Analyze:
+- whether our Gateway Agent design is correct
+- whether handoff/routing logic is implemented properly
+- whether guardrails are placed correctly
+- whether the Gateway Agent is doing too much or too little
+- whether agent responsibilities are clearly separated
+- whether internal details are hidden from users
+- whether the setup follows OpenAI agentic workflow best practices
+- where latency, routing, or tool-call issues can be improved
+
+Expected Output:
+Provide a review before making changes.
+
+Include:
+- current setup summary
+- what is working well
+- what looks incorrect or risky
+- recommended improvements
+- files/functions that may need changes
+- priority-wise action plan
+- test cases to verify the gateway flow
+
+Important:
+Do not implement directly first.
+First inspect the documentation and codebase, then suggest the best improvement plan for the Gateway Agent setup.
