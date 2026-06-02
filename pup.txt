@@ -1,42 +1,5 @@
-Task:
-Debug and remove chunk-level `:::cards` marker manipulation.
+Hi [Name], quick question on the human handoff flow: once the handoff tripwire has already been triggered, can the chat continue in the pre-trip planning state?
 
-Context:
-We use this card format:
+If yes, should we repeat the same soft-deny → handoff cycle for future requests, or should all subsequent handoff requests directly trigger the tripwire?
 
-:::cards
-<cards content>
-:::cards
-
-Recently, explicit chunk-level handling was added to manage `:::cards` during streaming.
-
-Issue:
-Sometimes the card marker is getting corrupted with extra colons, like:
-- `::::cards`
-- `:::::cards`
-- `::::::cards`
-
-This seems to be caused by custom chunk-level handling/merging logic.
-
-Required Work:
-- Find where `:::cards` is being handled or modified at the streaming/chunk level.
-- Debug why extra colons are being added.
-- Remove or simplify the chunk-level logic that mutates card markers.
-- Do not manually add/repair colons while streaming chunks.
-- Preserve the original agent output as much as possible.
-
-Important:
-We only want structure validation/repair on the complete final response/full chat output.
-We do not want card marker repair/manipulation at individual chunk level.
-
-Expected Behavior:
-- Streaming should not corrupt `:::cards`.
-- Card markers should remain exactly `:::cards`.
-- No extra colons should be added.
-- Full-response validation can still check/fix malformed card structure after complete response is available.
-
-Acceptance Criteria:
-- No chunk-level code adds extra `:` to card markers.
-- `:::cards` markers are streamed or buffered without mutation.
-- Full-response card validation remains intact.
-- Add tests for split chunks and ensure final output still has exactly `:::cards`.
+Also, we’ve removed the CTAs for the mobile agent and deployed all changes to dev.
