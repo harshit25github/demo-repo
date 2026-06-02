@@ -1,51 +1,51 @@
 Task:
-Debug why updated agents/system prompts are not showing for a specific App ID.
+Debug and fix why updated agents/system prompts are not showing for a specific App ID.
 
 Context:
 We have app-level routes.
 
 Flow:
-1. Admin token is used to fetch the list of apps.
+1. Admin token fetches the list of apps.
 2. Each app represents a service.
 3. Each app can use multiple agents.
 4. Each agent has its own system prompt.
 5. Using App ID, we fetch all agents and system prompts linked to that app.
 
 Current Issue:
-The app list is getting retrieved correctly using the admin token.
+App list is getting retrieved correctly using the admin token.
 But when fetching agents/prompts by App ID, the latest/updated agents are not showing.
 
-Possible Problem:
-It looks like updated agents may not be getting saved/linked properly in the database, or the App ID mapping is not updated correctly.
+Possible Cause:
+Updated agents may not be saved, linked, queried, or mapped correctly in the database/API response.
 
-Your Task:
-Do not fix directly first.
-Debug and identify the root cause.
+Required Work:
+1. Debug the issue.
+2. Identify the root cause.
+3. Fix the issue.
+4. Verify the App ID response returns all latest agents and prompts correctly.
 
-Please check:
-- app list API response using admin token
-- App ID being passed correctly
-- DB records for the selected app
-- agent-to-app mapping table/relationship
-- whether updated agents are saved in DB
-- whether updated prompts are saved in DB
-- whether old/cached data is being returned
-- whether query filters are excluding updated agents
-- whether environment/database mismatch exists
-- whether migration/seed/update logic is missing
-- whether API response mapping is dropping agent/prompt fields
+Please Check:
+- App ID is passed correctly.
+- Updated agents exist in DB.
+- Updated system prompts exist in DB.
+- Agent-to-app mapping is correct.
+- Query filters are not excluding updated agents.
+- API response mapper is not dropping agent/prompt fields.
+- Cache is not returning stale data.
+- Correct environment/database is being used.
+- Migration/seed/update logic is not missing.
 
-Expected Output:
-Provide a root-cause analysis with:
-- what API is working
-- where the data is missing
-- whether issue is in DB save, DB relation, query, cache, or response mapping
-- files/functions/routes involved
-- logs or DB queries used to verify
-- suggested fix plan
+Expected Fix:
+- Ensure updated agents are saved correctly.
+- Ensure updated agents are linked to the correct App ID.
+- Ensure App ID API returns all linked agents and system prompts.
+- Clear/update cache if stale data is causing the issue.
+- Add logs where needed for debugging.
 
 Acceptance Criteria:
-- Confirm whether updated agents exist in DB.
-- Confirm whether they are linked to the correct App ID.
-- Confirm why agents/prompts are missing from App ID response.
-- Provide a clear fix plan before implementation.
+- App list API works as before.
+- App ID API returns all latest agents.
+- App ID API returns all latest system prompts.
+- Updated agents are correctly linked in DB.
+- No old/stale agent data is returned.
+- Add a test or verification script for this flow.
