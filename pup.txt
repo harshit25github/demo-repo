@@ -1,57 +1,48 @@
 Task:
-Debug and fix agent/system prompt persistence for App creation and App ID retrieval.
+Fix backend update flow for Gateway agent model and agent mapping changes.
 
 Context:
-We have app-level routes.
+App/agent persistence issue is resolved, but new issues are found.
 
-Flow:
-1. Admin token fetches the list of apps.
-2. Each app represents a service.
-3. Each app can use multiple agents.
-4. Each agent has its own system prompt.
-5. Using App ID, we fetch all agents and system prompts linked to that app.
+Current Gateway/Orchestrator should use only these agents:
+- Flight Agent
+- Policy Agent
+- Trip Planner Agent
 
-Current Issues:
-
-Issue 1:
-App list is retrieved correctly using admin token.
-But when fetching agents/prompts by App ID, latest/updated agents and system prompts are not showing.
-
-Issue 2:
-When creating a new app/service, the app gets created successfully.
-But the agents/system prompts linked to that app are not getting written into the database.
-Because of this, fetching by App ID does not return the expected agents/prompts.
+Issue:
+When updating the app/agent setup:
+- Prompt updates are working.
+- But selected agents are not updating correctly.
+- Old/unused agent like Hotel Agent is still showing.
+- Model changes are also not getting updated properly.
+- Agent-to-app / gateway-to-agent mapping seems stale or incorrect.
 
 Required Work:
-1. Debug both issues.
-2. Identify the root cause.
-3. Fix the persistence and retrieval flow.
-4. Verify that new and updated apps return correct agents/prompts by App ID.
+Debug and fix the backend update flow so that whenever model or agent selection changes, DB tables are updated correctly.
 
 Please Check:
-- App creation API flow.
-- Whether agent records are created during new app creation.
-- Whether system prompts are saved in DB.
-- Whether agent-to-app mapping is created correctly.
-- Whether updated agents are saved correctly.
-- Whether App ID is passed correctly in retrieval API.
-- Whether query filters are excluding agents/prompts.
-- Whether response mapper is dropping agent/prompt fields.
-- Whether cache is returning stale data.
-- Whether correct environment/database is being used.
-- Whether migration/seed/update logic is missing.
+- App update API flow.
+- Gateway/orchestrator update logic.
+- Agent-to-app mapping table.
+- Gateway-to-agent mapping table.
+- Model field update logic.
+- Whether old agents are removed/unlinked properly.
+- Whether new selected agents are linked properly.
+- Whether stale/cache data is being returned.
+- Whether response mapper is showing old agent data.
 
-Expected Fix:
-- New app creation should save app details, agents, system prompts, and mappings correctly.
-- Updated agents/prompts should persist in DB.
-- App ID API should return all linked agents and system prompts.
-- Add logs where needed for debugging.
-- Add verification/test script for app creation and App ID retrieval.
+Expected Behavior:
+- If selected agents are Flight, Policy, and Trip Planner, only these should appear.
+- Hotel Agent should not appear unless explicitly selected.
+- Model changes should persist in DB.
+- Prompt changes should continue working.
+- Agent mappings should reflect the latest selected agents.
+- Retrieval API should return updated model + updated agent list.
 
 Acceptance Criteria:
-- Admin token app list API works as before.
-- New app creation saves agents and prompts in DB.
-- Updated agents and prompts are saved correctly.
-- Agent-to-app mapping is created correctly.
-- App ID API returns all latest linked agents and system prompts.
-- No stale/old data is returned.
+- Updating model updates DB correctly.
+- Updating selected agents updates mapping tables correctly.
+- Removed agents are unlinked from the app/gateway.
+- Retrieval by App ID returns only current agents.
+- No stale Hotel Agent appears.
+- Add/update tests for model update and agent mapping update.
