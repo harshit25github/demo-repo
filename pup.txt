@@ -1,43 +1,51 @@
 Task:
-Review and improve the Gateway Agent setup.
+Debug why updated agents/system prompts are not showing for a specific App ID.
 
 Context:
-We are using OpenAI as the agent engine.
-We have a Gateway Agent whose main responsibility is to receive every user request and hand it off to the correct downstream agent.
+We have app-level routes.
 
-Downstream agents may include:
-- Trip Planner Agent
-- Flight Agent
-- Policy Agent
-- Human Handoff / Guardrail flows
+Flow:
+1. Admin token is used to fetch the list of apps.
+2. Each app represents a service.
+3. Each app can use multiple agents.
+4. Each agent has its own system prompt.
+5. Using App ID, we fetch all agents and system prompts linked to that app.
 
-I will provide documentation/context separately.
+Current Issue:
+The app list is getting retrieved correctly using the admin token.
+But when fetching agents/prompts by App ID, the latest/updated agents are not showing.
+
+Possible Problem:
+It looks like updated agents may not be getting saved/linked properly in the database, or the App ID mapping is not updated correctly.
 
 Your Task:
-Go through the provided documentation and current codebase setup.
+Do not fix directly first.
+Debug and identify the root cause.
 
-Analyze:
-- whether our Gateway Agent design is correct
-- whether handoff/routing logic is implemented properly
-- whether guardrails are placed correctly
-- whether the Gateway Agent is doing too much or too little
-- whether agent responsibilities are clearly separated
-- whether internal details are hidden from users
-- whether the setup follows OpenAI agentic workflow best practices
-- where latency, routing, or tool-call issues can be improved
+Please check:
+- app list API response using admin token
+- App ID being passed correctly
+- DB records for the selected app
+- agent-to-app mapping table/relationship
+- whether updated agents are saved in DB
+- whether updated prompts are saved in DB
+- whether old/cached data is being returned
+- whether query filters are excluding updated agents
+- whether environment/database mismatch exists
+- whether migration/seed/update logic is missing
+- whether API response mapping is dropping agent/prompt fields
 
 Expected Output:
-Provide a review before making changes.
+Provide a root-cause analysis with:
+- what API is working
+- where the data is missing
+- whether issue is in DB save, DB relation, query, cache, or response mapping
+- files/functions/routes involved
+- logs or DB queries used to verify
+- suggested fix plan
 
-Include:
-- current setup summary
-- what is working well
-- what looks incorrect or risky
-- recommended improvements
-- files/functions that may need changes
-- priority-wise action plan
-- test cases to verify the gateway flow
-
-Important:
-Do not implement directly first.
-First inspect the documentation and codebase, then suggest the best improvement plan for the Gateway Agent setup.
+Acceptance Criteria:
+- Confirm whether updated agents exist in DB.
+- Confirm whether they are linked to the correct App ID.
+- Confirm why agents/prompts are missing from App ID response.
+- Provide a clear fix plan before implementation.
