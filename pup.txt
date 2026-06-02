@@ -1,5 +1,5 @@
 Task:
-Debug and fix why updated agents/system prompts are not showing for a specific App ID.
+Debug and fix agent/system prompt persistence for App creation and App ID retrieval.
 
 Context:
 We have app-level routes.
@@ -11,41 +11,47 @@ Flow:
 4. Each agent has its own system prompt.
 5. Using App ID, we fetch all agents and system prompts linked to that app.
 
-Current Issue:
-App list is getting retrieved correctly using the admin token.
-But when fetching agents/prompts by App ID, the latest/updated agents are not showing.
+Current Issues:
 
-Possible Cause:
-Updated agents may not be saved, linked, queried, or mapped correctly in the database/API response.
+Issue 1:
+App list is retrieved correctly using admin token.
+But when fetching agents/prompts by App ID, latest/updated agents and system prompts are not showing.
+
+Issue 2:
+When creating a new app/service, the app gets created successfully.
+But the agents/system prompts linked to that app are not getting written into the database.
+Because of this, fetching by App ID does not return the expected agents/prompts.
 
 Required Work:
-1. Debug the issue.
+1. Debug both issues.
 2. Identify the root cause.
-3. Fix the issue.
-4. Verify the App ID response returns all latest agents and prompts correctly.
+3. Fix the persistence and retrieval flow.
+4. Verify that new and updated apps return correct agents/prompts by App ID.
 
 Please Check:
-- App ID is passed correctly.
-- Updated agents exist in DB.
-- Updated system prompts exist in DB.
-- Agent-to-app mapping is correct.
-- Query filters are not excluding updated agents.
-- API response mapper is not dropping agent/prompt fields.
-- Cache is not returning stale data.
-- Correct environment/database is being used.
-- Migration/seed/update logic is not missing.
+- App creation API flow.
+- Whether agent records are created during new app creation.
+- Whether system prompts are saved in DB.
+- Whether agent-to-app mapping is created correctly.
+- Whether updated agents are saved correctly.
+- Whether App ID is passed correctly in retrieval API.
+- Whether query filters are excluding agents/prompts.
+- Whether response mapper is dropping agent/prompt fields.
+- Whether cache is returning stale data.
+- Whether correct environment/database is being used.
+- Whether migration/seed/update logic is missing.
 
 Expected Fix:
-- Ensure updated agents are saved correctly.
-- Ensure updated agents are linked to the correct App ID.
-- Ensure App ID API returns all linked agents and system prompts.
-- Clear/update cache if stale data is causing the issue.
+- New app creation should save app details, agents, system prompts, and mappings correctly.
+- Updated agents/prompts should persist in DB.
+- App ID API should return all linked agents and system prompts.
 - Add logs where needed for debugging.
+- Add verification/test script for app creation and App ID retrieval.
 
 Acceptance Criteria:
-- App list API works as before.
-- App ID API returns all latest agents.
-- App ID API returns all latest system prompts.
-- Updated agents are correctly linked in DB.
-- No old/stale agent data is returned.
-- Add a test or verification script for this flow.
+- Admin token app list API works as before.
+- New app creation saves agents and prompts in DB.
+- Updated agents and prompts are saved correctly.
+- Agent-to-app mapping is created correctly.
+- App ID API returns all latest linked agents and system prompts.
+- No stale/old data is returned.
