@@ -1,5 +1,5 @@
-For the Human Handoff Request Guardrail, tripwire happens only on the second occurrence. Until then, the summary is updated normally.
+This issue can happen rarely in long conversations because the LLM follows prompt rules probabilistically, not like strict code execution. When the context becomes very large, the custom Markdown format like :::cards ... ::: may occasionally be missed in streaming chunks.
 
-On tripwire, we do not update the summary because the workflow exits. So the consumer can use the latest summary from the previous successful turn, i.e. the N-1 summary.
+However, this is already handled at our side. The streamed chunks may sometimes miss the exact card format, but the final status_dump chunk has explicit fallback handling. I’ve added regex-based checks there, so if the card block or related columns are missing, the system detects it and updates/populates them automatically.
 
-If needed, they can also fetch it via /chat/{chatId} API.
+So the issue is expected at the model-output level in rare long-context cases, but we have a safeguard in the final chunk to normalize and fix it.
