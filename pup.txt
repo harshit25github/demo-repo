@@ -1,7 +1,1 @@
-Hey, any update on the redirect loop issue?
 
-You’d asked me to connect once, but I haven’t heard back yet.
-
-Also, in the cURL you shared yesterday, cookies were already present. I can see two different UUIDs in those cookies, and both are different from the UID I’m sending in the payload.
-
-Can you please confirm where these UUIDs are coming from and whether this mismatch is causing the redirect loop?
