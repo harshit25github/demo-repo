@@ -1,5 +1,5 @@
-This issue can happen rarely in long conversations because the LLM follows prompt rules probabilistically, not like strict code execution. When the context becomes very large, the custom Markdown format like :::cards ... ::: may occasionally be missed in streaming chunks.
+We checked this session and it was a very long conversation with a high token count. In such long-context cases, response/prompt drift can rarely happen because the :::cards format is enforced through prompt instructions, which are soft rules, not hard validation.
 
-However, this is already handled at our side. The streamed chunks may sometimes miss the exact card format, but the final status_dump chunk has explicit fallback handling. I’ve added regex-based checks there, so if the card block or related columns are missing, the system detects it and updates/populates them automatically.
+We use this soft-rule approach because a single agent response can be either Markdown or JSON, not multiple formats at once. So card data is embedded inside Markdown using the agreed format.
 
-So the issue is expected at the model-output level in rare long-context cases, but we have a safeguard in the final chunk to normalize and fix it.
+That said, the final response/state is protected. In the final status_dump, we have added hard verification and regex-based fallback handling. So even if streaming chunks miss the expected format, the final output gets normalized and updated as per the discussed rules.
