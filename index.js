@@ -9,6 +9,7 @@ const filterTypeValues = [
   'stops',
   'totalDuration',
   'layoverDuration',
+  'price',
 ];
 const baggageFilterCodes = ['0', '1', '2'];
 const timeSlotFilterCodes = ['EARLYMORNING', 'MORNING', 'AFTERNOON', 'EVENING'];
@@ -20,6 +21,7 @@ const apiFilterTypeByToolType = {
   departureTime: 'departtimeslotfilter',
   arrivalTime: 'departlandtimeslotfilter',
   baggage: 'baggage',
+  price: 'price',
   totalDuration: 'departdurationfilter',
   layoverDuration: 'departlayoverfilter',
 };
@@ -28,6 +30,7 @@ const orderedFilterTypes = [
   'departureTime',
   'arrivalTime',
   'baggage',
+  'price',
   'totalDuration',
   'layoverDuration',
 ];
@@ -43,7 +46,7 @@ const applyFilterSchema = z.object({
         filterType: z
           .enum(filterTypeValues)
           .describe(
-            'Filter category: baggage, departureTime, arrivalTime, stops, totalDuration, or layoverDuration.',
+            'Filter category: baggage, departureTime, arrivalTime, stops, totalDuration, layoverDuration, or price.',
           ),
         filterCode: z
           .enum(apiFilterCodeValues)
@@ -65,6 +68,16 @@ const applyFilterSchema = z.object({
           .max(2880)
           .nullable()
           .describe('Maximum duration in minutes. Use only for duration filters.'),
+        minPrice: z
+          .number()
+          .min(0)
+          .nullable()
+          .describe('Minimum price. Use only for price filters.'),
+        maxPrice: z
+          .number()
+          .min(0)
+          .nullable()
+          .describe('Maximum price. Use only for price filters.'),
         rawUserFilter: z
           .string()
           .nullable()
@@ -137,6 +150,57 @@ function inferDurationRange(rawUserFilter) {
   if (plainMatch) {
     return {
       maxDurationMinutes: durationToMinutes(plainMatch[1], plainMatch[2]),
+    };
+  }
+
+  return {};
+}
+
+function inferPriceRange(rawUserFilter) {
+  const text = toSearchText(rawUserFilter).replace(/,/g, '');
+  if (!text) {
+    return {};
+  }
+
+  const pricePattern =
+    '(?:usd|us\\$|\\$|dollars?|bucks?)?\\s*(\\d+(?:\\.\\d+)?)\\s*(?:usd|dollars?|bucks?)?';
+  const rangeMatch = text.match(
+    new RegExp(`(?:between|from)\\s+${pricePattern}\\s+(?:and|to|-)\\s+${pricePattern}`),
+  );
+  if (rangeMatch) {
+    return {
+      minPrice: Number(rangeMatch[1]),
+      maxPrice: Number(rangeMatch[2]),
+    };
+  }
+
+  const hyphenMatch = text.match(new RegExp(`${pricePattern}\\s*-\\s*${pricePattern}`));
+  if (hyphenMatch) {
+    return {
+      minPrice: Number(hyphenMatch[1]),
+      maxPrice: Number(hyphenMatch[2]),
+    };
+  }
+
+  const maxMatch = text.match(
+    new RegExp(
+      `(?:under|less than|below|up to|within|max(?:imum)?|at most|no more than|cheaper than)\\s+${pricePattern}`,
+    ),
+  );
+  if (maxMatch) {
+    return {
+      minPrice: 0,
+      maxPrice: Number(maxMatch[1]),
+    };
+  }
+
+  const minMatch = text.match(
+    new RegExp(`(?:over|more than|above|at least|min(?:imum)?)\\s+${pricePattern}`),
+  );
+  if (minMatch) {
+    return {
+      minPrice: Number(minMatch[1]),
+      maxPrice: null,
     };
   }
 
@@ -220,6 +284,22 @@ function normalizeApplyFilter(filters) {
           filter.minDurationMinutes ?? inferredDuration.minDurationMinutes ?? null,
         maxDurationMinutes:
           filter.maxDurationMinutes ?? inferredDuration.maxDurationMinutes ?? null,
+        minPrice: null,
+        maxPrice: null,
+        rawUserFilter: filter.rawUserFilter,
+      };
+    }
+
+    if (filter.filterType === 'price') {
+      // Price filters are range filters; final API payload uses [minPrice, maxPrice].
+      const inferredPrice = inferPriceRange(filter.rawUserFilter);
+      return {
+        filterType: filter.filterType,
+        filterCode: null,
+        minDurationMinutes: null,
+        maxDurationMinutes: null,
+        minPrice: filter.minPrice ?? inferredPrice.minPrice ?? null,
+        maxPrice: filter.maxPrice ?? inferredPrice.maxPrice ?? null,
         rawUserFilter: filter.rawUserFilter,
       };
     }
@@ -235,6 +315,8 @@ function normalizeApplyFilter(filters) {
       filterCode,
       minDurationMinutes: null,
       maxDurationMinutes: null,
+      minPrice: null,
+      maxPrice: null,
       rawUserFilter: filter.rawUserFilter,
     };
   });
@@ -243,6 +325,9 @@ function normalizeApplyFilter(filters) {
 function hasUsableFilterValue(filter) {
   if (durationFilterTypes.includes(filter.filterType)) {
     return filter.minDurationMinutes !== null || filter.maxDurationMinutes !== null;
+  }
+  if (filter.filterType === 'price') {
+    return filter.minPrice !== null || filter.maxPrice !== null;
   }
   return filter.filterCode !== null;
 }
@@ -273,12 +358,19 @@ function filterStateKey(filter) {
   if (durationFilterTypes.includes(filter.filterType)) {
     return filter.filterType;
   }
+  if (filter.filterType === 'price') {
+    return filter.filterType;
+  }
   return `${filter.filterType}:${filter.filterCode}`;
 }
 
 function removeMatchingFilter(filters, filterToRemove) {
   // Remove exact checkbox values when known; otherwise clear the whole type.
-  if (!filterToRemove.filterCode || durationFilterTypes.includes(filterToRemove.filterType)) {
+  if (
+    !filterToRemove.filterCode ||
+    durationFilterTypes.includes(filterToRemove.filterType) ||
+    filterToRemove.filterType === 'price'
+  ) {
     return filters.filter((filter) => filter.filterType !== filterToRemove.filterType);
   }
 
@@ -309,7 +401,7 @@ function mergeApplyFilterState(existingFilters, incomingFilters) {
     return [];
   }
 
-  // Update rule: durations always replace their old range. "only/instead"
+  // Update rule: duration and price ranges always replace their old range. "only/instead"
   // also replaces only that filter type. If the same checkbox type already
   // exists, a new value replaces it unless the user/model says add/also/with.
   const replaceTypes = new Set(
@@ -319,6 +411,7 @@ function mergeApplyFilterState(existingFilters, incomingFilters) {
           !hasRemoveIntent(filter) &&
           hasUsableFilterValue(filter) &&
           (durationFilterTypes.includes(filter.filterType) ||
+            filter.filterType === 'price' ||
             hasReplaceIntent(filter) ||
             ((existingFilters || []).some(
               (existingFilter) => existingFilter.filterType === filter.filterType,
@@ -360,6 +453,11 @@ function buildFinalFilterPayload(filters) {
         filter.minDurationMinutes ?? 0,
         filter.maxDurationMinutes ?? durationMaxByType[filter.filterType],
       ]);
+      continue;
+    }
+
+    if (filter.filterType === 'price') {
+      groupedValues.set(apiFilterType, [filter.minPrice ?? 0, filter.maxPrice ?? null]);
       continue;
     }
 
@@ -421,6 +519,19 @@ function matchesDurationMinutes(value, { minDurationMinutes, maxDurationMinutes 
   return true;
 }
 
+function matchesPrice(value, { minPrice, maxPrice }) {
+  if (typeof value !== 'number') {
+    return false;
+  }
+  if (minPrice !== null && value < minPrice) {
+    return false;
+  }
+  if (maxPrice !== null && value > maxPrice) {
+    return false;
+  }
+  return true;
+}
+
 function matchesApiFilter(flight, filter) {
   if (filter.filterType === 'baggage') {
     return !filter.filterCode || flight.baggage.includes(filter.filterCode);
@@ -439,6 +550,9 @@ function matchesApiFilter(flight, filter) {
   }
   if (filter.filterType === 'layoverDuration') {
     return matchesDurationMinutes(flight.layover_duration_minutes, filter);
+  }
+  if (filter.filterType === 'price') {
+    return matchesPrice(flight.price?.amount, filter);
   }
   return true;
 }
