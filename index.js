@@ -15,42 +15,26 @@ const timeSlotFilterCodes = ['EARLYMORNING', 'MORNING', 'AFTERNOON', 'EVENING'];
 const stopFilterCodes = ['0', '2', '3'];
 const apiFilterCodeValues = ['0', '1', '2', '3', ...timeSlotFilterCodes];
 const durationFilterTypes = ['totalDuration', 'layoverDuration'];
-
-const flightSearchSchema = z.object({
-  onds: z
-    .array(
-      z.object({
-        origin: z
-          .string()
-          .describe('Origin city, airport, or IATA code, for example Delhi or DEL.'),
-        destination: z
-          .string()
-          .describe('Destination city, airport, or IATA code, for example Mumbai or BOM.'),
-        outbound_date: z
-          .string()
-          .describe('Departure date in YYYY-MM-DD format when possible.'),
-        return_date: z
-          .string()
-          .nullable()
-          .describe('Return date for round trips, otherwise null.'),
-      }),
-    )
-    .min(1)
-    .describe('Origin-destination route segments for one-way, roundtrip, or multicity search.'),
-  trip_type: z
-    .enum(['oneway', 'roundtrip', 'multicity'])
-    .describe('Trip type. Use oneway by default unless return date or multicity is requested.'),
-  passengers: z
-    .object({
-      adults: z.number().int().min(1).describe('Adult passenger count. Default to 1.'),
-      children: z.number().int().min(0).describe('Child passenger count. Default to 0.'),
-      infants: z.number().int().min(0).describe('Infant passenger count. Default to 0.'),
-    })
-    .describe('Passenger counts.'),
-  cabin_class: z
-    .enum(['economy', 'premium_economy', 'business', 'first'])
-    .describe('Coach or cabin class. Default to economy.'),
-});
+const apiFilterTypeByToolType = {
+  stops: 'stop',
+  departureTime: 'departtimeslotfilter',
+  arrivalTime: 'departlandtimeslotfilter',
+  baggage: 'baggage',
+  totalDuration: 'departdurationfilter',
+  layoverDuration: 'departlayoverfilter',
+};
+const orderedFilterTypes = [
+  'stops',
+  'departureTime',
+  'arrivalTime',
+  'baggage',
+  'totalDuration',
+  'layoverDuration',
+];
+const durationMaxByType = {
+  totalDuration: 2880,
+  layoverDuration: 1500,
+};
 
 const applyFilterSchema = z.object({
   filters: z
@@ -90,103 +74,6 @@ const applyFilterSchema = z.object({
     .min(1)
     .describe('Apply-filter API filters. Each item must use exact API filter codes.'),
 });
-
-function createSearchKey(UID) {
-  return `search_${UID}_${Date.now()}`;
-}
-
-function buildDummyFlights({ onds, trip_type, passengers, cabin_class }) {
-  const firstOnd = onds[0];
-  const lastOnd = onds[onds.length - 1];
-  const passengerCount = passengers.adults + passengers.children + passengers.infants;
-
-  return {
-    source: 'dummy',
-    message: 'Sample flight results only. No live API was called.',
-    searchParams: {
-      onds,
-      trip_type,
-      passengers,
-      cabin_class,
-    },
-    summary: {
-      route: `${firstOnd.origin} to ${lastOnd.destination}`,
-      passengerCount,
-      optionCount: 2,
-    },
-    flights: [
-      {
-        id: 'dummy-flight-1',
-        airline: 'Sample Air',
-        flight_number: 'SA 101',
-        origin: firstOnd.origin,
-        destination: firstOnd.destination,
-        departure_time: '09:00',
-        arrival_time: '11:10',
-        departure_time_window: 'MORNING',
-        arrival_time_window: 'MORNING',
-        duration: '2h 10m',
-        total_duration_hours: 2.17,
-        total_duration_minutes: 130,
-        layover_duration_hours: 0,
-        layover_duration_minutes: 0,
-        stops: 0,
-        baggage: ['2', '1'],
-        cabin_class,
-        price: {
-          amount: 199,
-          currency: 'USD',
-        },
-      },
-      {
-        id: 'dummy-flight-2',
-        airline: 'Demo Airlines',
-        flight_number: 'DA 204',
-        origin: firstOnd.origin,
-        destination: firstOnd.destination,
-        departure_time: '14:30',
-        arrival_time: '17:05',
-        departure_time_window: 'AFTERNOON',
-        arrival_time_window: 'EVENING',
-        duration: '2h 35m',
-        total_duration_hours: 2.58,
-        total_duration_minutes: 155,
-        layover_duration_hours: 0.75,
-        layover_duration_minutes: 45,
-        stops: 1,
-        baggage: ['2', '1', '0'],
-        cabin_class,
-        price: {
-          amount: 179,
-          currency: 'USD',
-        },
-      },
-      {
-        id: 'dummy-flight-3',
-        airline: 'Example Express',
-        flight_number: 'EE 309',
-        origin: firstOnd.origin,
-        destination: firstOnd.destination,
-        departure_time: '05:45',
-        arrival_time: '13:40',
-        departure_time_window: 'EARLYMORNING',
-        arrival_time_window: 'AFTERNOON',
-        duration: '7h 55m',
-        total_duration_hours: 7.92,
-        total_duration_minutes: 475,
-        layover_duration_hours: 2.25,
-        layover_duration_minutes: 135,
-        stops: 2,
-        baggage: ['2'],
-        cabin_class,
-        price: {
-          amount: 149,
-          currency: 'USD',
-        },
-      },
-    ],
-  };
-}
 
 function getFlightContext(runContext) {
   const appContext = runContext?.context || {};
@@ -321,11 +208,10 @@ function isAllowedCodeForType(filterType, filterCode) {
 }
 
 function normalizeApplyFilter(filters) {
-  // Normalize model input into the exact codes/minutes the real API expects.
-  // This keeps the API integration layer from re-mapping natural language later.
+  // Normalize model/tool input into API codes and minute ranges once.
   return filters.map((filter) => {
     if (durationFilterTypes.includes(filter.filterType)) {
-      // Duration filters do not use filterCode; API payload uses minutes.
+      // Duration filters do not use filterCode; payload values are minutes.
       const inferredDuration = inferDurationRange(filter.rawUserFilter);
       return {
         filterType: filter.filterType,
@@ -338,8 +224,7 @@ function normalizeApplyFilter(filters) {
       };
     }
 
-    // For baggage/time/stops, prefer a valid explicit API code. If the model
-    // omits or sends an invalid code, infer it from rawUserFilter as fallback.
+    // Prefer valid explicit codes; infer from raw text if the model omits them.
     const inferredCode = inferFilterCode(filter.filterType, filter.rawUserFilter);
     const filterCode = isAllowedCodeForType(filter.filterType, filter.filterCode)
       ? filter.filterCode
@@ -353,6 +238,164 @@ function normalizeApplyFilter(filters) {
       rawUserFilter: filter.rawUserFilter,
     };
   });
+}
+
+function hasUsableFilterValue(filter) {
+  if (durationFilterTypes.includes(filter.filterType)) {
+    return filter.minDurationMinutes !== null || filter.maxDurationMinutes !== null;
+  }
+  return filter.filterCode !== null;
+}
+
+function hasRemoveIntent(filter) {
+  const text = toSearchText(filter.rawUserFilter);
+  return /\b(remove|without|exclude|clear|drop|delete|no\s+longer)\b/.test(text);
+}
+
+function hasClearAllIntent(filters) {
+  return filters.some((filter) => {
+    const text = toSearchText(filter.rawUserFilter);
+    return /\b(clear|remove|drop|delete)\s+(all\s+)?filters?\b/.test(text);
+  });
+}
+
+function hasReplaceIntent(filter) {
+  const text = toSearchText(filter.rawUserFilter);
+  return /\b(only|instead|replace|change|switch|show only|make it)\b/.test(text);
+}
+
+function hasAddIntent(filter) {
+  const text = toSearchText(filter.rawUserFilter);
+  return /\b(add|also|include|with|plus|keep)\b/.test(text);
+}
+
+function filterStateKey(filter) {
+  if (durationFilterTypes.includes(filter.filterType)) {
+    return filter.filterType;
+  }
+  return `${filter.filterType}:${filter.filterCode}`;
+}
+
+function removeMatchingFilter(filters, filterToRemove) {
+  // Remove exact checkbox values when known; otherwise clear the whole type.
+  if (!filterToRemove.filterCode || durationFilterTypes.includes(filterToRemove.filterType)) {
+    return filters.filter((filter) => filter.filterType !== filterToRemove.filterType);
+  }
+
+  return filters.filter(
+    (filter) =>
+      filter.filterType !== filterToRemove.filterType ||
+      filter.filterCode !== filterToRemove.filterCode,
+  );
+}
+
+function dedupeFilterState(filters) {
+  const seen = new Set();
+  const deduped = [];
+
+  for (const filter of filters) {
+    const key = filterStateKey(filter);
+    if (!seen.has(key)) {
+      seen.add(key);
+      deduped.push(filter);
+    }
+  }
+
+  return deduped;
+}
+
+function mergeApplyFilterState(existingFilters, incomingFilters) {
+  if (hasClearAllIntent(incomingFilters)) {
+    return [];
+  }
+
+  // Update rule: durations always replace their old range. "only/instead"
+  // also replaces only that filter type. If the same checkbox type already
+  // exists, a new value replaces it unless the user/model says add/also/with.
+  const replaceTypes = new Set(
+    incomingFilters
+      .filter(
+        (filter) =>
+          !hasRemoveIntent(filter) &&
+          hasUsableFilterValue(filter) &&
+          (durationFilterTypes.includes(filter.filterType) ||
+            hasReplaceIntent(filter) ||
+            ((existingFilters || []).some(
+              (existingFilter) => existingFilter.filterType === filter.filterType,
+            ) &&
+              !hasAddIntent(filter))),
+      )
+      .map((filter) => filter.filterType),
+  );
+
+  let updatedFilters = (existingFilters || []).filter(
+    (filter) => !replaceTypes.has(filter.filterType),
+  );
+
+  for (const filter of incomingFilters) {
+    if (hasRemoveIntent(filter)) {
+      updatedFilters = removeMatchingFilter(updatedFilters, filter);
+      continue;
+    }
+
+    if (hasUsableFilterValue(filter)) {
+      updatedFilters.push(filter);
+    }
+  }
+
+  return dedupeFilterState(updatedFilters);
+}
+
+function buildFinalFilterPayload(filters) {
+  const groupedValues = new Map();
+
+  for (const filter of filters) {
+    const apiFilterType = apiFilterTypeByToolType[filter.filterType];
+    if (!apiFilterType) {
+      continue;
+    }
+
+    if (durationFilterTypes.includes(filter.filterType)) {
+      groupedValues.set(apiFilterType, [
+        filter.minDurationMinutes ?? 0,
+        filter.maxDurationMinutes ?? durationMaxByType[filter.filterType],
+      ]);
+      continue;
+    }
+
+    if (!filter.filterCode) {
+      continue;
+    }
+
+    const values = groupedValues.get(apiFilterType) || [];
+    if (!values.includes(filter.filterCode)) {
+      values.push(filter.filterCode);
+    }
+    groupedValues.set(apiFilterType, values);
+  }
+
+  return orderedFilterTypes
+    .map((filterType) => {
+      const apiFilterType = apiFilterTypeByToolType[filterType];
+      const values = groupedValues.get(apiFilterType);
+
+      if (!values) {
+        return null;
+      }
+
+      if (filterType === 'stops') {
+        return {
+          filterType: apiFilterType,
+          Values: [values.join(',')],
+        };
+      }
+
+      return {
+        filterType: apiFilterType,
+        Values: values,
+      };
+    })
+    .filter(Boolean);
 }
 
 function matchesStopCode(flight, filterCode) {
@@ -402,40 +445,18 @@ function matchesApiFilter(flight, filter) {
 
 function applyFilters(flights, filters) {
   // Dummy-only local filtering. Real integration should use the API response.
-  return flights.filter((flight) => filters.every((filter) => matchesApiFilter(flight, filter)));
+  const filtersByType = filters.reduce((groups, filter) => {
+    groups[filter.filterType] ||= [];
+    groups[filter.filterType].push(filter);
+    return groups;
+  }, {});
+
+  return flights.filter((flight) =>
+    Object.values(filtersByType).every((filterGroup) =>
+      filterGroup.some((filter) => matchesApiFilter(flight, filter)),
+    ),
+  );
 }
-
-export const FlightSearchTool = tool({
-  name: 'flight_search',
-  description:
-    'Search for flights when origin, destination, travel date, trip type, passengers, and cabin class are known. Returns dummy sample flight data only.',
-  parameters: flightSearchSchema,
-  strict: true,
-  execute(input, context) {
-    const appContext = getFlightContext(context);
-    const searchKey = createSearchKey(appContext.UID);
-    const result = buildDummyFlights(input);
-
-    result.UID = appContext.UID;
-    result.searchKey = searchKey;
-
-    appContext.searchKey = searchKey;
-    appContext.lastSearch = input;
-    appContext.flightResults = result.flights;
-    appContext.filteredFlightResults = result.flights;
-    appContext.toolCallLog.push({ tool: 'flight_search', searchKey, input });
-
-    log('info', 'flight_search.called', {
-      requestId: appContext.requestId,
-      sessionId: appContext.sessionId,
-      UID: appContext.UID,
-      searchKey,
-      input,
-    });
-
-    return result;
-  },
-});
 
 export const ApplyFilterTool = tool({
   name: 'apply_filter',
@@ -445,31 +466,27 @@ export const ApplyFilterTool = tool({
   strict: true,
   execute(input, context) {
     const appContext = getFlightContext(context);
-    // UID comes from SDK run context and is required by the real Apply Filter API.
+
+    // UID comes from SDK run context and will be sent to the real API.
     // TODO: Read UID from context
     const UID = appContext.UID;
 
-    // searchKey is created by FlightSearchTool and identifies the active search.
-    // Apply filters only after this exists; otherwise the API has no result set.
+    // searchKey is written by FlightSearchTool and identifies active results.
+    // Without it, apply-filter has no search result set to filter.
     // TODO: Read searchKey from context
     const searchKey = appContext.searchKey;
 
-    // Existing filters live in appContext.lastAppliedFilters from the prior
-    // apply_filter call. They are replaced below by the updated filter state.
+    // Existing filters are the active state from earlier apply_filter turns.
+    const existingFilters = appContext.lastAppliedFilters || [];
 
-    // New filters are the latest filters requested by the user/model this turn.
+    // New filters are only what the latest user turn requested.
     const newFilters = normalizeApplyFilter(input.filters);
 
-    // Current contract: input.filters is the full desired filter state.
-    // - Add filter: include it in input.filters.
-    // - Keep filter: include it again in input.filters.
-    // - Remove filter: omit it from input.filters.
-    // So updatedFilters replaces the prior context state instead of merging blindly.
-    const updatedFilters = newFilters;
+    // Merge state: add new checkbox values, remove explicit values, and
+    // replace only the requested filter type for "only/instead/change".
+    const updatedFilters = mergeApplyFilterState(existingFilters, newFilters);
 
     if (!searchKey) {
-      // Without searchKey, do not call Apply Filter. Ask the agent to collect
-      // origin, destination, and travel date so FlightSearchTool can run first.
       log('info', 'apply_filter.missing_search', {
         requestId: appContext.requestId,
         sessionId: appContext.sessionId,
@@ -485,14 +502,18 @@ export const ApplyFilterTool = tool({
       };
     }
 
-    // Final payload shape that should go to the real Apply Filter API.
+    // Final API-ready array in the exact Apply Filter API format.
     // TODO: Build real Apply Filter API payload here using UID, searchKey, and updated filters.
+    const finalFilterPayload = buildFinalFilterPayload(updatedFilters);
+    console.log('FINAL_APPLY_FILTER_PAYLOAD', finalFilterPayload);
+
     const applyFilterApiPayload = {
       UID,
       searchKey,
-      filters: updatedFilters,
+      filters: finalFilterPayload,
     };
 
+    // TODO: Pass `finalFilterPayload` to the real Apply Filter API.
     // TODO: Call real Apply Filter API here.
     //
     // Example real API integration:
@@ -500,26 +521,27 @@ export const ApplyFilterTool = tool({
     // const payload = buildApplyFilterPayload({
     //   uid: UID,
     //   searchKey,
-    //   filters: updatedFilters,
+    //   filters: finalFilterPayload,
     // });
     //
     // const apiResponse = await applyFilterApi(payload);
     //
     // return mapApplyFilterResponse(apiResponse);
 
-    // TODO: Remove this dummy response when real Apply Filter API is integrated.
-    // Dummy code starts here: read current sample flights and filter locally.
+    // TODO: Remove dummy response once real API integration is done.
     const baseFlights = appContext.flightResults || [];
     const filteredFlights = applyFilters(baseFlights, updatedFilters);
 
-    // Store updated state in context for follow-up turns and test assertions.
+    // Persist latest filter state in context for follow-up turns and tests.
     appContext.filteredFlightResults = filteredFlights;
     appContext.lastAppliedFilters = updatedFilters;
+    appContext.lastFinalFilterPayload = finalFilterPayload;
     appContext.lastApplyFilterPayload = applyFilterApiPayload;
     appContext.toolCallLog.push({
       tool: 'apply_filter',
       searchKey,
       filters: updatedFilters,
+      finalFilterPayload,
       apiPayload: applyFilterApiPayload,
     });
 
@@ -529,13 +551,11 @@ export const ApplyFilterTool = tool({
       UID,
       searchKey,
       filters: updatedFilters,
+      finalFilterPayload,
       resultCount: filteredFlights.length,
     });
 
     // TODO: Map real API response into tool output format here.
-    // Replace the dummy return below with the normalized API response. Keep
-    // UID/searchKey in the output so the agent and caller can verify state.
-
     return {
       ok: true,
       source: 'dummy',
@@ -543,6 +563,7 @@ export const ApplyFilterTool = tool({
       UID,
       searchKey,
       filters: updatedFilters,
+      finalFilterPayload,
       apiPayload: applyFilterApiPayload,
       summary: {
         originalCount: baseFlights.length,
@@ -552,5 +573,3 @@ export const ApplyFilterTool = tool({
     };
   },
 });
-
-export const flightTools = [FlightSearchTool, ApplyFilterTool];
