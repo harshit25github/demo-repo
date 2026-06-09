@@ -34,9 +34,10 @@ const orderedFilterTypes = [
   'totalDuration',
   'layoverDuration',
 ];
-const durationMaxByType = {
-  totalDuration: 2880,
-  layoverDuration: 1500,
+const maxOnlyFilterLabels = {
+  totalDuration: 'total duration',
+  layoverDuration: 'layover duration',
+  price: 'price',
 };
 
 const applyFilterSchema = z.object({
@@ -58,21 +59,19 @@ const applyFilterSchema = z.object({
           .number()
           .int()
           .min(0)
-          .max(2880)
           .nullable()
-          .describe('Minimum duration in minutes. Use only for duration filters.'),
+          .describe('Deprecated minimum duration. It is accepted but ignored and normalized to 0.'),
         maxDurationMinutes: z
           .number()
           .int()
           .min(0)
-          .max(2880)
           .nullable()
-          .describe('Maximum duration in minutes. Use only for duration filters.'),
+          .describe('Maximum duration in minutes. No fixed tool-level cap is applied.'),
         minPrice: z
           .number()
           .min(0)
           .nullable()
-          .describe('Minimum price. Use only for price filters.'),
+          .describe('Deprecated minimum price. It is accepted but ignored and normalized to 0.'),
         maxPrice: z
           .number()
           .min(0)
@@ -271,19 +270,39 @@ function isAllowedCodeForType(filterType, filterCode) {
   return false;
 }
 
+function buildIgnoredMinimumFeedback(filterType, ignoredMinimum, validMaximum) {
+  const label = maxOnlyFilterLabels[filterType];
+  const unit = filterType === 'price' ? '' : ' minutes';
+  const maximumMessage =
+    validMaximum !== null
+      ? ` Applied the ${label} maximum of ${validMaximum}${unit} with minimum fixed at 0.`
+      : ` No ${label} update was applied because a maximum value was not provided.`;
+
+  return `The ${label} minimum of ${ignoredMinimum}${unit} was ignored because this filter supports maximum values only.${maximumMessage}`;
+}
+
 function normalizeApplyFilter(filters) {
-  // Normalize model/tool input into API codes and minute ranges once.
-  return filters.map((filter) => {
+  // Normalize model/tool input into API codes and max-only ranges once.
+  const feedback = [];
+  const normalizedFilters = filters.map((filter) => {
     if (durationFilterTypes.includes(filter.filterType)) {
-      // Duration filters do not use filterCode; payload values are minutes.
+      // Duration filters accept legacy minimum input but always apply [0, max].
       const inferredDuration = inferDurationRange(filter.rawUserFilter);
+      const providedMinimum =
+        inferredDuration.minDurationMinutes ?? filter.minDurationMinutes ?? null;
+      const maximum = filter.maxDurationMinutes ?? inferredDuration.maxDurationMinutes ?? null;
+
+      if (providedMinimum !== null && providedMinimum !== 0) {
+        feedback.push(
+          buildIgnoredMinimumFeedback(filter.filterType, providedMinimum, maximum),
+        );
+      }
+
       return {
         filterType: filter.filterType,
         filterCode: null,
-        minDurationMinutes:
-          filter.minDurationMinutes ?? inferredDuration.minDurationMinutes ?? null,
-        maxDurationMinutes:
-          filter.maxDurationMinutes ?? inferredDuration.maxDurationMinutes ?? null,
+        minDurationMinutes: 0,
+        maxDurationMinutes: maximum,
         minPrice: null,
         maxPrice: null,
         rawUserFilter: filter.rawUserFilter,
@@ -291,15 +310,22 @@ function normalizeApplyFilter(filters) {
     }
 
     if (filter.filterType === 'price') {
-      // Price filters are range filters; final API payload uses [minPrice, maxPrice].
+      // Price accepts legacy minimum input but always applies [0, max].
       const inferredPrice = inferPriceRange(filter.rawUserFilter);
+      const providedMinimum = inferredPrice.minPrice ?? filter.minPrice ?? null;
+      const maximum = filter.maxPrice ?? inferredPrice.maxPrice ?? null;
+
+      if (providedMinimum !== null && providedMinimum !== 0) {
+        feedback.push(buildIgnoredMinimumFeedback(filter.filterType, providedMinimum, maximum));
+      }
+
       return {
         filterType: filter.filterType,
         filterCode: null,
         minDurationMinutes: null,
         maxDurationMinutes: null,
-        minPrice: filter.minPrice ?? inferredPrice.minPrice ?? null,
-        maxPrice: filter.maxPrice ?? inferredPrice.maxPrice ?? null,
+        minPrice: 0,
+        maxPrice: maximum,
         rawUserFilter: filter.rawUserFilter,
       };
     }
@@ -320,14 +346,19 @@ function normalizeApplyFilter(filters) {
       rawUserFilter: filter.rawUserFilter,
     };
   });
+
+  return {
+    feedback,
+    normalizedFilters,
+  };
 }
 
 function hasUsableFilterValue(filter) {
   if (durationFilterTypes.includes(filter.filterType)) {
-    return filter.minDurationMinutes !== null || filter.maxDurationMinutes !== null;
+    return filter.maxDurationMinutes !== null;
   }
   if (filter.filterType === 'price') {
-    return filter.minPrice !== null || filter.maxPrice !== null;
+    return filter.maxPrice !== null;
   }
   return filter.filterCode !== null;
 }
@@ -449,15 +480,16 @@ function buildFinalFilterPayload(filters) {
     }
 
     if (durationFilterTypes.includes(filter.filterType)) {
-      groupedValues.set(apiFilterType, [
-        filter.minDurationMinutes ?? 0,
-        filter.maxDurationMinutes ?? durationMaxByType[filter.filterType],
-      ]);
+      if (filter.maxDurationMinutes !== null) {
+        groupedValues.set(apiFilterType, [0, filter.maxDurationMinutes]);
+      }
       continue;
     }
 
     if (filter.filterType === 'price') {
-      groupedValues.set(apiFilterType, [filter.minPrice ?? 0, filter.maxPrice ?? null]);
+      if (filter.maxPrice !== null) {
+        groupedValues.set(apiFilterType, [0, filter.maxPrice]);
+      }
       continue;
     }
 
@@ -509,21 +541,15 @@ function matchesStopCode(flight, filterCode) {
   return true;
 }
 
-function matchesDurationMinutes(value, { minDurationMinutes, maxDurationMinutes }) {
-  if (minDurationMinutes !== null && value < minDurationMinutes) {
-    return false;
-  }
+function matchesDurationMinutes(value, { maxDurationMinutes }) {
   if (maxDurationMinutes !== null && value > maxDurationMinutes) {
     return false;
   }
   return true;
 }
 
-function matchesPrice(value, { minPrice, maxPrice }) {
+function matchesPrice(value, { maxPrice }) {
   if (typeof value !== 'number') {
-    return false;
-  }
-  if (minPrice !== null && value < minPrice) {
     return false;
   }
   if (maxPrice !== null && value > maxPrice) {
@@ -575,7 +601,7 @@ function applyFilters(flights, filters) {
 export const ApplyFilterTool = tool({
   name: 'apply_filter',
   description:
-    'Apply filters to an existing flight search. Use exact API filter codes in filters[]. Requires searchKey in context from a previous flight_search call.',
+    'Apply filters to an existing flight search. Total duration, layover duration, and price are maximum-only filters; minimum input is accepted but ignored with feedback. Requires searchKey from flight_search.',
   parameters: applyFilterSchema,
   strict: true,
   execute(input, context) {
@@ -594,7 +620,7 @@ export const ApplyFilterTool = tool({
     const existingFilters = appContext.lastAppliedFilters || [];
 
     // New filters are only what the latest user turn requested.
-    const newFilters = normalizeApplyFilter(input.filters);
+    const { feedback, normalizedFilters: newFilters } = normalizeApplyFilter(input.filters);
 
     // Merge state: add new checkbox values, remove explicit values, and
     // replace only the requested filter type for "only/instead/change".
@@ -613,6 +639,7 @@ export const ApplyFilterTool = tool({
         code: 'MISSING_SEARCH',
         message:
           'No active flight search found. Ask for origin, destination, and travel date before applying filters.',
+        feedback,
       };
     }
 
@@ -651,12 +678,14 @@ export const ApplyFilterTool = tool({
     appContext.lastAppliedFilters = updatedFilters;
     appContext.lastFinalFilterPayload = finalFilterPayload;
     appContext.lastApplyFilterPayload = applyFilterApiPayload;
+    appContext.lastApplyFilterFeedback = feedback;
     appContext.toolCallLog.push({
       tool: 'apply_filter',
       searchKey,
       filters: updatedFilters,
       finalFilterPayload,
       apiPayload: applyFilterApiPayload,
+      feedback,
     });
 
     log('info', 'apply_filter.called', {
@@ -666,6 +695,7 @@ export const ApplyFilterTool = tool({
       searchKey,
       filters: updatedFilters,
       finalFilterPayload,
+      feedback,
       resultCount: filteredFlights.length,
     });
 
@@ -679,6 +709,7 @@ export const ApplyFilterTool = tool({
       filters: updatedFilters,
       finalFilterPayload,
       apiPayload: applyFilterApiPayload,
+      feedback,
       summary: {
         originalCount: baseFlights.length,
         filteredCount: filteredFlights.length,
