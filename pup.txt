@@ -1,30 +1,6 @@
-```markdown
-Verify multi-city handling in the `searchCriteria <-> flightContext` mappers.
-
-Task:
-- Check the `flight_search_tool` and identify the exact `flightContext` format it expects for multi-city search.
-- Compare that expected format with the output of:
-  - `searchCriteria -> flightContext`
-  - `flightContext -> searchCriteria`
-- Ensure multi-city segments are mapped correctly without losing or reordering data.
-
-Validate:
-- Segment order is preserved.
-- Each segment has correct origin, destination, and departure date.
-- One-way and round-trip mapping should not break.
-- Mapper output should match the format already consumed by `flight_search_tool`.
-
-If mismatch is found:
-- Fix the mapper only.
-- Do not change `flight_search_tool` schema unless absolutely required.
-
-Add tests for:
-- Multi-city with 2 segments.
-- Multi-city with 3 segments.
-- Updating one segment date.
-- Updating one segment destination.
-- Round-trip check: `searchCriteria -> flightContext -> searchCriteria`.
-
-Deliverable:
-Provide a short report with mismatch found, fixes applied, and test results.
-```
+Current search state:
+- UID is available in context.
+- Active search exists: ${hasActiveSearch ? 'yes' : 'no'}.
+- Existing search parameters: ${buildActiveSearchSummary(context)}
+- For a partial core-search change, reuse every unchanged existing search parameter above.
+- Do not ask again for origin, destination, dates, trip type, passengers, or cabin when already available above.
