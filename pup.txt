@@ -1,115 +1,30 @@
-````markdown
-Update the `/chat` flight context handling and make `searchCriteria` the source of truth for flight state.
+```markdown
+Verify multi-city handling in the `searchCriteria <-> flightContext` mappers.
 
-Current flow:
-- `/chat` request currently receives two flight-related payloads:
-  1. `searchCriteria`
-  2. `flightSearchContext`
-- `searchCriteria` contains search-level data like:
-  - ONDs / segments
-  - trip type
-  - cabin/class
-  - passenger details
-  - dates
-- `flightSearchContext` currently contains:
-  - UID
-  - searchKey
-  - CNT 
-- Flight workflow has an internal `flightContext` used by tools like:
-  - `flight_search_tool`
-  - `apply_filter_tool`
-  - other flight tools
-- Earlier, flight context was mainly hydrated from DB.
+Task:
+- Check the `flight_search_tool` and identify the exact `flightContext` format it expects for multi-city search.
+- Compare that expected format with the output of:
+  - `searchCriteria -> flightContext`
+  - `flightContext -> searchCriteria`
+- Ensure multi-city segments are mapped correctly without losing or reordering data.
 
-Required change:
-Remove `flightSearchContext` from the `/chat` payload contract and merge its fields into `searchCriteria`.
+Validate:
+- Segment order is preserved.
+- Each segment has correct origin, destination, and departure date.
+- One-way and round-trip mapping should not break.
+- Mapper output should match the format already consumed by `flight_search_tool`.
 
-Update `searchCriteria` to include:
-- `uid`
-- `searchKey`
-- `cnt`  — use the exact existing property name used in codebase
-- `layoverLocations`
-- `airlineCodes`
-- `redirectURL`
+If mismatch is found:
+- Fix the mapper only.
+- Do not change `flight_search_tool` schema unless absolutely required.
 
-New source of truth:
-- For flight-related context, `searchCriteria` is now the source of truth.
-- Do not use DB as the primary source for flight search context anymore.
-- DB can still be used for chat metadata/messages if required, but not to hydrate the latest flight search state.
-- On every `/chat` request, read flight state from `searchCriteria` and map it into internal `flightContext`.
+Add tests for:
+- Multi-city with 2 segments.
+- Multi-city with 3 segments.
+- Updating one segment date.
+- Updating one segment destination.
+- Round-trip check: `searchCriteria -> flightContext -> searchCriteria`.
 
-Implementation requirements:
-
-1. Update request DTO/schema
-- Remove `flightSearchContext`.
-- Add the required fields inside `searchCriteria`.
-- Ensure backward compatibility only if needed, but new flow should use `searchCriteria` only.
-
-2. Add mapper: `searchCriteria -> flightContext`
-Create/update a mapping layer that reads the full `searchCriteria` object and updates internal `flightContext`.
-
-This mapper should populate all fields currently required by:
-- `flight_search_tool`
-- `apply_filter_tool`
-- other flight tools
-
-Important:
-- Do not change existing tool schemas.
-- Do not change `flight_search_tool` or `apply_filter_tool` input contract unless absolutely required.
-- Only update how `flightContext` is hydrated before the workflow/tool execution.
-- At the end we update the DB after streaming ends that will be remain same . 
-
-3. Workflow behavior
-- At the start of `/chat`, convert incoming `searchCriteria` into `flightContext`.
-- Run the existing agentic workflow.
-- During the workflow, tools may update `flightContext` as usual.
-- After workflow completion, convert the latest `flightContext` back into `searchCriteria`.
-
-4. Add reverse mapper: `flightContext -> searchCriteria`
-After all flight-related processing is complete, generate an updated `searchCriteria` object from the latest `flightContext`.
-
-The generated `searchCriteria` should include:
-- latest ONDs / segments
-- latest trip type
-- latest dates
-- latest cabin/class
-- latest passenger details
-- latest uid
-- latest searchKey
-- latest cnt/cltv
-- latest layoverLocations
-- latest airlineCodes
-- latest redirectUrl
-- any other existing searchCriteria fields that must be preserved
-
-5. Streaming/chunk response
-- Since we stream chunks to the chat service, include the updated `searchCriteria` in the outgoing chunk/response.
-- Chat service will rebound/echo this updated `searchCriteria` in the next request.
-- This keeps app/chat/AI service context in sync.
-
-Expected final flow:
-```text
-/chat request
-  -> receive searchCriteria
-  -> map searchCriteria to flightContext
-  -> run agent workflow/tools
-  -> tools update flightContext
-  -> map latest flightContext back to searchCriteria
-  -> stream/send updated searchCriteria as response chunk
-  -> next request receives updated searchCriteria again
-````
-
-Validation:
-
-* Verify `/chat` works without `flightSearchContext`.
-* Verify `uid`, `searchKey`, `cnt`, `layoverLocations`, `airlineCodes`, and `redirectUrl` are available inside `flightContext`.
-* Verify `flight_search_tool` still works without schema changes.
-* Verify `apply_filter_tool` still works without schema changes.
-* Verify updated `searchCriteria` is sent back in the streaming response/chunk.
-* Verify next request uses the latest returned `searchCriteria`, not stale DB flight context.
-* Verify DB is not used as source of truth for flight context anymore.
-
-
-
-```
+Deliverable:
+Provide a short report with mismatch found, fixes applied, and test results.
 ```
