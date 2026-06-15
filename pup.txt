@@ -1,6 +1,2 @@
-Current search state:
-- UID is available in context.
-- Active search exists: ${hasActiveSearch ? 'yes' : 'no'}.
-- Existing search parameters: ${buildActiveSearchSummary(context)}
-- For a partial core-search change, reuse every unchanged existing search parameter above.
-- Do not ask again for origin, destination, dates, trip type, passengers, or cabin when already available above.
+Thank you for your trust and confidence in me for this leadership role. I’m grateful for the opportunity and look forward to making a meaningful impact.
+
