@@ -10,17 +10,24 @@ const filterTypeValues = [
   'totalDuration',
   'layoverDuration',
   'price',
+  'airline',
+  'layoverAirport',
+  'departureAirport',
+  'arrivalAirport',
 ];
 const baggageFilterCodes = ['0', '1', '2'];
 const timeSlotFilterCodes = ['EARLYMORNING', 'MORNING', 'AFTERNOON', 'EVENING'];
 const stopFilterCodes = ['0', '2', '3'];
-const apiFilterCodeValues = ['0', '1', '2', '3', ...timeSlotFilterCodes];
 const durationFilterTypes = ['totalDuration', 'layoverDuration'];
 const apiFilterTypeByToolType = {
   stops: 'stop',
   departureTime: 'departtimeslotfilter',
   arrivalTime: 'departlandtimeslotfilter',
   baggage: 'baggage',
+  airline: 'airline',
+  layoverAirport: 'outboundlayover',
+  departureAirport: 'outbounddepart',
+  arrivalAirport: 'outboundarrival',
   price: 'price',
   totalDuration: 'departdurationfilter',
   layoverDuration: 'departlayoverfilter',
@@ -30,6 +37,10 @@ const orderedFilterTypes = [
   'departureTime',
   'arrivalTime',
   'baggage',
+  'airline',
+  'layoverAirport',
+  'departureAirport',
+  'arrivalAirport',
   'price',
   'totalDuration',
   'layoverDuration',
@@ -47,13 +58,13 @@ const applyFilterSchema = z.object({
         filterType: z
           .enum(filterTypeValues)
           .describe(
-            'Filter category: baggage, departureTime, arrivalTime, stops, totalDuration, layoverDuration, or price.',
+            'Filter category: baggage, departureTime, arrivalTime, stops, totalDuration, layoverDuration, price, airline, layoverAirport, departureAirport, or arrivalAirport.',
           ),
         filterCode: z
-          .enum(apiFilterCodeValues)
+          .string()
           .nullable()
           .describe(
-            'Exact API code for baggage, time, or stops. Use null for duration filters.',
+            'Candidate API code for baggage, time, or stops. Stop counts are normalized to supported API buckets. Use null for airline, airport, duration, and price filters.',
           ),
         minDurationMinutes: z
           .number()
@@ -77,6 +88,30 @@ const applyFilterSchema = z.object({
           .min(0)
           .nullable()
           .describe('Maximum price. Use only for price filters.'),
+        airlineNames: z
+          .array(z.string())
+          .nullable()
+          .describe(
+            'User-requested airline names. Use only for airline filters; use null for other filters.',
+          ),
+        layoverAirportNames: z
+          .array(z.string())
+          .nullable()
+          .describe(
+            'User-requested layover airport codes, airport names, or city names. Use only for layoverAirport filters; use null for other filters.',
+          ),
+        departureAirportNames: z
+          .array(z.string())
+          .nullable()
+          .describe(
+            'User-requested departure airport codes, airport names, or city names. Use only for departureAirport filters; use null for other filters.',
+          ),
+        arrivalAirportNames: z
+          .array(z.string())
+          .nullable()
+          .describe(
+            'User-requested arrival airport codes, airport names, or city names. Use only for arrivalAirport filters; use null for other filters.',
+          ),
         rawUserFilter: z
           .string()
           .nullable()
@@ -89,7 +124,10 @@ const applyFilterSchema = z.object({
 
 function getFlightContext(runContext) {
   const appContext = runContext?.context || {};
-  appContext.UID ||= 'demo-user';
+  appContext.UID ||= appContext.uid || 'demo-user';
+  appContext.uid ||= appContext.UID;
+  appContext.searchKey ||= appContext.sid;
+  appContext.sid ||= appContext.searchKey;
   appContext.toolCallLog ||= [];
   return appContext;
 }
@@ -243,11 +281,35 @@ function inferFilterCode(filterType, rawUserFilter) {
     if (/non[-\s]?stop|nonstop|direct/.test(text)) {
       return '0';
     }
-    if (/one[-\s]?stop|\b1\s*stop\b/.test(text)) {
+    if (/one[-\s]?stops?|\b1\s*stops?\b/.test(text)) {
       return '2';
     }
-    if (/1\+|one plus|more stops|multiple stops|multi[-\s]?stop|two[-\s]?stop|2\+/.test(text)) {
+    if (/\b1\+\s*stops?\b/.test(text)) {
       return '3';
+    }
+    if (
+      /\b(?:two|three|four|five|six|seven|eight|nine|ten)(?:\s+or\s+more)?[-\s]*stops?\b/.test(
+        text,
+      ) ||
+      /\b(?:multiple|more|many)\s+stops?\b/.test(text) ||
+      /\bmulti[-\s]?stops?\b/.test(text) ||
+      /\b(?:at least|more than)\s+\d+\s+stops?\b/.test(text)
+    ) {
+      return '3';
+    }
+
+    const numericStopMatch = text.match(/\b(\d+)\s*(?:\+|or\s+more)?\s*stops?\b/);
+    if (numericStopMatch) {
+      const requestedStopCount = Number(numericStopMatch[1]);
+      if (requestedStopCount >= 2) {
+        return '3';
+      }
+      if (requestedStopCount === 1) {
+        return '2';
+      }
+      if (requestedStopCount === 0) {
+        return '0';
+      }
     }
   }
 
@@ -270,6 +332,48 @@ function isAllowedCodeForType(filterType, filterCode) {
   return false;
 }
 
+function normalizeFilterCode(filterType, filterCode, rawUserFilter) {
+  const inferredCode = inferFilterCode(filterType, rawUserFilter);
+
+  if (filterType === 'stops') {
+    // Raw stop-count intent wins because API code "2" means one stop, while
+    // a user's "2 stops" request belongs to the max bucket API code "3".
+    if (inferredCode) {
+      return inferredCode;
+    }
+
+    const numericCode = Number(filterCode);
+    if (Number.isInteger(numericCode)) {
+      if (numericCode >= 3) {
+        return '3';
+      }
+      if (numericCode === 1) {
+        return '2';
+      }
+    }
+  }
+
+  return isAllowedCodeForType(filterType, filterCode) ? filterCode : inferredCode;
+}
+
+function normalizeStopApiCode(filterCode) {
+  if (stopFilterCodes.includes(filterCode)) {
+    return filterCode;
+  }
+
+  const numericCode = Number(filterCode);
+  if (!Number.isInteger(numericCode)) {
+    return null;
+  }
+  if (numericCode >= 3) {
+    return '3';
+  }
+  if (numericCode === 1) {
+    return '2';
+  }
+  return null;
+}
+
 function buildIgnoredMinimumFeedback(filterType, ignoredMinimum, validMaximum) {
   const label = maxOnlyFilterLabels[filterType];
   const unit = filterType === 'price' ? '' : ' minutes';
@@ -281,10 +385,411 @@ function buildIgnoredMinimumFeedback(filterType, ignoredMinimum, validMaximum) {
   return `The ${label} minimum of ${ignoredMinimum}${unit} was ignored because this filter supports maximum values only.${maximumMessage}`;
 }
 
-function normalizeApplyFilter(filters) {
+function normalizeSourceOptionValue(value) {
+  return toSearchText(value).replace(/\s+/g, ' ');
+}
+
+function uniqueStrings(values) {
+  return [...new Set(values.filter(Boolean))];
+}
+
+function emptySourceFilter({
+  filterType,
+  filterCode = null,
+  airlineNames = null,
+  layoverAirportNames = null,
+  departureAirportNames = null,
+  arrivalAirportNames = null,
+  rawUserFilter = null,
+}) {
+  return {
+    filterType,
+    filterCode,
+    minDurationMinutes: null,
+    maxDurationMinutes: null,
+    minPrice: null,
+    maxPrice: null,
+    airlineNames,
+    layoverAirportNames,
+    departureAirportNames,
+    arrivalAirportNames,
+    rawUserFilter,
+  };
+}
+
+function getRequestedAirlineNames(filter, airlineOptions) {
+  const explicitNames = uniqueStrings(
+    (filter.airlineNames || []).map((name) => String(name).trim()).filter(Boolean),
+  );
+  if (explicitNames.length > 0) {
+    return explicitNames;
+  }
+
+  // Fallback for model omissions: identify known airline names present in raw user text.
+  const rawText = normalizeSourceOptionValue(filter.rawUserFilter);
+  if (!rawText) {
+    return [];
+  }
+
+  return uniqueStrings(
+    airlineOptions.flatMap((option) => {
+      const candidates = [option.Name, option.Text].filter(Boolean);
+      return candidates.some((name) => rawText.includes(normalizeSourceOptionValue(name)))
+        ? [option.Name || option.Text]
+        : [];
+    }),
+  );
+}
+
+function resolveAirlineFilter(filter, airlineOptions) {
+  const requestedNames = getRequestedAirlineNames(filter, airlineOptions);
+  const enabledOptions = airlineOptions.filter((option) => option && option.IsDisabled !== true);
+  const matchedCodes = [];
+  const missingNames = [];
+
+  for (const requestedName of requestedNames) {
+    const normalizedRequestedName = normalizeSourceOptionValue(requestedName);
+    const matches = enabledOptions.filter((option) =>
+      [option.Name, option.Text]
+        .filter(Boolean)
+        .some((name) => normalizeSourceOptionValue(name) === normalizedRequestedName),
+    );
+
+    if (matches.length === 0) {
+      missingNames.push(requestedName);
+      continue;
+    }
+
+    for (const match of matches) {
+      if (match.Code && !matchedCodes.includes(match.Code)) {
+        // Keep the exact source code, including suffixes such as "+".
+        matchedCodes.push(match.Code);
+      }
+    }
+  }
+
+  const feedback = [];
+  if (requestedNames.length > 0 && matchedCodes.length === 0) {
+    feedback.push('The requested airline was not found in the current flight results.');
+  } else if (missingNames.length > 0) {
+    feedback.push(
+      `${missingNames.join(', ')} was not available in the current flight results, so I applied filters for the available requested airlines.`,
+    );
+  }
+
+  const normalizedFilters =
+    matchedCodes.length > 0
+      ? matchedCodes.map((filterCode) => ({
+          filterType: 'airline',
+          filterCode,
+          minDurationMinutes: null,
+          maxDurationMinutes: null,
+          minPrice: null,
+          maxPrice: null,
+          airlineNames: requestedNames,
+          layoverAirportNames: null,
+          departureAirportNames: null,
+          arrivalAirportNames: null,
+          rawUserFilter: filter.rawUserFilter,
+        }))
+      : [
+          {
+            filterType: 'airline',
+            filterCode: null,
+            minDurationMinutes: null,
+            maxDurationMinutes: null,
+            minPrice: null,
+            maxPrice: null,
+            airlineNames: requestedNames,
+            layoverAirportNames: null,
+            departureAirportNames: null,
+            arrivalAirportNames: null,
+            rawUserFilter: filter.rawUserFilter,
+          },
+        ];
+
+  return { feedback, normalizedFilters };
+}
+
+function getRequestedLayoverAirportNames(filter, layoverAirportOptions) {
+  const explicitNames = uniqueStrings(
+    (filter.layoverAirportNames || []).map((name) => String(name).trim()).filter(Boolean),
+  );
+  if (explicitNames.length > 0) {
+    return explicitNames;
+  }
+
+  // Fallback for model omissions: identify known codes, airport names, or cities in raw text.
+  const rawText = normalizeSourceOptionValue(filter.rawUserFilter);
+  if (!rawText) {
+    return [];
+  }
+
+  return uniqueStrings(
+    layoverAirportOptions.flatMap((option) => {
+      const candidates = [option.Code, option.Text, option.AirportCityName].filter(Boolean);
+      const matchingCandidate = candidates.find((value) =>
+        rawText.includes(normalizeSourceOptionValue(value)),
+      );
+      return matchingCandidate ? [matchingCandidate] : [];
+    }),
+  );
+}
+
+function resolveLayoverAirportFilter(filter, layoverAirportOptions) {
+  const requestedNames = getRequestedLayoverAirportNames(filter, layoverAirportOptions);
+  const enabledOptions = layoverAirportOptions.filter(
+    (option) => option && option.IsDisabled !== true,
+  );
+  const matchedCodes = [];
+  const missingNames = [];
+
+  for (const requestedName of requestedNames) {
+    const normalizedRequestedName = normalizeSourceOptionValue(requestedName);
+    const matches = enabledOptions.filter((option) =>
+      [option.Code, option.Text, option.AirportCityName]
+        .filter(Boolean)
+        .some((value) => normalizeSourceOptionValue(value) === normalizedRequestedName),
+    );
+
+    if (matches.length === 0) {
+      missingNames.push(requestedName);
+      continue;
+    }
+
+    for (const match of matches) {
+      if (match.Code && !matchedCodes.includes(match.Code)) {
+        // Keep the exact code supplied by the current search's layover option array.
+        matchedCodes.push(match.Code);
+      }
+    }
+  }
+
+  const feedback = [];
+  if (requestedNames.length > 0 && matchedCodes.length === 0) {
+    feedback.push('The requested layover airport was not found in the current flight results.');
+  } else if (missingNames.length > 0) {
+    feedback.push(
+      `${missingNames.join(', ')} was not available as a layover airport in the current results, so I applied filters for the available requested layover airports.`,
+    );
+  }
+
+  const normalizedFilters =
+    matchedCodes.length > 0
+      ? matchedCodes.map((filterCode) => ({
+          filterType: 'layoverAirport',
+          filterCode,
+          minDurationMinutes: null,
+          maxDurationMinutes: null,
+          minPrice: null,
+          maxPrice: null,
+          airlineNames: null,
+          layoverAirportNames: requestedNames,
+          departureAirportNames: null,
+          arrivalAirportNames: null,
+          rawUserFilter: filter.rawUserFilter,
+        }))
+      : [
+          {
+            filterType: 'layoverAirport',
+            filterCode: null,
+            minDurationMinutes: null,
+            maxDurationMinutes: null,
+            minPrice: null,
+            maxPrice: null,
+            airlineNames: null,
+            layoverAirportNames: requestedNames,
+            departureAirportNames: null,
+            arrivalAirportNames: null,
+            rawUserFilter: filter.rawUserFilter,
+          },
+        ];
+
+  return { feedback, normalizedFilters };
+}
+
+function getAirportNearbyPreference(rawUserFilter) {
+  const text = toSearchText(rawUserFilter);
+  if (/\b(non[-\s]?nearby|not\s+nearby|main|primary)\b/.test(text)) {
+    return false;
+  }
+  if (/\b(nearby|alternate|alternative|near\s*by)\b/.test(text)) {
+    return true;
+  }
+  return null;
+}
+
+function optionMatchesRequestedAirport(option, requestedAirport) {
+  const requested = normalizeSourceOptionValue(requestedAirport);
+  if (!requested) {
+    return false;
+  }
+
+  const code = normalizeSourceOptionValue(option.Code);
+  if (code && code === requested) {
+    return true;
+  }
+
+  return [option.Text, option.AirportCityName]
+    .filter(Boolean)
+    .some((value) => {
+      const candidate = normalizeSourceOptionValue(value);
+      return candidate === requested || candidate.includes(requested) || requested.includes(candidate);
+    });
+}
+
+function getRequestedAirportNames(filter, airportOptions, inputField) {
+  const explicitNames = uniqueStrings(
+    (filter[inputField] || []).map((name) => String(name).trim()).filter(Boolean),
+  );
+  if (explicitNames.length > 0) {
+    return explicitNames;
+  }
+
+  // Fallback for model omissions: identify known codes, airport names, or cities in raw text.
+  const rawText = normalizeSourceOptionValue(filter.rawUserFilter);
+  if (!rawText) {
+    return [];
+  }
+
+  return uniqueStrings(
+    airportOptions.flatMap((option) => {
+      const candidates = [option.Code, option.Text, option.AirportCityName].filter(Boolean);
+      const matchingCandidate = candidates.find((value) =>
+        rawText.includes(normalizeSourceOptionValue(value)),
+      );
+      return matchingCandidate ? [matchingCandidate] : [];
+    }),
+  );
+}
+
+function buildAirportFeedbackLabel(filterType) {
+  return filterType === 'departureAirport' ? 'departure airport' : 'arrival airport';
+}
+
+function resolveFlightEndpointAirportFilter(filter, airportOptions, inputField) {
+  const requestedNames = getRequestedAirportNames(filter, airportOptions, inputField);
+  const nearbyPreference = getAirportNearbyPreference(filter.rawUserFilter);
+  const enabledOptions = airportOptions.filter((option) => option && option.IsDisabled !== true);
+  const eligibleOptions = enabledOptions.filter(
+    (option) => nearbyPreference === null || option.IsNearby === nearbyPreference,
+  );
+  const matchedCodes = [];
+  const missingNames = [];
+  const feedback = [];
+  const label = buildAirportFeedbackLabel(filter.filterType);
+
+  if (requestedNames.length === 0 && nearbyPreference !== null) {
+    for (const option of eligibleOptions) {
+      if (option.Code && !matchedCodes.includes(option.Code)) {
+        matchedCodes.push(option.Code);
+      }
+    }
+  } else {
+    for (const requestedName of requestedNames) {
+      const matches = eligibleOptions.filter((option) =>
+        optionMatchesRequestedAirport(option, requestedName),
+      );
+
+      if (matches.length === 0) {
+        missingNames.push(requestedName);
+        continue;
+      }
+
+      for (const match of matches) {
+        if (match.Code && !matchedCodes.includes(match.Code)) {
+          matchedCodes.push(match.Code);
+        }
+      }
+    }
+  }
+
+  if (nearbyPreference === true && matchedCodes.length > 0) {
+    feedback.push(
+      `Applied nearby/alternate ${label} filter using ${matchedCodes.join(', ')}.`,
+    );
+  }
+
+  if (nearbyPreference === true && matchedCodes.length === 0) {
+    feedback.push(
+      `No eligible nearby/alternate ${label}s were found in the current flight results.`,
+    );
+  } else if (requestedNames.length > 0 && matchedCodes.length === 0) {
+    feedback.push(`The requested ${label} was not found in the current flight results.`);
+  } else if (missingNames.length > 0) {
+    feedback.push(
+      `${missingNames.join(', ')} was not available as a ${label} in the current results, so I applied filters for the available requested airports.`,
+    );
+  }
+
+  const sourceNames = requestedNames.length > 0 ? requestedNames : null;
+  const normalizedFilters =
+    matchedCodes.length > 0
+      ? matchedCodes.map((filterCode) =>
+          emptySourceFilter({
+            filterType: filter.filterType,
+            filterCode,
+            departureAirportNames:
+              filter.filterType === 'departureAirport' ? sourceNames : null,
+            arrivalAirportNames: filter.filterType === 'arrivalAirport' ? sourceNames : null,
+            rawUserFilter: filter.rawUserFilter,
+          }),
+        )
+      : [
+          emptySourceFilter({
+            filterType: filter.filterType,
+            departureAirportNames:
+              filter.filterType === 'departureAirport' ? sourceNames : null,
+            arrivalAirportNames: filter.filterType === 'arrivalAirport' ? sourceNames : null,
+            rawUserFilter: filter.rawUserFilter,
+          }),
+        ];
+
+  return { feedback, normalizedFilters };
+}
+
+function normalizeApplyFilter(
+  filters,
+  airlineOptions,
+  layoverAirportOptions,
+  departureAirportOptions,
+  arrivalAirportOptions,
+) {
   // Normalize model/tool input into API codes and max-only ranges once.
   const feedback = [];
-  const normalizedFilters = filters.map((filter) => {
+  const normalizedFilters = filters.flatMap((filter) => {
+    if (filter.filterType === 'airline') {
+      const resolvedAirline = resolveAirlineFilter(filter, airlineOptions);
+      feedback.push(...resolvedAirline.feedback);
+      return resolvedAirline.normalizedFilters;
+    }
+
+    if (filter.filterType === 'layoverAirport') {
+      const resolvedLayoverAirport = resolveLayoverAirportFilter(filter, layoverAirportOptions);
+      feedback.push(...resolvedLayoverAirport.feedback);
+      return resolvedLayoverAirport.normalizedFilters;
+    }
+
+    if (filter.filterType === 'departureAirport') {
+      const resolvedDepartureAirport = resolveFlightEndpointAirportFilter(
+        filter,
+        departureAirportOptions,
+        'departureAirportNames',
+      );
+      feedback.push(...resolvedDepartureAirport.feedback);
+      return resolvedDepartureAirport.normalizedFilters;
+    }
+
+    if (filter.filterType === 'arrivalAirport') {
+      const resolvedArrivalAirport = resolveFlightEndpointAirportFilter(
+        filter,
+        arrivalAirportOptions,
+        'arrivalAirportNames',
+      );
+      feedback.push(...resolvedArrivalAirport.feedback);
+      return resolvedArrivalAirport.normalizedFilters;
+    }
+
     if (durationFilterTypes.includes(filter.filterType)) {
       // Duration filters accept legacy minimum input but always apply [0, max].
       const inferredDuration = inferDurationRange(filter.rawUserFilter);
@@ -305,6 +810,10 @@ function normalizeApplyFilter(filters) {
         maxDurationMinutes: maximum,
         minPrice: null,
         maxPrice: null,
+        airlineNames: null,
+        layoverAirportNames: null,
+        departureAirportNames: null,
+        arrivalAirportNames: null,
         rawUserFilter: filter.rawUserFilter,
       };
     }
@@ -326,15 +835,20 @@ function normalizeApplyFilter(filters) {
         maxDurationMinutes: null,
         minPrice: 0,
         maxPrice: maximum,
+        airlineNames: null,
+        layoverAirportNames: null,
+        departureAirportNames: null,
+        arrivalAirportNames: null,
         rawUserFilter: filter.rawUserFilter,
       };
     }
 
     // Prefer valid explicit codes; infer from raw text if the model omits them.
-    const inferredCode = inferFilterCode(filter.filterType, filter.rawUserFilter);
-    const filterCode = isAllowedCodeForType(filter.filterType, filter.filterCode)
-      ? filter.filterCode
-      : inferredCode;
+    const filterCode = normalizeFilterCode(
+      filter.filterType,
+      filter.filterCode,
+      filter.rawUserFilter,
+    );
 
     return {
       filterType: filter.filterType,
@@ -343,6 +857,10 @@ function normalizeApplyFilter(filters) {
       maxDurationMinutes: null,
       minPrice: null,
       maxPrice: null,
+      airlineNames: null,
+      layoverAirportNames: null,
+      departureAirportNames: null,
+      arrivalAirportNames: null,
       rawUserFilter: filter.rawUserFilter,
     };
   });
@@ -397,6 +915,21 @@ function filterStateKey(filter) {
 
 function removeMatchingFilter(filters, filterToRemove) {
   // Remove exact checkbox values when known; otherwise clear the whole type.
+  if (
+    (filterToRemove.filterType === 'airline' ||
+      filterToRemove.filterType === 'layoverAirport' ||
+      filterToRemove.filterType === 'departureAirport' ||
+      filterToRemove.filterType === 'arrivalAirport') &&
+    !filterToRemove.filterCode &&
+    (filterToRemove.airlineNames?.length ||
+      filterToRemove.layoverAirportNames?.length ||
+      filterToRemove.departureAirportNames?.length ||
+      filterToRemove.arrivalAirportNames?.length)
+  ) {
+    // Requested source options did not match, so preserve the active filter state.
+    return filters;
+  }
+
   if (
     !filterToRemove.filterCode ||
     durationFilterTypes.includes(filterToRemove.filterType) ||
@@ -493,13 +1026,18 @@ function buildFinalFilterPayload(filters) {
       continue;
     }
 
-    if (!filter.filterCode) {
+    const payloadFilterCode =
+      filter.filterType === 'stops'
+        ? normalizeStopApiCode(filter.filterCode)
+        : filter.filterCode;
+
+    if (!payloadFilterCode) {
       continue;
     }
 
     const values = groupedValues.get(apiFilterType) || [];
-    if (!values.includes(filter.filterCode)) {
-      values.push(filter.filterCode);
+    if (!values.includes(payloadFilterCode)) {
+      values.push(payloadFilterCode);
     }
     groupedValues.set(apiFilterType, values);
   }
@@ -513,7 +1051,13 @@ function buildFinalFilterPayload(filters) {
         return null;
       }
 
-      if (filterType === 'stops') {
+      if (
+        filterType === 'stops' ||
+        filterType === 'airline' ||
+        filterType === 'layoverAirport' ||
+        filterType === 'departureAirport' ||
+        filterType === 'arrivalAirport'
+      ) {
         return {
           filterType: apiFilterType,
           Values: [values.join(',')],
@@ -536,7 +1080,7 @@ function matchesStopCode(flight, filterCode) {
     return flight.stops === 1;
   }
   if (filterCode === '3') {
-    return flight.stops >= 1;
+    return flight.stops >= 2;
   }
   return true;
 }
@@ -580,6 +1124,18 @@ function matchesApiFilter(flight, filter) {
   if (filter.filterType === 'price') {
     return matchesPrice(flight.price?.amount, filter);
   }
+  if (filter.filterType === 'airline') {
+    return flight.airline_code === filter.filterCode;
+  }
+  if (filter.filterType === 'layoverAirport') {
+    return flight.layover_airport_codes?.includes(filter.filterCode) ?? false;
+  }
+  if (filter.filterType === 'departureAirport') {
+    return flight.departure_airport_code === filter.filterCode;
+  }
+  if (filter.filterType === 'arrivalAirport') {
+    return flight.arrival_airport_code === filter.filterCode;
+  }
   return true;
 }
 
@@ -601,7 +1157,7 @@ function applyFilters(flights, filters) {
 export const ApplyFilterTool = tool({
   name: 'apply_filter',
   description:
-    'Apply filters to an existing flight search. Total duration, layover duration, and price are maximum-only filters; minimum input is accepted but ignored with feedback. Requires searchKey from flight_search.',
+    'Apply filters, including airline, layover airport, departure airport, and arrival airport options, to an existing flight search. Source-option codes are resolved from current search arrays in shared context. Total duration, layover duration, and price are maximum-only filters. Requires searchKey from flight_search.',
   parameters: applyFilterSchema,
   strict: true,
   execute(input, context) {
@@ -616,22 +1172,12 @@ export const ApplyFilterTool = tool({
     // TODO: Read searchKey from context
     const searchKey = appContext.searchKey;
 
-    // Existing filters are the active state from earlier apply_filter turns.
-    const existingFilters = appContext.lastAppliedFilters || [];
-
-    // New filters are only what the latest user turn requested.
-    const { feedback, normalizedFilters: newFilters } = normalizeApplyFilter(input.filters);
-
-    // Merge state: add new checkbox values, remove explicit values, and
-    // replace only the requested filter type for "only/instead/change".
-    const updatedFilters = mergeApplyFilterState(existingFilters, newFilters);
-
     if (!searchKey) {
       log('info', 'apply_filter.missing_search', {
         requestId: appContext.requestId,
         sessionId: appContext.sessionId,
         UID,
-        filters: updatedFilters,
+        filters: input.filters,
       });
 
       return {
@@ -639,9 +1185,45 @@ export const ApplyFilterTool = tool({
         code: 'MISSING_SEARCH',
         message:
           'No active flight search found. Ask for origin, destination, and travel date before applying filters.',
-        feedback,
+        feedback: [],
       };
     }
+
+    // Existing filters are the active state from earlier apply_filter turns.
+    const existingFilters = appContext.lastAppliedFilters || [];
+
+    // New filters are only what the latest user turn requested.
+    // The application adds the active search's airline array to shared SDK context.
+    // Airline codes must only be resolved from this context array, never from a static map.
+    const airlineFilterOptions =
+      appContext.airlineFilterOptions || appContext.airlineFilters || [];
+    // The application adds the active search's layover airport array to shared SDK context.
+    // Codes must only be resolved from this context array, never generated manually.
+    const layoverAirportFilterOptions =
+      appContext.layoverAirportFilterOptions || appContext.layoverAirportFilters || [];
+    // Departure and arrival airport filters use the API arrays returned by flight_search.
+    // Do not generate airport codes manually; only use Code from these source arrays.
+    const departureAirportFilterOptions =
+      appContext.DepartAirports ||
+      appContext.departureAirportFilterOptions ||
+      appContext.departureAirportFilters ||
+      [];
+    const arrivalAirportFilterOptions =
+      appContext.DepLandAirports ||
+      appContext.arrivalAirportFilterOptions ||
+      appContext.arrivalAirportFilters ||
+      [];
+    const { feedback, normalizedFilters: newFilters } = normalizeApplyFilter(
+      input.filters,
+      airlineFilterOptions,
+      layoverAirportFilterOptions,
+      departureAirportFilterOptions,
+      arrivalAirportFilterOptions,
+    );
+
+    // Merge state: add new checkbox values, remove explicit values, and
+    // replace only the requested filter type for "only/instead/change".
+    const updatedFilters = mergeApplyFilterState(existingFilters, newFilters);
 
     // Final API-ready array in the exact Apply Filter API format.
     // TODO: Build real Apply Filter API payload here using UID, searchKey, and updated filters.
