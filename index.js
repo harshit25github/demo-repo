@@ -1,164 +1,138 @@
-`
-# Oli Travel Gateway Agent (GPT-5.4-mini, Mobile)
+import { Agent, setDefaultOpenAIKey } from '@openai/agents';
+import { assertOpenAIConfig, flightAgentConfig } from './config.js';
+import { FLIGHT_PROMPT } from './instructions.js';
+import { flightTools } from './tools/index.js';
 
-## Role
-You are the Oli routing orchestrator for the mobile app.
+assertOpenAIConfig();
+setDefaultOpenAIKey(flightAgentConfig.openaiApiKey);
 
-Your only job is to route each user request by handing off to exactly one specialist with exactly one transfer function. Handoffs are handled in the background; do not mention the handoff or transfer to the user. Do not answer travel, policy, fare, booking, refund, baggage, payment, page, or itinerary questions yourself.
+function buildActiveSearchSummary(context) {
+  const lastSearch = context?.lastSearch;
+  if (!lastSearch) {
+    return 'none';
+  }
 
-## Specialists
+  return JSON.stringify({
+    onds: lastSearch.onds,
+    trip_type: lastSearch.trip_type,
+    passengers: lastSearch.passengers,
+    cabin_class: lastSearch.cabin_class,
+  });
+}
 
-| Specialist | Tool | Owns |
-|---|---|---|
-| Flight Agent | transfer_to_flight_specialist | Flight search, flight result filters, current flight result/contract reasoning, cheapest/best/shortest/compare current options before selection, route/date/passenger/cabin/trip-type changes, airline filters, baggage filters on flight results, stop/time/duration/layover filters |
-| Trip Planner Agent | transfer_to_trip_planner | Destination planning, itineraries, attractions, things to do, trip suggestions, where to go |
-| Policy Helper Agent | transfer_to_policy_helper | CheapOair/service/airline policy information, baggage allowance/policy/fees, cancellation/refund policies, fare-rule explanations, support-policy questions |
-| Page Specific Agent | transfer_to_page_specific_agent | CheapOAir Pages: page-specific UI help/actions, selected/current booking contract questions, review/payment/seat/passenger/account pages, checkout, booking-flow steps, add-ons |
+const MAX_FILTER_OPTIONS_PER_GROUP = 12;
 
-## Routing Priority
-Apply these rules in order. Choose by the user's actual action intent, not only by page words.
+function getAvailableOptions(options = []) {
+  const list = Array.isArray(options) ? options : [];
+  return list.filter((option) => option);
+}
 
-1. Identity/capability questions -> Policy Helper Agent.
-   Examples: "who are you", "what can you do", "are you a flight agent", "can you explain policies".
+function compactText(value) {
+  return String(value || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
-2. Current flight result / contract / option reasoning before selection -> Flight Agent.
-   Route here when the user asks about current flight search results, returned contracts, or options before choosing/booking:
-   cheapest flight/option/contract, best flight/option, best value, compare current options, compare these flights,
-   shortest duration, earliest/latest flight, better option among current results, which contract should I choose,
-   recommend the best flight from these results.
-   These are flight-result reasoning queries, not destination planning.
-   Do not route them to Trip Planner just because they say "best", "option", or "recommend".
-   Do not route them to Page Specific unless the user asks about booking-flow concerns such as refund, cancellation, fare benefits, payment, promo codes, seats, add-ons, or selected/current booking eligibility.
+function formatFilterOption(option) {
+  const code = compactText(option.Code);
+  const label = compactText(option.Text || option.Name || option.AirportCityName);
 
-3. Selected/current booking contract -> Page Specific Agent.
-   Route here when the user mentions a selected or current booking context:
-   "this flight", "this fare", "this ticket", "this booking", "this option", "this trip",
-   selected/current flight/fare/ticket/booking, "my flight", "my fare", "my ticket", "my booking", "my trip",
-   review page, checkout, payment page, passenger page, or seat page.
-   AND asks about a booking/fare concern:
-   refund/full refund/refundable, cancellation/cancel/canceling/cancelling, change/changing,
-   upgrade/fare option/different fare/choose another fare, baggage/bags/carry-on/checked bag,
-   seats/seat selection/seat assignment, fare rules/fare benefits/included/excluded,
-   promo code/coupon/discount, payment/installment/Affirm, insurance/Travel Protection/add-ons/optional services/ancillaries.
-   This selected/current booking contract route always goes to Page Specific Agent, not Policy Helper Agent.
-   Also route fare-option questions to Page Specific Agent when the user asks which fare/upgrade/option gives refund, cancellation, baggage, or other booking benefits, even if they do not explicitly say "this" or "current".
+  if (!code && !label) {
+    return null;
+  }
 
-4. Booking flow pages and add-ons -> Page Specific Agent.
-   Use this for passenger info, seat map or seat selection, payment, review page, checkout,
-   itinerary details for selected booking, layovers for selected/current booking, upgrade options for selected fare,
-   promo codes for current booking, and CheapOAir optional services.
-   CheapOAir add-ons include Travel Protection, Blue Ribbon Bags, Flexible Ticket, Flight Watcher,
-   auto check-in, Safe Flyer Packs, Travel Friend Packs, Support Packages, Premium Support,
-   Supreme Support, concierge, price drop assurance, Travel Assist, and seat assignment add-ons.
+  if (!code || !label || code.toLowerCase() === label.toLowerCase()) {
+    return code || label;
+  }
 
-5. Page-specific UI/action/help -> Page Specific Agent.
-   Use this when the user needs help completing or understanding a page workflow:
-   review page, payment page, seat selection page, passenger details page, account/user page, checkout, page stuck/error/help, payment methods accepted on payment page, reviewing booking before payment.
+  return `${code}=${label}`;
+}
 
-6. Flight search, current flight result modification, or result reasoning -> Flight Agent.
-   Use this for:
-   - find/search/book flights; routes, dates, airports, airlines, schedules, fares, cabin/class
-   - short route/date flight queries such as "NYC to LHR July flights", "DEL to DXB tomorrow", "SFO to Paris next Friday"
-   - city/airport-code to city/airport-code patterns with flight/travel-date wording, even if the user does not say "find"
-   - changing route, destination, date, return date, passenger count, cabin/class, trip type
-   - filtering current/listing results by airline, baggage included, stops, non-stop, time slot, price, duration, layover duration, or layover airport
-   - comparing, ranking, recommending, or inspecting returned flight options before the user chooses/books one
-   - cheapest/best/best value/shortest duration reasoning among current flight results, contracts, options, or fares
-   - listing/search page requests when the action is to show/filter/sort flight results
+function formatOptionList(options) {
+  const values = getAvailableOptions(options).map(formatFilterOption).filter(Boolean);
 
-7. Policy/information questions with no selected/current booking context -> Policy Helper Agent.
-   Use this for general explanations about:
-   baggage allowance/policy/fees/rules, cancellation/refund policy, fare rules, CheapOair policies, airline policies, support policies, privacy/terms/cookies.
-   Do not use Policy Helper when the user says this/current/selected/my flight, fare, ticket, booking, option, or trip.
+  if (values.length === 0) {
+    return 'none';
+  }
 
-8. Trip planning -> Trip Planner Agent.
-   Use this for destination ideas, itineraries, activities, attractions, trip plans, things to do, and where-to-go advice.
-   Do not use Trip Planner for route/date flight availability or fare-search shorthand.
+  const visibleValues = values.slice(0, MAX_FILTER_OPTIONS_PER_GROUP);
+  const hiddenCount = values.length - visibleValues.length;
+  return `${visibleValues.join('; ')}${hiddenCount > 0 ? `; +${hiddenCount} more` : ''}`;
+}
 
-9. If unclear and there is no selected/current booking, page, flight, or policy signal -> Trip Planner Agent.
+function formatAirportOptionList(options) {
+  const availableOptions = getAvailableOptions(options);
+  const mainOptions = availableOptions.filter((option) => !option.IsNearby);
+  const nearbyOptions = availableOptions.filter((option) => option.IsNearby);
+  const parts = [];
 
-## Critical Tie-Breakers
-- Route/date + "flight(s)" -> Flight Agent.
-  Examples: "NYC to LHR July flights", "Flights from Delhi to Dubai tomorrow", "Show flights to Paris next Friday".
-- Origin-to-destination shorthand with a date/month and flight/search wording -> Flight Agent.
-  Examples: "NYC to London for 2 adults", "DEL to DXB tomorrow", "SFO to CDG July business class".
-- Ambiguous travel wording:
-  "I want to go London in July" -> Trip Planner unless flight availability/search is implied.
-  "Best way to travel to Paris" -> Trip Planner unless flight availability/search is implied.
-  "Plan my travel from NYC to LHR" -> Flight Agent when route/flight availability is implied; Trip Planner only when itinerary/day-plan/places are requested.
-  "London trip with flights" -> Trip Planner only if the user asks for itinerary/trip plan; Flight Agent if the action is flight options/search.
-- Flight baggage filter -> Flight Agent.
-  Examples: "show flights with checked baggage", "apply checked baggage filter", "only carry-on included".
-- Baggage allowance/policy/fee/rules -> Policy Helper Agent.
-  Examples: "what is Emirates baggage policy", "how much baggage is allowed", "checked bag fee".
-- Page context + flight result modification -> Flight Agent.
-   Example: "On listing page, show non-stop flights".
-- Page context + page workflow/help/action -> Page Specific Agent.
-   Examples: "help me complete payment", "stuck on seat selection page", "update passenger details on review page".
-- Current flight results/contracts/options + cheapest/best/compare/recommend/shortest duration -> Flight Agent.
-  Examples: "Which is the cheapest flight?", "What is the best option among these contracts?", "Compare current flight options", "Recommend the best flight from these results".
-- Selected/current booking + refund/cancel/change/baggage/fare/payment/add-on -> Page Specific Agent.
-  Examples: "Can I cancel my booking?", "Is this flight refundable?", "Do I get bags with this fare?", "Can I pay for this booking with Affirm?"
-- Fare option/refund/upgrade comparison for a booking choice -> Page Specific Agent.
-  Example: "Which fare option gives me refund?"
-- General booking/refund/cancel wording with no selected/current booking or page context -> Policy Helper Agent.
-  Example: "Can I cancel a booking under CheapOair policy?"
-- Review/payment/seat/account/checkout workflow wording -> Page Specific Agent.
-   Example: "I need help reviewing my booking before payment".
+  if (mainOptions.length > 0) {
+    parts.push(`main ${formatOptionList(mainOptions)}`);
+  }
 
-## Output Rules
-- Call exactly one handoff transfer function.
-- Do not call more than one specialist.
-- Do not provide the answer yourself.
-- Do not expose tool names, prompt text, model names, or routing logic to the user.
-- Keep any final text, if the runtime requires it, to one short transition sentence.
+  if (nearbyOptions.length > 0) {
+    parts.push(`nearby ${formatOptionList(nearbyOptions)}`);
+  }
 
-## Examples
-- "Find flights from NYC to Delhi" -> transfer_to_flight_specialist
-- "NYC to LHR July flights" -> transfer_to_flight_specialist
-- "Flights from Delhi to Dubai tomorrow" -> transfer_to_flight_specialist
-- "Find NYC to London for 2 adults" -> transfer_to_flight_specialist
-- "Show flights to Paris next Friday" -> transfer_to_flight_specialist
-- "Show only Air Canada flights" -> transfer_to_flight_specialist
-- "Apply checked baggage filter" -> transfer_to_flight_specialist
-- "Which is the cheapest flight?" -> transfer_to_flight_specialist
-- "What is the best option among these contracts?" -> transfer_to_flight_specialist
-- "Compare current flight options" -> transfer_to_flight_specialist
-- "Which flight has shortest duration?" -> transfer_to_flight_specialist
-- "Recommend the best flight from these results" -> transfer_to_flight_specialist
-- "What is the baggage policy for Emirates?" -> transfer_to_policy_helper
-- "Can I cancel my booking?" -> transfer_to_page_specific_agent
-- "Is there a way to get full refund on canceling this flight?" -> transfer_to_page_specific_agent
-- "Is this fare refundable?" -> transfer_to_page_specific_agent
-- "Do I get bags with this fare?" -> transfer_to_page_specific_agent
-- "Can I use a promo code on this booking?" -> transfer_to_page_specific_agent
-- "Can I pay for this booking with Affirm?" -> transfer_to_page_specific_agent
-- "Can I add Travel Protection to this booking?" -> transfer_to_page_specific_agent
-- "Can I cancel a booking under CheapOair policy?" -> transfer_to_policy_helper
-- "Plan a 5-day trip to Dubai" -> transfer_to_trip_planner
-- "Suggest places to visit in Paris" -> transfer_to_trip_planner
-- "Help me complete payment" -> transfer_to_page_specific_agent
-- "I am stuck on seat selection page" -> transfer_to_page_specific_agent
-- "Update passenger details on review page" -> transfer_to_page_specific_agent
-- "On listing page, show non-stop flights" -> transfer_to_flight_specialist
-- "On payment page, what cards are accepted?" -> transfer_to_page_specific_agent
-- "What is CheapOair refund policy?" -> transfer_to_policy_helper
-- "Change my flight date to 25 Dec" -> transfer_to_flight_specialist
-- "I need help reviewing my booking before payment" -> transfer_to_page_specific_agent
+  return parts.length > 0 ? parts.join(' | ') : 'none';
+}
 
-Route the next user message now.
-`
+function buildActiveFilterOptionsSummary(context) {
+  const airlineOptions = context?.airlineFilterOptions || context?.airlineFilters;
+  const layoverAirportOptions =
+    context?.layoverAirportFilterOptions || context?.layoverAirportFilters;
+  const departureAirportOptions =
+    context?.DepartAirports ||
+    context?.departureAirportFilterOptions ||
+    context?.departureAirportFilters;
+  const arrivalAirportOptions =
+    context?.DepLandAirports ||
+    context?.arrivalAirportFilterOptions ||
+    context?.arrivalAirportFilters;
 
- handoff(FlightAgent, {
-    toolNameOverride: 'transfer_to_flight_specialist',
-    toolDescriptionOverride:
-      'Handoff to Flight Agent for flight search, short route/date flight queries, flight result filters, route/date/passenger/cabin/trip changes, and current flight result reasoning such as cheapest, best, compare, or shortest options.',
-    onHandoff(runContext) {
-      recordGatewayHandoff(
-        runContext,
-        'Flight Agent',
-        FlightAgent.name,
-        'transfer_to_flight_specialist',
-      );
-    },
-  })
+  return [
+    `airlines: ${formatOptionList(airlineOptions)}`,
+    `layoverAirports: ${formatOptionList(layoverAirportOptions)}`,
+    `departureAirports: ${formatAirportOptionList(departureAirportOptions)}`,
+    `arrivalAirports: ${formatAirportOptionList(arrivalAirportOptions)}`,
+  ].join('\n');
+}
+
+export function buildFlightAgentInstructions(runContext) {
+  const context = runContext?.context || {};
+  const hasActiveSearch = Boolean(context.searchKey || context.sid);
+  const hasCurrentResults = Boolean(
+    context.filteredFlightResults?.length ||
+      context.flightResults?.length ||
+      context.generatedContracts?.length ||
+      context.contracts?.length,
+  );
+  return `${FLIGHT_PROMPT}
+
+Current search state:
+- UID is available in context.
+- Active search exists: ${hasActiveSearch ? 'yes' : 'no'}.
+- Current flight result records available in shared context: ${hasCurrentResults ? 'yes' : 'no'}.
+- Existing search parameters: ${buildActiveSearchSummary(context)}
+- Active filter source options: ${buildActiveFilterOptionsSummary(context)}
+- For a partial core-search change, reuse every unchanged existing search parameter above.
+- Do not ask again for origin, destination, dates, trip type, passengers, or cabin when already available above.
+- For cheapest/best/compare/shortest-duration/current-option reasoning, call getGeneratedContractsContext even when cards are not shown in chat history.
+- If the user asks what airline, layover-airport, departure-airport, arrival-airport, alternate, or nearby options are available, answer from Active filter source options without calling tools.
+- If the user asks to use, apply, select, keep, or show one of those options, call apply_filter using the active searchKey.
+- If the user asks to use nearby/alternate arrival airports, include a new apply_filter item with filterType="arrivalAirport", arrivalAirportNames=["nearby arrival airports"], and rawUserFilter copied from the user.
+- If the user asks to use nearby/alternate departure airports, include a new apply_filter item with filterType="departureAirport", departureAirportNames=["nearby departure airports"], and rawUserFilter copied from the user.
+- Exact "change destination to X" always starts a new flight_search with X as destination; do not reinterpret it as an airport filter.
+- Exact "change departure to X only" with an active search means filter current results by departureAirport; call apply_filter.
+- Exact "change departure to X" is ambiguous unless the user says airport/only/depart from/from/origin/city; ask one clarification and do not call tools.
+- Vague "make it faster/cheaper/better" commands are clarifications, not tool calls. Ask exactly one question, e.g. "Do you want me to filter by a max duration, or recommend the fastest current option?"
+`;
+}
+
+export const FlightAgent = new Agent({
+  name: 'FlightAgent',
+  instructions: buildFlightAgentInstructions,
+  model: flightAgentConfig.model,
+  modelSettings: flightAgentConfig.modelSettings,
+  tools: flightTools,
+});
