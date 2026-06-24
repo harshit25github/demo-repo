@@ -1,6 +1,11 @@
-Hi, quick clarification on `IsDisabled`.
+In this case, the user mentioned “travelling with friends”, but did not provide an exact passenger count.
 
-For time filters, when `IsDisabled: true`, the option is greyed out in the UI, which makes sense. But I noticed that in some cases, like NYC → LHR, alternate airport options also have `IsDisabled: true`, but they still look selectable/applicable in the UI.
+As per the product behavior, when passenger details are missing, the flight agent should infer a reasonable value from the user’s context instead of always defaulting to 1 passenger. Since “friends” clearly indicates multiple travelers, the agent inferred 4 passengers and proceeded with the flight search.
 
-Can you confirm if `IsDisabled` works differently for airport filters compared to time filters? Should we ignore it for airports, or is there some separate logic behind this?
+If the user later provides the exact passenger count, we can update the search criteria accordingly. But with the current input, choosing multiple passengers is expected behavior and context-based inference.
+Here the user has only entered “cancellation”, so we should treat it as an intent to get cancellation-related information, not as a request to cancel an existing booking.
+
+The guardrail/tripwire should trigger only when the user clearly asks to cancel a specific booking, for example: “cancel my booking”, “cancel this booking”, or shares booking-related context.
+
+Since no booking context is provided here, routing this to the Policy Agent makes sense, as we already have cancellation process documentation there. The agent can explain the cancellation policy/process and ask for booking details only if the user wants to proceed with an actual cancellation.
 
