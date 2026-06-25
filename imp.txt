@@ -1,11 +1,118 @@
-In this case, the user mentioned “travelling with friends”, but did not provide an exact passenger count.
+```markdown
+Fix `suggestedQuestions` generation in the Extractor Agent.
 
-As per the product behavior, when passenger details are missing, the flight agent should infer a reasonable value from the user’s context instead of always defaulting to 1 passenger. Since “friends” clearly indicates multiple travelers, the agent inferred 4 passengers and proceeded with the flight search.
+Context:
+After every agent interaction, we call the Extractor Agent with:
+- current user message
+- current agent response
+- older summary context
 
-If the user later provides the exact passenger count, we can update the search criteria accordingly. But with the current input, choosing multiple passengers is expected behavior and context-based inference.
-Here the user has only entered “cancellation”, so we should treat it as an intent to get cancellation-related information, not as a request to cancel an existing booking.
+Extractor Agent then updates the summary object and returns:
+- updated summary context
+- `suggestedQuestions: string[]`
 
-The guardrail/tripwire should trigger only when the user clearly asks to cancel a specific booking, for example: “cancel my booking”, “cancel this booking”, or shares booking-related context.
+`suggestedQuestions` are shown in UI under “You might ask”.
 
-Since no booking context is provided here, routing this to the Policy Agent makes sense, as we already have cancellation process documentation there. The agent can explain the cancellation policy/process and ask for booking details only if the user wants to proceed with an actual cancellation.
+Important:
+These are NOT questions from the agent to the user.
+These should be questions/actions that the user might ask the agent next.
 
+Current problems:
+1. Some suggestions sound like the agent is asking the user.
+   Wrong:
+   - "When are you going to travel?"
+   - "Would you like me to show cheaper flights?"
+   - "Do you want to add passengers?"
+
+   Correct:
+   - "Show me cheaper flights"
+   - "Add 2 adults to this search"
+   - "Find flights for next weekend"
+
+2. Suggestions repeat across multiple turns and are not refreshed based on the latest interaction.
+
+Required behavior:
+- Generate suggestions from the user’s perspective only.
+- Suggestions should be based mainly on:
+  - current user message
+  - current agent response
+  - updated summary context
+- Older summary should be used only for continuity, not for stale repetition.
+- Avoid repeating previous suggestions unless they are still highly relevant.
+- Suggestions should help move the current journey forward.
+
+New generation rule:
+Create around 3–5 suggestions:
+- 2–3 suggestions should help complete missing/unfilled summary context fields.
+- 1–2 suggestions should add value to the user journey based on the current conversation.
+
+Example:
+If destination is available but origin is missing, suggest user-side actions like:
+- "Add my departure city"
+- "Search flights from Delhi"
+- "Help me complete this flight search"
+
+If flight results are shown:
+- "Show me the cheapest flight"
+- "Compare the current options"
+- "Show only non-stop flights"
+
+If filters are applied:
+- "Remove this filter"
+- "Show flights with checked baggage"
+- "Which option is best now?"
+
+Rules:
+- Never generate assistant-side questions like:
+  - "Would you like..."
+  - "Do you want..."
+  - "Should I..."
+  - "Can I help you..."
+  - "When are you..."
+- Prefer user-side wording:
+  - "Show me..."
+  - "Find..."
+  - "Compare..."
+  - "Apply..."
+  - "Remove..."
+  - "Add..."
+  - "What is..."
+  - "Which option..."
+
+De-duplication:
+- Normalize suggestions before comparing:
+  - lowercase
+  - trim spaces
+  - remove punctuation where needed
+- Avoid same meaning repeated with different wording.
+- Do not keep returning the same first-turn suggestions in later turns.
+
+Output requirement:
+- `suggestedQuestions` must always be an array of strings.
+- Keep each suggestion short, natural, and clickable.
+- Do not include explanation inside `suggestedQuestions`.
+
+Please update:
+- Extractor Agent prompt/logic
+- Summary update flow if stale suggestions are being carried forward
+- Tests for suggestion quality and repetition
+
+Test cases:
+1. Suggestions are always from user perspective.
+2. No suggestion sounds like agent asking the user.
+3. Suggestions update after each turn.
+4. Repeated suggestions are avoided.
+5. Missing summary fields influence 2–3 suggestions.
+6. 1–2 suggestions add journey value.
+7. Suggestions stay relevant to current user + agent messages.
+8. Output remains `suggestedQuestions: string[]`.
+
+Deliverable:
+- Fix the issue.
+- Add before/after examples.
+- Add tests.
+- Provide a short report explaining:
+  - root cause
+  - changes made
+  - test results
+```
