@@ -1,106 +1,17 @@
-Fix Trip Planner streaming response to remove links before sending chunks to client.
+We have completed key enhancements in the agentic flight search workflow. The flight search agent is now synced with the app’s flight search flow, allowing user search context to move both ways — from the app listing page to the AI agent and from the AI agent back to the app. This enables continuity, so users can continue their flight search without losing context during the flow.
 
-Context:
+Current enhancements completed:
 
-* We have a gateway/agentic workflow with multiple agents.
-* During OpenAI streaming, we can identify the active/last triggered agent using `last_agent`.
-* This fix is only required when `last_agent` is Trip Planner.
-* Trip Planner sometimes generates links/source URLs in streamed text chunks.
-* We do not want to show any links in Trip Planner responses on the client side.
+* Integrated flight search context between the app workflow and the agentic workflow.
+* Enabled advanced filters in the flight agent, aligned with the filters supported by the app.
+* Implemented multi-apply filter support, allowing users to apply multiple filters in a single request.
+* Enhanced trip planning with flight search, multi-search, and context-aware search flows.
+* Built a RAG-based policy agent using CheapoAir knowledge, covering policy-related information like airline rules, cancellation, baggage, and other support content.
+* Added guardrails to keep the conversation focused on relevant travel/booking use cases.
+* Enabled human handoff support when the user explicitly asks to connect with a real person.
 
-Required handling:
-Add a server-side sanitization layer for Trip Planner streamed chunks.
+Future work:
 
-Goals:
-
-1. Update Trip Planner prompt so it does not generate links in the response.
-2. Sanitize streaming chunks before sending them to the client.
-3. Sanitize the final accumulated response before sending the final `status: done` payload.
-
-Streaming behavior:
-
-* If `last_agent` is not Trip Planner, keep existing streaming behavior unchanged.
-* If `last_agent` is Trip Planner:
-
-  * Do not directly forward raw chunks to client.
-  * Buffer chunks safely before sending.
-  * Detect and remove links from the buffered text.
-  * Handle links even when they are split across multiple chunks.
-  * Send only sanitized text to the client.
-
-Links to remove:
-
-* Raw URLs:
-
-  * `https://...`
-  * `http://...`
-  * `www.example.com`
-* Markdown links:
-
-  * `[text](https://...)`
-* HTML links:
-
-  * `<a href="...">text</a>`
-* Source/reference style links if generated in text.
-
-Important:
-Chunks can be very small, so a link may be split like:
-
-* chunk 1: `Visit https://`
-* chunk 2: `example.com for details`
-
-In this case:
-
-* Buffer until the link is complete.
-* Remove the full link.
-* Then send the cleaned text.
-
-Suggested approach:
-
-* Create a Trip Planner stream sanitizer utility.
-* Maintain a small rolling buffer for Trip Planner chunks.
-* Flush only safe/sanitized text.
-* Keep enough trailing characters in buffer to detect incomplete URLs/markdown links.
-* On stream completion, flush the remaining sanitized buffer.
-* Also sanitize the final accumulated response before sending `status: done`.
-
-Final response handling:
-
-* We already maintain a variable that accumulates the full streamed response.
-* Before sending the final `status: done` response:
-
-  * validate the full text
-  * remove any remaining links
-  * send only sanitized final text
-
-Trip Planner prompt update:
-Add/strengthen instruction:
-
-* Do not include raw URLs.
-* Do not include markdown links.
-* Do not include source links.
-* Mention places/recommendations naturally without clickable links.
-
-Tests to add:
-
-1. Trip Planner returns raw URL in one chunk → link removed before client receives it.
-2. Trip Planner URL split across multiple chunks → full link removed.
-3. Markdown link split across chunks → link removed, visible text preserved if possible.
-4. HTML anchor link → link removed.
-5. Final accumulated response contains link → removed before `status: done`.
-6. Non-Trip Planner agent response contains normal text → streaming unchanged.
-7. Trip Planner response without links → streaming should work normally.
-8. No broken/incomplete chunks should be sent to client.
-
-Deliverable:
-
-* Implement Trip Planner-only link sanitization for streaming chunks.
-* Update Trip Planner prompt to avoid links.
-* Add final response sanitization before `status: done`.
-* Add tests for split-link streaming cases.
-* Provide a short report:
-
-  * root cause
-  * implementation approach
-  * before/after examples
-  * test results
+* Extend the agentic workflow to support hotels, cars, packages, and deals.
+* Enable users to search and continue these flows through the same app-to-agent and agent-to-app continuity model.
+* Expand the knowledge and action capabilities so the assistant can support more end-to-end travel planning and booking-related queries.
