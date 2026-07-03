@@ -1,12 +1,5 @@
-Hi, I need one clarification regarding the location API flow.
+Here, “Cheapest flight” is acting as an intent capture, not a complete search request.
 
-When I search for “Bangkok” using the first API, it returns `BKKG` with type as `group_city`. I then pass this code to the second API to fetch airport details like `airportCode`, `airportCodeText`, `countryCode`, and `airportType`.
+The user has given the route/OND, but the travel date is still missing. So even if the user selects “Cheapest flight”, the agent still needs the travel date to perform the actual flight search and return accurate results.
 
-But when I pass `BKKG`, the second API returns a different location, like `TBI` / Bahamas-related data, which seems incorrect.
-
-APIs used:
-
-* Location API: `<add API here>`
-* Airport details API: `<add API here>`
-
-Could you please confirm if `BKKG` can be directly passed to the second API, or do we need to transform/map `group_city` codes before calling it?
+So the agent asking for the travel date is expected behavior. The suggestion helps identify the user’s intent, while the missing mandatory fields are still required to complete the search.
