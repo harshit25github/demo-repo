@@ -1,59 +1,12 @@
-```markdown
-Verify and fix UID flow in `/chat` API and Flight Agent context.
+Hi, I need one clarification regarding the location API flow.
 
-Context:
-- `/chat` API receives request body with `searchCriteria`.
-- `UID` is expected to come from the incoming request/search context.
-- This UID should be used consistently for all flight-related operations.
-- Earlier issue: UID was mainly used during `apply_filter`, but for `flight_search`, if UID was missing, code was falling back to an old/random UID. This is wrong.
-- I have updated the code to extract UID from the incoming request and added validation, but it looks like UID is still not flowing properly into the Flight Agent/flight context.
+When I search for “Bangkok” using the first API, it returns `BKKG` with type as `group_city`. I then pass this code to the second API to fetch airport details like `airportCode`, `airportCodeText`, `countryCode`, and `airportType`.
 
-Required behavior:
-- UID must be mandatory for `/chat` API requests.
-- Validate UID at the beginning using Zod schema.
-- If UID is missing, return a proper validation error immediately.
-- Do not allow fallback to any old/random/default UID.
-- The same UID from the request must flow into:
-  - request-level context
-  - gateway/agentic workflow context
-  - Flight Agent context
-  - flight object / flight search context
-  - `flight_search_tool`
-  - `apply_filter_tool`
-  - any mapper/helper that builds flight payloads
+But when I pass `BKKG`, the second API returns a different location, like `TBI` / Bahamas-related data, which seems incorrect.
 
-Things to verify:
-1. Is UID correctly extracted from incoming `/chat` request?
-2. Is Zod validation rejecting requests without UID?
-3. Is UID being passed into the agent context correctly?
-4. Is Flight Agent receiving the correct UID in its flight context?
-5. Is `flight_search_tool` using the incoming UID, not fallback UID?
-6. Is `apply_filter_tool` using the same UID?
-7. After flight search, is UID preserved in updated context/searchCriteria?
-8. Are there any places still using old/random/default UID fallback logic?
+APIs used:
 
-Expected fix:
-- Remove fallback UID behavior.
-- Use only the UID coming from the current `/chat` request.
-- Ensure UID is available in the flight object/context before any flight tool call.
-- Add clear error handling if UID is missing or invalid.
+* Location API: `<add API here>`
+* Airport details API: `<add API here>`
 
-Tests to add:
-1. `/chat` request without UID → should fail at Zod validation.
-2. `/chat` request with UID → UID should flow into Flight Agent context.
-3. New flight search → `flight_search_tool` should receive same UID.
-4. Apply filter after search → `apply_filter_tool` should receive same UID.
-5. Multi-turn flow → UID should remain consistent.
-6. Verify no old/random/default UID is used anywhere.
-
-Deliverable:
-- Thoroughly trace UID flow.
-- Fix any broken propagation.
-- Remove fallback UID usage.
-- Add/update validation and tests.
-- Provide a short report:
-  - where UID was getting lost
-  - what was using fallback UID
-  - what changes were made
-  - test results
-```
+Could you please confirm if `BKKG` can be directly passed to the second API, or do we need to transform/map `group_city` codes before calling it?
