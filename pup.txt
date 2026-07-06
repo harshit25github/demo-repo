@@ -1,5 +1,5 @@
 ```markdown
-Fix Flight Agent `suggestedQuestions` in Extractor Agent.
+Fix Flight Agent `suggestedQuestions` generation in Extractor Agent.
 
 Context:
 - After every agent workflow, Extractor Agent runs.
@@ -7,77 +7,118 @@ Context:
   - current user message
   - current agent response
   - older summary context
-- It updates the summary object and generates `suggestedQuestions: string[]`.
+- It updates the summary object and returns `suggestedQuestions: string[]`.
 - These suggestions are shown in UI as “You might ask”.
-- These are user-side questions/actions that the user may ask the agent next.
+- These should always be user-side queries/actions, not questions from agent to user.
 
-Problem:
-For Flight Agent flows, Extractor Agent is suggesting questions like:
-- "Pick a destination for me"
-- "Suggest a travel date"
-- "Where should I fly from?"
+We need to fix two issues together for Flight Agent flows.
 
-This creates a contradiction because Flight Agent must not invent or recommend these 3 mandatory search fields:
+Issue 1: Mandatory flight search fields should not be suggested
+Flight Agent has 3 mandatory fields:
 - origin
 - destination
 - travel date/date range
 
-These values must always come from the user directly.
+These values must always come from the user directly. The agent should not recommend/pick these values through suggested questions.
 
-Required change:
-When the active/last triggered agent is Flight Agent, never generate `suggestedQuestions` that ask the agent to provide or choose:
-- origin
-- destination
-- travel date
-- date range
-- departure city
-- arrival city
-- trip location
-- “where should I go”
-- “pick a destination”
-- “suggest dates”
-
-Blocked examples:
+Blocked suggestions:
 - "Pick a destination for me"
 - "Suggest where I should fly"
 - "Choose my travel dates"
-- "Find me a destination"
-- "Where should I travel?"
 - "Suggest a departure city"
+- "Where should I travel?"
+- "Find me a destination"
+- "When should I travel?"
 
-Allowed examples:
-- "Show me cheaper flights"
-- "Apply non-stop filter"
-- "Show flights with checked baggage"
-- "Compare the current options"
-- "Change cabin to business"
-- "Add 2 adults"
+Do not generate suggested questions related to choosing/recommending:
+- origin
+- destination
+- travel dates
+
+Issue 2: Advanced filters should only appear after search exists
+Advanced flight suggestions should only be generated if:
+
+`context.flight.search_key` exists
+
+`search_key` means flight search already happened and we have filterable/searchable context.
+
+If `context.flight.search_key` does NOT exist:
+Do not suggest:
 - "Show morning departures"
+- "Show flights with checked baggage"
+- "Apply non-stop filter"
+- "Compare current options"
 - "Which flight is best?"
+- "Show cheaper flights"
+- "Show United Airlines flights"
+- "Show shorter layovers"
 
-Rules:
-- For Flight Agent, `suggestedQuestions` should only help users refine or continue a flight search.
-- Do not generate suggestions that ask the agent to fill mandatory search fields.
-- Origin, destination, and travel dates can be asked by the main Flight Agent as clarification only, but they should not appear as “You might ask” suggestions.
-- Keep suggestions from the user’s perspective.
-- Avoid repetition across turns.
-- Keep suggestions relevant to current user message + agent response.
+Because these only make sense after flight results exist.
 
-Please update:
-- Extractor Agent prompt/logic
-- Agent-specific suggestion rules for Flight Agent
-- Tests for blocked mandatory-field suggestions
+Safe suggestions when `search_key` does NOT exist:
+- "Update cabin to economy"
+- "Update cabin to premium economy"
+- "Change trip type to round trip"
+- "Search one-way flights"
+- "Add 2 adults"
+- "Change passenger count"
+- "Add 1 child"
+
+Allowed suggestions when `search_key` exists:
+- "Show cheaper flights"
+- "Apply non-stop filter"
+- "Show morning departures"
+- "Show flights with checked baggage"
+- "Compare current options"
+- "Which flight is best?"
+- "Show United Airlines flights"
+- "Show flights with shorter layover"
+
+General rules:
+- Suggestions must be from the user’s perspective.
+- Do not write assistant-style questions like:
+  - "Would you like..."
+  - "Do you want..."
+  - "Should I..."
+  - "When are you..."
+- Prefer user-style actions:
+  - "Update..."
+  - "Add..."
+  - "Change..."
+  - "Show..."
+  - "Apply..."
+  - "Compare..."
+  - "Search..."
+
+Also fix repetition:
+- Do not repeat the same suggestions across turns.
+- Current user message + current agent response should drive suggestions.
+- Older summary context should only be used for continuity.
+- Avoid stale suggestions from previous turns.
+
+Required implementation:
+- Add Flight Agent specific rules in Extractor Agent prompt/logic.
+- Add gating condition for advanced suggestions using `context.flight.search_key`.
+- Add blocking rules for origin/destination/travel-date suggestions.
+- Keep output format as `suggestedQuestions: string[]`.
 
 Test cases:
-1. Flight Agent triggered with missing destination → `suggestedQuestions` must not include “pick/suggest destination”.
-2. Flight Agent triggered with missing date → `suggestedQuestions` must not include “suggest travel dates”.
-3. Flight Agent triggered with missing origin → `suggestedQuestions` must not include “choose departure city”.
-4. Flight results shown → suggestions should focus on filters, comparison, cheaper/best flights.
-5. Suggestions should not repeat across multiple turns.
+1. Flight Agent active, no `context.flight.search_key`:
+   - only safe suggestions like cabin, trip type, passengers.
+   - no filters/result comparison suggestions.
+
+2. Flight Agent active, `context.flight.search_key` exists:
+   - advanced filters and result comparison suggestions are allowed.
+
+3. Flight Agent missing origin/destination/date:
+   - suggestedQuestions must still not ask agent to pick/suggest these fields.
+
+4. Multiple turns:
+   - suggestions should refresh and avoid repetition.
 
 Deliverable:
-- Fix the issue.
+- Fix Extractor Agent suggestion logic.
 - Add tests.
 - Provide before/after examples.
-- Provide a short report explaining the root cause and changes made.
+- Provide short report with root cause, changes made, and test results.
 ```
