@@ -1,5 +1,83 @@
-Here, “Cheapest flight” is acting as an intent capture, not a complete search request.
+```markdown
+Fix Flight Agent `suggestedQuestions` in Extractor Agent.
 
-The user has given the route/OND, but the travel date is still missing. So even if the user selects “Cheapest flight”, the agent still needs the travel date to perform the actual flight search and return accurate results.
+Context:
+- After every agent workflow, Extractor Agent runs.
+- It receives:
+  - current user message
+  - current agent response
+  - older summary context
+- It updates the summary object and generates `suggestedQuestions: string[]`.
+- These suggestions are shown in UI as “You might ask”.
+- These are user-side questions/actions that the user may ask the agent next.
 
-So the agent asking for the travel date is expected behavior. The suggestion helps identify the user’s intent, while the missing mandatory fields are still required to complete the search.
+Problem:
+For Flight Agent flows, Extractor Agent is suggesting questions like:
+- "Pick a destination for me"
+- "Suggest a travel date"
+- "Where should I fly from?"
+
+This creates a contradiction because Flight Agent must not invent or recommend these 3 mandatory search fields:
+- origin
+- destination
+- travel date/date range
+
+These values must always come from the user directly.
+
+Required change:
+When the active/last triggered agent is Flight Agent, never generate `suggestedQuestions` that ask the agent to provide or choose:
+- origin
+- destination
+- travel date
+- date range
+- departure city
+- arrival city
+- trip location
+- “where should I go”
+- “pick a destination”
+- “suggest dates”
+
+Blocked examples:
+- "Pick a destination for me"
+- "Suggest where I should fly"
+- "Choose my travel dates"
+- "Find me a destination"
+- "Where should I travel?"
+- "Suggest a departure city"
+
+Allowed examples:
+- "Show me cheaper flights"
+- "Apply non-stop filter"
+- "Show flights with checked baggage"
+- "Compare the current options"
+- "Change cabin to business"
+- "Add 2 adults"
+- "Show morning departures"
+- "Which flight is best?"
+
+Rules:
+- For Flight Agent, `suggestedQuestions` should only help users refine or continue a flight search.
+- Do not generate suggestions that ask the agent to fill mandatory search fields.
+- Origin, destination, and travel dates can be asked by the main Flight Agent as clarification only, but they should not appear as “You might ask” suggestions.
+- Keep suggestions from the user’s perspective.
+- Avoid repetition across turns.
+- Keep suggestions relevant to current user message + agent response.
+
+Please update:
+- Extractor Agent prompt/logic
+- Agent-specific suggestion rules for Flight Agent
+- Tests for blocked mandatory-field suggestions
+
+Test cases:
+1. Flight Agent triggered with missing destination → `suggestedQuestions` must not include “pick/suggest destination”.
+2. Flight Agent triggered with missing date → `suggestedQuestions` must not include “suggest travel dates”.
+3. Flight Agent triggered with missing origin → `suggestedQuestions` must not include “choose departure city”.
+4. Flight results shown → suggestions should focus on filters, comparison, cheaper/best flights.
+5. Suggestions should not repeat across multiple turns.
+
+Deliverable:
+- Fix the issue.
+- Add tests.
+- Provide before/after examples.
+- Provide a short report explaining the root cause and changes made.
+```
