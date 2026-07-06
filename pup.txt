@@ -1,174 +1,97 @@
 ````markdown
-Fix Flight Agent `suggestedQuestions` issue with workflow-based testing.
+Fix Flight Agent `suggestedQuestions` issue in Extractor Agent.
 
 Problem:
-Even after adding `currentAgent` and `searchKey`, the UI still shows wrong “You might ask” questions for Flight Agent, such as:
-- "Add travel city"
-- "Add departure city"
+For Flight Agent, “You might ask” still shows invalid suggestions like:
 - "Add origin city"
+- "Add departure city"
+- "Add travel city"
 - "What travel dates?"
 - "Pick a destination"
-- "Suggest travel dates"
 
-This is wrong.
-
-For Flight Agent, suggested questions must never ask the agent to provide/choose:
+This is wrong because Flight Agent must not suggest questions where the agent chooses/provides:
 - origin
 - destination
 - travel date/date range
 
-These 3 fields must always come directly from the user.
+These values must come from the user only.
 
 ## How to trigger workflow
 
-I will provide the exact workflow trigger steps here:
-
 [ADD WORKFLOW TRIGGER STEPS HERE]
 
-## Required debugging flow
+## Testing rule
 
-1. Trigger the workflow using the above steps.
-2. Ask flight-related queries where origin/destination/date are missing or partially available.
-3. Inspect the final `suggestedQuestions` returned by the Extractor Agent.
-4. Verify why blocked questions are still coming.
-5. Fix the issue with minimal code changes.
-6. Re-run the same workflow until the bad suggestions are fully removed.
+Do not provide all 3 mandatory fields together:
+- origin
+- destination
+- travel date/date range
 
-## Things to inspect
+Reason:
+Providing all 3 may trigger actual flight search, which is not required for this test.
 
-Please check:
+Test only partial context:
+- origin only
+- destination only
+- date only
+- origin + date
+- destination + date
+- origin + destination
 
-1. Is `currentAgent` actually reaching the Extractor Agent?
-2. Is `currentAgent` correctly identifying Flight Agent?
-   - Handle values like `flight`, `FlightAgent`, `flight_agent`, etc.
-3. Is `searchKey` actually reaching the Extractor Agent?
-4. Is old summary context carrying stale `suggestedQuestions` forward?
-5. Is Extractor Agent prompt still telling the model to fill missing origin/destination/date?
-6. Is there any fallback logic that regenerates missing-field suggestions?
-7. Is there any post-processing that merges old suggestions with new suggestions?
+Goal is only to verify `suggestedQuestions`.
 
 ## Required fix
 
-Add both prompt-level and code-level protection.
-
-### 1. Prompt-level rule
-
-When `currentAgent` is Flight Agent:
-
-Never generate suggested questions related to:
-- origin
-- departure city
-- from city
-- source city
-- destination
-- arrival city
-- travel city
-- travel date
-- departure date
-- return date
-- date range
-- “when should I travel”
-- “where should I go”
-- “pick/suggest a destination”
-
-Blocked examples:
-- "Add origin city"
-- "Add departure city"
-- "Add travel city"
-- "What travel dates?"
-- "Pick a destination for me"
-- "Suggest where I should fly"
-- "Choose my travel dates"
-
-### 2. Search-key based rule
-
-If `currentAgent` is Flight Agent and `searchKey` does NOT exist:
-
-Do not generate advanced filter/result suggestions like:
-- "Apply non-stop filter"
-- "Show morning departures"
-- "Show flights with checked baggage"
-- "Compare current options"
-- "Which flight is best?"
-- "Show cheaper flights"
-
-Only safe suggestions are allowed, such as:
-- "Update cabin to economy"
-- "Update cabin to premium economy"
-- "Change trip type to round trip"
-- "Search one-way flights"
-- "Add 2 adults"
-- "Change passenger count"
-
-If even safe suggestions do not fit current context, return fewer suggestions instead of forcing bad ones.
-
-### 3. Code-level sanitizer
-
-Add a deterministic sanitizer after Extractor Agent generates `suggestedQuestions`.
-
-For Flight Agent:
-- Remove any suggestion related to origin/destination/travel dates.
-- If `searchKey` is missing, also remove advanced filter/result suggestions.
-- Remove duplicate or stale suggestions.
-- Do not merge old blocked suggestions back into the final output.
-
-This is important because prompt-only fix is not reliable enough.
-
-## Expected output behavior
-
-Bad output:
-```json
-[
-  "Add origin city",
-  "Add travel dates",
-  "Pick a destination"
-]
+1. Ensure Extractor Agent receives:
+```ts
+currentAgent
+searchKey
 ````
 
-Correct output when Flight Agent has no `searchKey`:
+2. If `currentAgent` is Flight Agent:
 
-```json
-[
-  "Update cabin to economy",
-  "Change trip type to round trip",
-  "Add 2 adults"
-]
-```
+* Remove/block suggestions related to origin, destination, or travel dates.
+* Do not ask the agent to pick/suggest these values.
 
-Correct output when Flight Agent has `searchKey`:
+3. If `currentAgent` is Flight Agent and `searchKey` is missing:
 
-```json
-[
-  "Show cheaper flights",
-  "Apply non-stop filter",
-  "Compare current options"
-]
-```
+* Do not show advanced filter/result suggestions like:
 
-## Tests to add
+  * "Apply non-stop filter"
+  * "Show morning departures"
+  * "Show checked baggage flights"
+  * "Compare current options"
+  * "Which flight is best?"
 
-1. Flight Agent + no origin → should not suggest origin/departure city.
-2. Flight Agent + no destination → should not suggest destination/travel city.
-3. Flight Agent + no date → should not suggest travel date/date range.
-4. Flight Agent + no `searchKey` → should not suggest advanced filters.
-5. Flight Agent + valid `searchKey` → advanced filters are allowed.
-6. Old summary contains bad suggestions → final output should sanitize/remove them.
-7. Multi-turn flow → suggestions should refresh and not repeat stale blocked questions.
+4. Add a code-level sanitizer after Extractor Agent output:
+
+* Remove blocked Flight Agent suggestions.
+* Remove advanced suggestions when `searchKey` is missing.
+* Remove duplicates/stale suggestions.
+
+## Allowed safe suggestions without `searchKey`
+
+* "Update cabin to economy"
+* "Update cabin to premium economy"
+* "Change trip type to round trip"
+* "Add 2 adults"
+* "Change passenger count"
+
+## Tests
+
+* Flight Agent + origin only → no destination/date suggestions.
+* Flight Agent + destination only → no origin/date suggestions.
+* Flight Agent + date only → no origin/destination suggestions.
+* Flight Agent + no `searchKey` → no advanced filter suggestions.
+* Old summary has bad suggestions → final output should remove them.
 
 ## Deliverable
 
-* Recreate the issue using the workflow.
-* Identify exactly why blocked suggestions are still coming.
-* Fix with minimal code changes.
-* Add prompt update + deterministic sanitizer.
+* Recreate issue using partial-context tests.
+* Fix prompt/logic with minimal changes.
+* Add sanitizer.
 * Add tests.
-* Provide a short report:
-
-  * actual Extractor Agent input
-  * actual bad output
-  * root cause
-  * fix applied
-  * final test results
+* Share root cause and final test results.
 
 ```
 ```
