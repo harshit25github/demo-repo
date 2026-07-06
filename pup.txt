@@ -1,75 +1,72 @@
 ````markdown
-Fix Flight Agent `suggestedQuestions` issue in Extractor Agent.
+Fix ONLY the Extractor Agent `suggestedQuestions` logic. Do not modify any other agent/code area.
+
+Strict scope:
+- Work only on Extractor Agent related files.
+- You may inspect other agents only to understand data flow.
+- Do NOT update Flight Agent prompt.
+- Do NOT update Trip Planner Agent.
+- Do NOT update Policy Agent.
+- Do NOT update Gateway routing logic.
+- Do NOT update React/UI/client code.
+- Do NOT refactor unrelated shared code.
+- Do NOT change source code outside Extractor Agent unless absolutely required, and if required, ask/mention first before changing.
 
 Problem:
-For Flight Agent, “You might ask” still shows invalid suggestions like:
-- "Add origin city"
-- "Add departure city"
-- "Add travel city"
-- "What travel dates?"
-- "Pick a destination"
+Extractor Agent generates `suggestedQuestions` shown under “You might ask”.
 
-This is wrong because Flight Agent must not suggest questions where the agent chooses/provides:
-- origin
-- destination
-- travel date/date range
+Current issues:
+1. It suggests invalid Flight Agent questions like:
+   - "Add origin city"
+   - "Add departure city"
+   - "Pick a destination"
+   - "What travel dates?"
+
+2. It sometimes suggests advanced flight filters before search exists:
+   - "Apply non-stop filter"
+   - "Show morning departures"
+   - "Compare current options"
+
+3. After blocking bad suggestions, sometimes `suggestedQuestions` becomes empty.
+
+Required fix inside Extractor Agent only:
+
+Input expected:
+```ts
+{
+  oldSummaryContext,
+  currentUserMessage,
+  currentAgentResponse,
+  currentAgent,
+  searchKey
+}
+````
+
+Rules:
+
+If `currentAgent` is Flight Agent:
+
+1. Never suggest questions where agent chooses/provides:
+
+* origin
+* destination
+* travel date/date range
 
 These values must come from the user only.
 
-## How to trigger workflow
+2. If `searchKey` is missing:
+   Do not suggest advanced filters/result questions.
 
-[ADD WORKFLOW TRIGGER STEPS HERE]
+Blocked without `searchKey`:
 
-## Testing rule
+* "Apply non-stop filter"
+* "Show morning departures"
+* "Show checked baggage flights"
+* "Compare current options"
+* "Which flight is best?"
 
-Do not provide all 3 mandatory fields together:
-- origin
-- destination
-- travel date/date range
-
-Reason:
-Providing all 3 may trigger actual flight search, which is not required for this test.
-
-Test only partial context:
-- origin only
-- destination only
-- date only
-- origin + date
-- destination + date
-- origin + destination
-
-Goal is only to verify `suggestedQuestions`.
-
-## Required fix
-
-1. Ensure Extractor Agent receives:
-```ts
-currentAgent
-searchKey
-````
-
-2. If `currentAgent` is Flight Agent:
-
-* Remove/block suggestions related to origin, destination, or travel dates.
-* Do not ask the agent to pick/suggest these values.
-
-3. If `currentAgent` is Flight Agent and `searchKey` is missing:
-
-* Do not show advanced filter/result suggestions like:
-
-  * "Apply non-stop filter"
-  * "Show morning departures"
-  * "Show checked baggage flights"
-  * "Compare current options"
-  * "Which flight is best?"
-
-4. Add a code-level sanitizer after Extractor Agent output:
-
-* Remove blocked Flight Agent suggestions.
-* Remove advanced suggestions when `searchKey` is missing.
-* Remove duplicates/stale suggestions.
-
-## Allowed safe suggestions without `searchKey`
+3. `suggestedQuestions` should never be empty.
+   If sanitizer removes all suggestions, add safe fallback suggestions like:
 
 * "Update cabin to economy"
 * "Update cabin to premium economy"
@@ -77,21 +74,38 @@ searchKey
 * "Add 2 adults"
 * "Change passenger count"
 
-## Tests
+Implementation:
 
-* Flight Agent + origin only → no destination/date suggestions.
-* Flight Agent + destination only → no origin/date suggestions.
-* Flight Agent + date only → no origin/destination suggestions.
-* Flight Agent + no `searchKey` → no advanced filter suggestions.
-* Old summary has bad suggestions → final output should remove them.
+* Update Extractor Agent prompt/logic.
+* Add deterministic sanitizer inside Extractor Agent flow.
+* Remove duplicate/stale suggestions.
+* Add fallback suggestions if final array becomes empty.
+* Keep output as `suggestedQuestions: string[]`.
 
-## Deliverable
+Testing rule:
+Do not trigger full flight search while testing.
+Do not provide all 3 together:
 
-* Recreate issue using partial-context tests.
-* Fix prompt/logic with minimal changes.
-* Add sanitizer.
-* Add tests.
-* Share root cause and final test results.
+* origin
+* destination
+* travel date
+
+Use partial-context tests only:
+
+* origin only
+* destination only
+* date only
+* origin + date
+* destination + date
+* origin + destination
+
+Deliverable:
+
+* Fix only Extractor Agent logic.
+* Show files changed.
+* Confirm no other agent/UI/source area was modified.
+* Add tests for invalid suggestions, advanced suggestions without `searchKey`, duplicate suggestions, and empty suggestions.
+* Provide root cause and final test results.
 
 ```
 ```
