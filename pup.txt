@@ -1,124 +1,180 @@
-```markdown
-Fix Flight Agent `suggestedQuestions` generation in Extractor Agent.
+````markdown
+Fix Extractor Agent `suggestedQuestions` logic using `currentAgent` and `searchKey`.
 
 Context:
-- After every agent workflow, Extractor Agent runs.
-- It receives:
-  - current user message
-  - current agent response
-  - older summary context
-- It updates the summary object and returns `suggestedQuestions: string[]`.
-- These suggestions are shown in UI as “You might ask”.
-- These should always be user-side queries/actions, not questions from agent to user.
+Currently, after every agentic workflow completes, we call the Extractor Agent with:
+- old summary context
+- current user message
+- current assistant/agent response
 
-We need to fix two issues together for Flight Agent flows.
+Extractor Agent updates the summary object and generates `suggestedQuestions`.
 
-Issue 1: Mandatory flight search fields should not be suggested
-Flight Agent has 3 mandatory fields:
-- origin
-- destination
-- travel date/date range
+Problem:
+The Extractor Agent does not know:
+1. Which agent was triggered in the current turn.
+2. Whether Flight Agent already has a valid flight search context/search key.
 
-These values must always come from the user directly. The agent should not recommend/pick these values through suggested questions.
+Because of this, it sometimes generates wrong suggestions for Flight Agent, like:
+- asking the agent to pick origin/destination/date
+- showing advanced filter questions before flight results exist
+- repeating stale suggestions from previous turns
 
-Blocked suggestions:
-- "Pick a destination for me"
-- "Suggest where I should fly"
-- "Choose my travel dates"
-- "Suggest a departure city"
-- "Where should I travel?"
-- "Find me a destination"
-- "When should I travel?"
+## Solution
 
-Do not generate suggested questions related to choosing/recommending:
-- origin
-- destination
-- travel dates
+Enhance the Extractor Agent input payload by passing two additional fields:
 
-Issue 2: Advanced filters should only appear after search exists
-Advanced flight suggestions should only be generated if:
+```ts
+currentAgent: string
+searchKey?: string | null
+````
 
-`context.flight.search_key` exists
+So the Extractor Agent input should become:
 
-`search_key` means flight search already happened and we have filterable/searchable context.
+```ts
+{
+  oldSummaryContext,
+  currentUserMessage,
+  currentAgentResponse,
+  currentAgent,
+  searchKey
+}
+```
 
-If `context.flight.search_key` does NOT exist:
-Do not suggest:
-- "Show morning departures"
-- "Show flights with checked baggage"
-- "Apply non-stop filter"
-- "Compare current options"
-- "Which flight is best?"
-- "Show cheaper flights"
-- "Show United Airlines flights"
-- "Show shorter layovers"
+Where:
 
-Because these only make sense after flight results exist.
+* `currentAgent` = last/current agent triggered by the workflow, e.g. `flight`, `tripPlanner`, `policy`
+* `searchKey` = flight search key if a flight search has already happened
+* If no flight search exists, `searchKey` should be `null` or empty
 
-Safe suggestions when `search_key` does NOT exist:
-- "Update cabin to economy"
-- "Update cabin to premium economy"
-- "Change trip type to round trip"
-- "Search one-way flights"
-- "Add 2 adults"
-- "Change passenger count"
-- "Add 1 child"
+Implementation requirements:
 
-Allowed suggestions when `search_key` exists:
-- "Show cheaper flights"
-- "Apply non-stop filter"
-- "Show morning departures"
-- "Show flights with checked baggage"
-- "Compare current options"
-- "Which flight is best?"
-- "Show United Airlines flights"
-- "Show flights with shorter layover"
+1. Update workflow/extractor call
 
-General rules:
-- Suggestions must be from the user’s perspective.
-- Do not write assistant-style questions like:
-  - "Would you like..."
-  - "Do you want..."
-  - "Should I..."
-  - "When are you..."
-- Prefer user-style actions:
-  - "Update..."
-  - "Add..."
-  - "Change..."
-  - "Show..."
-  - "Apply..."
-  - "Compare..."
-  - "Search..."
+* Wherever Extractor Agent is called after the main agent response, pass:
 
-Also fix repetition:
-- Do not repeat the same suggestions across turns.
-- Current user message + current agent response should drive suggestions.
-- Older summary context should only be used for continuity.
-- Avoid stale suggestions from previous turns.
+  * `currentAgent`
+  * `searchKey`
+* `currentAgent` should come from the last triggered agent in the workflow.
+* `searchKey` should come from current flight context/search criteria if available.
 
-Required implementation:
-- Add Flight Agent specific rules in Extractor Agent prompt/logic.
-- Add gating condition for advanced suggestions using `context.flight.search_key`.
-- Add blocking rules for origin/destination/travel-date suggestions.
-- Keep output format as `suggestedQuestions: string[]`.
+2. Update Extractor Agent input schema
 
-Test cases:
-1. Flight Agent active, no `context.flight.search_key`:
-   - only safe suggestions like cabin, trip type, passengers.
-   - no filters/result comparison suggestions.
+* Add `currentAgent`
+* Add optional `searchKey`
+* Keep existing fields unchanged.
 
-2. Flight Agent active, `context.flight.search_key` exists:
-   - advanced filters and result comparison suggestions are allowed.
+3. Update Extractor Agent prompt/logic
 
-3. Flight Agent missing origin/destination/date:
-   - suggestedQuestions must still not ask agent to pick/suggest these fields.
+If `currentAgent` is Flight Agent:
 
-4. Multiple turns:
-   - suggestions should refresh and avoid repetition.
+A. Never suggest questions where the agent is asked to choose/provide:
+
+* origin
+* destination
+* travel date/date range
+
+Blocked examples:
+
+* "Pick a destination for me"
+* "Suggest where I should fly"
+* "Choose my travel dates"
+* "Suggest a departure city"
+* "When should I travel?"
+* "Find me a destination"
+
+These fields must always come from the user.
+
+B. Only suggest advanced flight filters if `searchKey` exists.
+
+If `searchKey` does NOT exist, do not suggest:
+
+* "Apply non-stop filter"
+* "Show morning departures"
+* "Show flights with checked baggage"
+* "Compare current options"
+* "Which flight is best?"
+* "Show cheaper flights"
+* "Show United Airlines flights"
+
+Safe suggestions when Flight Agent is active but `searchKey` does NOT exist:
+
+* "Update cabin to economy"
+* "Update cabin to premium economy"
+* "Change trip type to round trip"
+* "Search one-way flights"
+* "Add 2 adults"
+* "Change passenger count"
+
+Allowed suggestions when Flight Agent is active and `searchKey` exists:
+
+* "Show cheaper flights"
+* "Apply non-stop filter"
+* "Show morning departures"
+* "Show flights with checked baggage"
+* "Compare current options"
+* "Which flight is best?"
+* "Show United Airlines flights"
+* "Show flights with shorter layover"
+
+4. General suggestion rules
+
+* `suggestedQuestions` must always be from the user’s perspective.
+* Do not generate assistant-style questions like:
+
+  * "Would you like..."
+  * "Do you want..."
+  * "Should I..."
+  * "When are you..."
+* Prefer user-style actions:
+
+  * "Show..."
+  * "Apply..."
+  * "Compare..."
+  * "Update..."
+  * "Change..."
+  * "Add..."
+  * "Search..."
+
+5. Avoid repetition
+
+* Do not blindly reuse old `suggestedQuestions`.
+* Current user message + current agent response should drive the latest suggestions.
+* Old summary context should be used only for continuity.
+* Avoid repeating same/similar suggestions across turns.
+
+Tests to add:
+
+1. Flight Agent active + no `searchKey`
+
+   * should not generate advanced filter/result suggestions.
+
+2. Flight Agent active + valid `searchKey`
+
+   * can generate advanced filter/result suggestions.
+
+3. Flight Agent active with missing origin/destination/date
+
+   * should not suggest agent-side questions like “pick destination” or “choose travel date”.
+
+4. Non-Flight Agent active
+
+   * existing behavior should remain stable.
+
+5. Multi-turn flow
+
+   * suggestions should refresh and avoid repeated stale questions.
 
 Deliverable:
-- Fix Extractor Agent suggestion logic.
-- Add tests.
-- Provide before/after examples.
-- Provide short report with root cause, changes made, and test results.
+
+* Add `currentAgent` and `searchKey` to Extractor Agent input.
+* Update schema and prompt/logic.
+* Add tests for Flight Agent suggestion rules.
+* Provide a short report:
+
+  * files changed
+  * how `currentAgent` and `searchKey` are passed
+  * before/after examples
+  * test results
+
+```
 ```
