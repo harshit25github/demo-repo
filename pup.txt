@@ -1,18 +1,18 @@
-````markdown
-Fix Flight-specific `suggestedQuestions` issue in Summary Extractor Agent only.
+Fix Flight-specific `suggestedQuestions` issue in Summary Mobile Extractor Agent only.
 
 ## Scope
 
-Work only on the Summary Extractor Agent.
+Work only on the Summary Mobile Extractor Agent.
 
 Do not modify:
-- Flight Agent
-- Trip Planner Agent
-- Policy Agent
-- Page Specific Agent
-- Gateway routing
-- UI/client code
-- Any unrelated shared logic
+
+* Flight Agent
+* Trip Planner Agent
+* Policy Agent
+* Page Specific Agent
+* Gateway routing
+* UI/client code
+* Any unrelated shared logic
 
 Other agents should keep existing behavior unchanged.
 
@@ -20,19 +20,22 @@ Other agents should keep existing behavior unchanged.
 
 1. User request comes to Gateway Agent.
 2. Gateway handles guardrails and routes/handoffs to one of these agents:
-   - Flight Agent
-   - Trip Planner Agent
-   - Policy Agent
-   - Page Specific Agent
+
+   * Flight Agent
+   * Trip Planner Agent
+   * Policy Agent
+   * Page Specific Agent
 3. Agent responds through streaming.
 4. During/after streaming, we can identify the last triggered agent.
-5. After the main response is complete, Summary Extractor Agent runs.
+5. After the main response is complete, Summary Mobile Extractor Agent runs.
 6. Extractor Agent receives:
-   - old summary context
-   - current user message
-   - current agent response
+
+   * old summary context
+   * current user message
+   * current agent response
 7. Extractor Agent updates the summary object and generates:
-   - `suggestedQuestions: string[]`
+
+   * `suggestedQuestions: string[]`
 
 These questions are shown in UI as “You might ask”.
 
@@ -41,29 +44,31 @@ These questions are shown in UI as “You might ask”.
 For Flight Agent, there is a strict rule:
 
 Flight Agent must never recommend or choose these 3 mandatory fields:
-- origin
-- destination
-- travel dates/date range
+
+* origin
+* destination
+* travel dates/date range
 
 These values must always come from the user.
 
-But Summary Extractor Agent sees missing context and generates bad suggestions like:
-- "Add a destination for me"
-- "Pick an origin for me"
-- "Suggest travel dates"
-- "What are the best travel dates?"
-- "Choose a destination"
-- "Where should I fly from?"
+But Summary Mobile Extractor Agent sees missing context and generates bad suggestions like:
+
+* "Add a destination for me"
+* "Pick an origin for me"
+* "Suggest travel dates"
+* "What are the best travel dates?"
+* "Choose a destination"
+* "Where should I fly from?"
 
 This is wrong because it creates contradiction with Flight Agent behavior.
 
 ## Required solution
 
-Pass one new field to Summary Extractor Agent:
+Pass one new field to Summary Mobile Extractor Agent:
 
 ```ts
 lastAgent: string
-````
+```
 
 Example extractor input:
 
