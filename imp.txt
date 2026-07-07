@@ -1,5 +1,42 @@
-In our current flow, “expert” does not always mean a human agent. We have multiple AI experts like Trip Planner, Flight, Baggage, Policy, etc., so “chat with expert” can still be interpreted as routing to the right AI expert.
+```markdown
+Fix Summary Mobile Extractor Agent to always return exactly 3 `suggestedQuestions`.
 
-Human handoff should trigger only when the user clearly asks to connect with a real person/human agent/live support.
+Scope:
+- Update only Summary Mobile Extractor Agent prompt/logic.
+- Do not modify Flight Agent, Gateway, UI, or other agents.
 
-So if the expected behavior is to treat “chat with expert” as human handoff, we need to explicitly add this phrase as a human-handoff trigger in the guardrail/routing logic.
+Issue:
+Flight invalid suggestions are mostly removed now, but sometimes `suggestedQuestions` is empty or fewer than 3.
+
+Requirement:
+- Always return exactly 3 suggested questions.
+- Never return empty array.
+- Never return fewer than 3.
+- If any suggestion is blocked/removed, replace it with a valid fallback.
+- Suggestions must be user-side questions/actions, shown under “You might ask”.
+
+Flight Agent rule:
+If `lastAgent` is Flight Agent, never suggest questions asking the agent to choose/provide:
+- origin
+- destination
+- travel date/date range
+
+Blocked examples:
+- "Add origin city"
+- "Pick a destination"
+- "Suggest travel dates"
+
+Safe fallback examples:
+- "Change cabin to economy"
+- "Change trip type to round trip"
+- "Add 2 adults"
+- "Update passenger count"
+- "Make it a one-way search"
+
+Acceptance:
+- Exactly 3 suggestions in every extractor output.
+- No blocked Flight Agent suggestions.
+- No duplicates.
+- No empty/fewer-than-3 output.
+- Show before/after extractor outputs from 4–5 test turns.
+```
