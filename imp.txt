@@ -1,32 +1,45 @@
 ```markdown
-Fix Summary Mobile Extractor Agent to always return exactly 3 `suggestedQuestions`.
+Enhance Summary Mobile Extractor Agent `suggestedQuestions` with `searchKey` gating.
 
 Scope:
 - Update only Summary Mobile Extractor Agent prompt/logic.
 - Do not modify Flight Agent, Gateway, UI, or other agents.
 
-Issue:
-Flight invalid suggestions are mostly removed now, but sometimes `suggestedQuestions` is empty or fewer than 3.
+Current fixed behavior:
+- `suggestedQuestions` should always return exactly 3 questions.
+- Flight Agent suggestions should not ask agent to choose/provide:
+  - origin
+  - destination
+  - travel date/date range
 
-Requirement:
-- Always return exactly 3 suggested questions.
-- Never return empty array.
-- Never return fewer than 3.
-- If any suggestion is blocked/removed, replace it with a valid fallback.
-- Suggestions must be user-side questions/actions, shown under “You might ask”.
+New requirement:
+If `lastAgent` is Flight Agent, check if flight `searchKey` is available.
 
-Flight Agent rule:
-If `lastAgent` is Flight Agent, never suggest questions asking the agent to choose/provide:
-- origin
-- destination
-- travel date/date range
+If `searchKey` exists:
+- Flight results already exist.
+- Advanced flight/result suggestions are allowed.
 
-Blocked examples:
-- "Add origin city"
-- "Pick a destination"
-- "Suggest travel dates"
+Allowed with `searchKey`:
+- "Compare current flights"
+- "Show cheaper flights"
+- "Show fare differences"
+- "Which flight is best?"
+- "Apply non-stop filter"
+- "Show flights with checked baggage"
 
-Safe fallback examples:
+If `searchKey` does NOT exist:
+- Do not suggest anything that needs existing flight results/contracts.
+
+Blocked without `searchKey`:
+- "Compare current flights"
+- "Show fare differences"
+- "Which flight is best?"
+- "Show cheaper flights"
+- "Apply non-stop filter"
+- "Show checked baggage flights"
+- "Show morning departures"
+
+Safe fallback without `searchKey`:
 - "Change cabin to economy"
 - "Change trip type to round trip"
 - "Add 2 adults"
@@ -34,9 +47,10 @@ Safe fallback examples:
 - "Make it a one-way search"
 
 Acceptance:
-- Exactly 3 suggestions in every extractor output.
-- No blocked Flight Agent suggestions.
+- Always exactly 3 suggestions.
+- No origin/destination/date recommendation suggestions for Flight Agent.
+- No advanced filter/contract/result suggestions when `searchKey` is missing.
+- Advanced suggestions allowed only when `searchKey` exists.
 - No duplicates.
-- No empty/fewer-than-3 output.
 - Show before/after extractor outputs from 4–5 test turns.
 ```
