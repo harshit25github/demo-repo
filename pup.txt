@@ -1,111 +1,188 @@
 ````markdown
-Fix ONLY the Extractor Agent `suggestedQuestions` logic. Do not modify any other agent/code area.
+Fix Flight-specific `suggestedQuestions` issue in Summary Extractor Agent only.
 
-Strict scope:
-- Work only on Extractor Agent related files.
-- You may inspect other agents only to understand data flow.
-- Do NOT update Flight Agent prompt.
-- Do NOT update Trip Planner Agent.
-- Do NOT update Policy Agent.
-- Do NOT update Gateway routing logic.
-- Do NOT update React/UI/client code.
-- Do NOT refactor unrelated shared code.
-- Do NOT change source code outside Extractor Agent unless absolutely required, and if required, ask/mention first before changing.
+## Scope
 
-Problem:
-Extractor Agent generates `suggestedQuestions` shown under “You might ask”.
+Work only on the Summary Extractor Agent.
 
-Current issues:
-1. It suggests invalid Flight Agent questions like:
-   - "Add origin city"
-   - "Add departure city"
-   - "Pick a destination"
-   - "What travel dates?"
+Do not modify:
+- Flight Agent
+- Trip Planner Agent
+- Policy Agent
+- Page Specific Agent
+- Gateway routing
+- UI/client code
+- Any unrelated shared logic
 
-2. It sometimes suggests advanced flight filters before search exists:
-   - "Apply non-stop filter"
-   - "Show morning departures"
-   - "Compare current options"
+Other agents should keep existing behavior unchanged.
 
-3. After blocking bad suggestions, sometimes `suggestedQuestions` becomes empty.
+## Current workflow
 
-Required fix inside Extractor Agent only:
+1. User request comes to Gateway Agent.
+2. Gateway handles guardrails and routes/handoffs to one of these agents:
+   - Flight Agent
+   - Trip Planner Agent
+   - Policy Agent
+   - Page Specific Agent
+3. Agent responds through streaming.
+4. During/after streaming, we can identify the last triggered agent.
+5. After the main response is complete, Summary Extractor Agent runs.
+6. Extractor Agent receives:
+   - old summary context
+   - current user message
+   - current agent response
+7. Extractor Agent updates the summary object and generates:
+   - `suggestedQuestions: string[]`
 
-Input expected:
+These questions are shown in UI as “You might ask”.
+
+## Problem
+
+For Flight Agent, there is a strict rule:
+
+Flight Agent must never recommend or choose these 3 mandatory fields:
+- origin
+- destination
+- travel dates/date range
+
+These values must always come from the user.
+
+But Summary Extractor Agent sees missing context and generates bad suggestions like:
+- "Add a destination for me"
+- "Pick an origin for me"
+- "Suggest travel dates"
+- "What are the best travel dates?"
+- "Choose a destination"
+- "Where should I fly from?"
+
+This is wrong because it creates contradiction with Flight Agent behavior.
+
+## Required solution
+
+Pass one new field to Summary Extractor Agent:
+
+```ts
+lastAgent: string
+````
+
+Example extractor input:
+
 ```ts
 {
   oldSummaryContext,
   currentUserMessage,
   currentAgentResponse,
-  currentAgent,
-  searchKey
+  lastAgent
 }
-````
+```
 
-Rules:
+`lastAgent` should come from the actual agent triggered during streaming.
 
-If `currentAgent` is Flight Agent:
+## Dynamic instruction handling
 
-1. Never suggest questions where agent chooses/provides:
+Update Summary Extractor Agent instructions dynamically based on `lastAgent`.
+
+If `lastAgent` is Flight Agent, add a strict instruction:
+
+Never generate `suggestedQuestions` where the user asks the agent to choose/recommend/provide:
 
 * origin
 * destination
-* travel date/date range
+* travel dates/date range
 
-These values must come from the user only.
+Blocked Flight suggestions:
 
-2. If `searchKey` is missing:
-   Do not suggest advanced filters/result questions.
+* "Pick a destination for me"
+* "Suggest where I should fly"
+* "Choose my travel dates"
+* "Find me a destination"
+* "Suggest a departure city"
+* "What are the best travel dates?"
+* "Add origin for me"
+* "Add destination for me"
 
-Blocked without `searchKey`:
+Allowed style:
+Suggestions should still be genuine user-side actions, but not related to asking the agent to choose origin/destination/date.
 
-* "Apply non-stop filter"
-* "Show morning departures"
-* "Show checked baggage flights"
-* "Compare current options"
-* "Which flight is best?"
+Examples of safer suggestions:
 
-3. `suggestedQuestions` should never be empty.
-   If sanitizer removes all suggestions, add safe fallback suggestions like:
-
-* "Update cabin to economy"
-* "Update cabin to premium economy"
+* "Change cabin to economy"
 * "Change trip type to round trip"
 * "Add 2 adults"
-* "Change passenger count"
+* "Update passenger count"
+* "Use premium economy"
+* "Make it a one-way search"
 
-Implementation:
+Important:
 
-* Update Extractor Agent prompt/logic.
-* Add deterministic sanitizer inside Extractor Agent flow.
-* Remove duplicate/stale suggestions.
-* Add fallback suggestions if final array becomes empty.
-* Keep output as `suggestedQuestions: string[]`.
+* Do not force suggestions if they do not fit.
+* Keep them natural and relevant to the latest user message and agent response.
+* Do not reuse stale suggestions from old summary context.
+* Do not ask questions that look like the agent is asking the user.
+* Suggestions must look like something the user would ask the agent.
 
-Testing rule:
-Do not trigger full flight search while testing.
-Do not provide all 3 together:
+## Expected behavior
 
-* origin
-* destination
-* travel date
+If `lastAgent` is Flight Agent:
 
-Use partial-context tests only:
+* No origin recommendation suggestions
+* No destination recommendation suggestions
+* No travel date recommendation suggestions
+* Suggestions should remain relevant and genuine
 
-* origin only
-* destination only
-* date only
-* origin + date
-* destination + date
-* origin + destination
+If `lastAgent` is not Flight Agent:
 
-Deliverable:
+* Existing extractor behavior should remain unchanged.
 
-* Fix only Extractor Agent logic.
-* Show files changed.
-* Confirm no other agent/UI/source area was modified.
-* Add tests for invalid suggestions, advanced suggestions without `searchKey`, duplicate suggestions, and empty suggestions.
-* Provide root cause and final test results.
+## Add protection
+
+Prompt-only may not be enough, so add a small deterministic sanitizer inside Summary Extractor Agent output flow.
+
+For Flight Agent only:
+
+* Remove any suggested question related to choosing/recommending origin.
+* Remove any suggested question related to choosing/recommending destination.
+* Remove any suggested question related to choosing/recommending travel dates.
+* Remove duplicates/stale suggestions.
+
+## Tests
+
+Add tests for:
+
+1. `lastAgent = Flight Agent`
+
+   * Output must not contain origin/destination/travel-date suggestions.
+
+2. `lastAgent = Flight Agent`, missing destination in summary
+
+   * Still must not suggest “pick/suggest/add destination”.
+
+3. `lastAgent = Flight Agent`, missing origin in summary
+
+   * Still must not suggest “pick/suggest/add origin”.
+
+4. `lastAgent = Flight Agent`, missing date in summary
+
+   * Still must not suggest “pick/suggest/add travel date”.
+
+5. `lastAgent = Trip Planner / Policy / Page Specific`
+
+   * Existing behavior should not break.
+
+## Deliverable
+
+* Pass `lastAgent` to Summary Extractor Agent.
+* Add dynamic instructions based on `lastAgent`.
+* Add Flight-specific sanitizer for `suggestedQuestions`.
+* Keep changes limited to Summary Extractor Agent flow.
+* Add tests.
+* Share a short report:
+
+  * files changed
+  * how `lastAgent` is passed
+  * root cause
+  * before/after examples
+  * test results
 
 ```
 ```
