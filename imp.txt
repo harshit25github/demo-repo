@@ -1,34 +1,138 @@
-
-```markdown
-Fix Policy Agent source URL/citation handling.
+````markdown
+Fix `validate_trip_date` tool loop in Trip Planner.
 
 Problem:
-Policy Agent uses a retrieval tool to fetch policy/airline-related chunks. Sometimes the response cites content like `[1]` or `URL 1`, but the actual URL is missing in the final answer.
+Trip Planner is going into a repeated tool-call loop.
 
-Expected behavior:
-- If Policy Agent cites a source, it must include the actual URL from the retrieved chunk metadata.
-- Never output placeholder text like:
-  - `URL 1`
-  - `Source 1`
-  - `[1]` without the real URL
-- If retrieved chunk has no URL, do not create a fake/placeholder URL.
-- If multiple chunks are used, map each citation correctly to its source URL.
-- Final answer should include clear source references only when valid URLs exist.
+Example:
+User asks: “Malaysia in September”
 
-Please update:
-- Policy Agent prompt/instructions
-- Citation/source formatting logic, if needed
-- Retrieval chunk parsing if URL metadata is not being passed correctly
+Current bad flow:
+- Trip Planner calls `validate_trip_date`
+- Tool input has `candidateDate: "/"` and `eventKeyword: "September Malaysia"`
+- Tool returns invalid date error
+- Model gets confused and calls the same tool again with same/bad input
+- Turns get burned and we hit `MaxTurnsExceededError`
 
-Test cases:
-1. Retrieved chunk has URL → final response includes actual URL.
-2. Multiple chunks have URLs → citations map correctly.
-3. Retrieved chunk has no URL → no placeholder URL is shown.
-4. Agent should never output `URL 1` without real URL.
+Root cause:
+`validate_trip_date` is treating placeholder values like `/` as real dates and returning confusing text errors. The agent does not know whether to retry, ask user, or continue.
 
-Deliverable:
-- Fix the issue.
-- Add tests.
-- Share root cause and before/after examples.
+## Required fix
+
+### 1. Sanitize date inputs
+Inside `validate_trip_date`, treat these as invalid/empty:
+- `/`
+- `-`
+- `""`
+- `N/A`
+- `NA`
+- `null`
+- `undefined`
+
+So `candidateDate: "/"` should become `undefined`.
+
+### 2. Handle month-only input
+For input like:
+```json
+{
+  "candidateDate": "/",
+  "eventKeyword": "September Malaysia",
+  "userProvidedYear": false
+}
+````
+
+Do not return invalid calendar date.
+
+Extract month intent:
+
+* date/month = September
+* destination keyword = Malaysia
+
+If today is July 2026, infer September 2026 and return a month range:
+
+```json
+{
+  "status": "valid_month_range",
+  "dateType": "month",
+  "startDate": "2026-09-01",
+  "endDate": "2026-09-30",
+  "messageForAgent": "Month-level date is valid. Do not call validate_trip_date again. Continue planning using this month range."
+}
 ```
 
+### 3. Return structured tool output
+
+Stop returning confusing plain text like:
+“Invalid date / does not exist on calendar.”
+
+Return clear statuses:
+
+* `valid_exact_date`
+* `valid_month_range`
+* `needs_clarification`
+* `blocked_repeat_call`
+
+Every non-success output must include:
+
+```json
+{
+  "messageForAgent": "Do not retry validate_trip_date with same input. Ask user for exact dates or continue general planning."
+}
+```
+
+### 4. Add repeat-call protection
+
+Add a fingerprint check inside `validate_trip_date`.
+
+If the same invalid/ambiguous input is repeated, return:
+
+```json
+{
+  "status": "blocked_repeat_call",
+  "action": "stop_calling_validate_trip_date",
+  "messageForAgent": "Repeated validate_trip_date call detected. Do not call this tool again. Ask user for exact dates or continue general planning."
+}
+```
+
+### 5. Update Trip Planner prompt
+
+Add rules:
+
+* Never pass `/`, `-`, empty string, or placeholders as `candidateDate`.
+* If user provides only a month like “September”, do not call tool with placeholder date.
+* Infer nearest future valid month if within booking window.
+* If `validate_trip_date` returns `needs_clarification` or `blocked_repeat_call`, do not call it again with same input.
+* After one failed/ambiguous validation, ask user for exact dates or continue month-level planning.
+
+### 6. Keep `maxTurns` only as safety
+
+Increasing `maxTurns` is okay, but it is not the root fix. The loop must be stopped at tool/prompt level.
+
+### 7. Add logs/tests
+
+Log:
+
+* raw input
+* sanitized input
+* parsed month
+* tool output status
+* repeat-call fingerprint
+
+Test cases:
+
+1. “Malaysia in September” → should return `valid_month_range`, no loop.
+2. `candidateDate: "/"` → sanitized to `undefined`.
+3. Repeated same invalid input → returns `blocked_repeat_call`.
+4. Exact valid date → returns `valid_exact_date`.
+5. Missing/unclear date → returns `needs_clarification`, no retry loop.
+
+Deliverable:
+
+* Fix `validate_trip_date`.
+* Update Trip Planner prompt.
+* Add repeat-call protection.
+* Add tests.
+* Provide before/after trace showing loop is resolved.
+
+```
+```
