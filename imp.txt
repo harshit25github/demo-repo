@@ -1,44 +1,8 @@
-```markdown
-Fix Gateway routing for Super Saver Fare / Saver Airline queries.
+Treat "Super Saver Fare", "Super Saver", "Saver Fare", "Saver Airline" as flight fare/filter terms, not CheapoAir page intent.
 
-Issue:
-Gateway is incorrectly routing queries like:
-- "Super Saver Fare airline"
-- "Super Saver airline"
-- "Book Super Saver Fare"
-- "Show Saver Airline only"
-
-These are being redirected to CheapoAir page-related agent/flow, but they should go to Flight Agent.
-
-Expected behavior:
-Any query where user is asking for a flight airline/fare/filter like:
-- Super Saver Fare
-- Saver Airline
-- Super Saver airline
-- airline-only filter
-- fare/airline selection
-
-must route to Flight Agent.
-
-Reason:
-`Super Saver Fare` is part of flight filter/airline/fare context, not a page navigation intent.
-
-Update Gateway prompt/routing:
-- Preserve “Super Saver Fare” / “Saver Airline” as flight fare/filter intent.
-- Do not treat it as CheapoAir page intent.
-- Do not route it to Page Specific Agent.
-- Airline/fare/filter intent should always take priority and route to Flight Agent.
-
-Test cases:
-1. “Show Super Saver Fare flights” → Flight Agent
-2. “Apply Super Saver airline only” → Flight Agent
-3. “Book Super Saver Fare” → Flight Agent
-4. “Show Saver Airline only” → Flight Agent
-5. “Filter by Super Saver Fare” → Flight Agent
-
-Deliverable:
-- Recreate the wrong routing.
-- Fix Gateway routing prompt/rules.
-- Add tests.
-- Share before/after routing results.
-```
+These queries must route to Flight Agent:
+- "show Super Saver Fare flights"
+- "apply Super Saver airline"
+- "book Super Saver Fare"
+- "filter by Saver Airline"
+- "show only Super Saver"
