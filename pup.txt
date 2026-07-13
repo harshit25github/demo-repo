@@ -1,97 +1,95 @@
-````markdown
-Add focused logging for Flight Agent request → context mapper → dynamic prompt flow.
+```markdown
+Debug stale search context and round-trip contract formatting issues in Flight Agent.
 
-Problem:
-There may be a mismatch between the incoming `/chat` payload, `searchCriteria`, mapper output, and the dynamic context finally passed to the Flight Agent prompt.
+Goal:
+Please inspect the codebase and identify if stale flight data/search context can be used anywhere, especially around `searchKey`, `searchCriteria`, apply-filter flow, and round-trip contract formatting.
 
-We need focused debug logs to trace only important Flight Agent fields, not full huge payloads.
+Do not blindly fix first. First debug, trace, and report the possible root cause.
 
-## Flow to log
+## Issue 1: Possible stale `searchKey` / stale search context
 
-### 1. Incoming request payload
-Log only flight-relevant fields from request/searchCriteria:
+Current expected priority:
 
-- from/origin
-- to/destination
-- where/location if used
-- tripType
-- cabinClass
-- passengers
-- dates
-- service
-- UID
-- searchKey
-- CLTV/CNT if available
-- filters if available
+1. If incoming request payload has `searchCriteria.searchKey`, use that first.
+2. If incoming request does not have `searchKey`, then use DB-saved search criteria/context.
+3. Never let old/random/stale DB searchKey override a fresh request payload searchKey.
 
-### 2. SearchCriteria extraction
-Log what exactly is extracted from `searchCriteria` before mapper runs.
+Please verify:
+- Is incoming `searchCriteria.searchKey` always given highest priority?
+- Is DB searchKey used only as fallback?
+- Is there any mapper/helper where old searchKey can overwrite the latest one?
+- Is any stale field flowing from DB into current flight context?
+- Check not only `searchKey`, but also:
+  - UID
+  - service
+  - origin/from
+  - destination/to
+  - tripType
+  - departure date
+  - return date
+  - cabin
+  - passengers
+  - filters
+  - CLTV/CNT
+  - redirectUrl
 
-### 3. Mapper output
-Log what mapper updates into Flight context from `searchCriteria`.
+## Issue 2: Apply filter + round-trip contract formatting
 
-Compare:
-- before mapper context
-- incoming searchCriteria values
-- after mapper context
+There may be an issue when `apply_filter` returns contracts and we format them inside the apply-filter service.
 
-Only log selected keys, not full objects.
+Please verify especially for round-trip:
+- Are outbound segments formatted correctly?
+- Are inbound/return segments formatted correctly?
+- Are return segments missing or mapped incorrectly?
+- Is round-trip raw API response being transformed correctly into final contracts?
+- Is apply-filter using the correct latest searchKey/searchCriteria?
+- Is there any stale context used while formatting contracts?
 
-### 4. Final Flight Agent context
-Before triggering Flight Agent, log the final flight context used by the agent.
+Example scenario to test:
+1. User creates search from listing page:
+   - DEL → RST
+   - round trip
+   - return: RST → DEL on different date
+2. User enters chat and says:
+   - “Apply morning filter”
+3. Expected:
+   - Use incoming searchKey from request payload.
+   - Apply filter on that latest searchKey.
+   - Format contracts with both outbound and inbound segments correctly.
 
-### 5. Dynamic prompt/instruction context
-Inside the instruction function where dynamic context is injected into Flight Agent prompt, log the final compact context being passed.
+## Required debugging
 
-## Logging requirements
+Add focused logs if needed, but keep logs compact.
 
-Create a clean debug log group with a request/correlation id.
+Log these checkpoints:
+1. Incoming request `searchCriteria`
+2. SearchKey selected and why:
+   - from request payload
+   - or fallback from DB
+3. Flight context before mapper
+4. Flight context after mapper
+5. Final context passed to Flight Agent
+6. Apply-filter request payload
+7. Apply-filter raw API response summary
+8. Formatted contract summary:
+   - contracts count
+   - outbound segments count
+   - inbound segments count
+   - tripType
+   - searchKey used
 
-Example:
-
-```ts
-[FlightDebug][requestId] Incoming searchCriteria
-[FlightDebug][requestId] Extracted flight fields
-[FlightDebug][requestId] Mapper before/after
-[FlightDebug][requestId] Final flight context
-[FlightDebug][requestId] Dynamic prompt context
-````
-
-Do not log:
-
-* full API responses
-* full flight contracts
-* huge filter arrays
-* sensitive user data
-* complete prompts if too large
-
-Instead, log summaries/counts:
-
-* contractsCount
-* filtersCount
-* airlineCodesCount
-* layoverLocationsCount
-* hasSearchKey
-* hasUID
-
-## Goal
-
-After logs, we should be able to verify:
-
-1. What values came in request.
-2. What values came from `searchCriteria`.
-3. What mapper changed.
-4. What Flight Agent actually received.
-5. What dynamic prompt context contained.
-6. Whether fields like service, dates, passenger, cabin, from/to, UID, searchKey are lost or overwritten.
+Do not log full huge contracts unless needed. Log summaries and important keys only.
 
 ## Deliverable
 
-* Add focused debug logging for the above flow.
-* Keep logs readable and compact.
-* Add requestId/correlationId to connect all logs.
-* Share sample log output for one Flight Agent request.
-* Mention if any mismatch is found.
+Please provide a report with:
 
-```
+1. Is stale searchKey possible? If yes, where?
+2. Can any other stale field flow into Flight Agent context?
+3. Is request payload searchKey always prioritized over DB searchKey?
+4. Is round-trip contract formatting correct?
+5. Are outbound/inbound segments mapped correctly after apply-filter?
+6. Root cause if issue found.
+7. Suggested fix with exact files/functions.
+8. Before/after logs or payload examples.
 ```
