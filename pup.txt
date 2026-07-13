@@ -1,170 +1,32 @@
-import { Agent, setDefaultOpenAIKey } from '@openai/agents';
-import { assertOpenAIConfig, flightAgentConfig } from './config.js';
-import { FLIGHT_PROMPT } from './instructions.js';
-import { flightTools } from './tools/index.js';
+```markdown
+Update listing page API domains from `www.cheapo.com` to `m.cheapo.com`.
 
-assertOpenAIConfig();
-setDefaultOpenAIKey(flightAgentConfig.openaiApiKey);
+Scope:
+- Check the shared listing page files.
+- Check listing API integrations.
+- Check related tools/helpers where hardcoded listing URLs are used.
 
-function buildActiveSearchSummary(context) {
-  const lastSearch = context?.lastSearch;
-  if (!lastSearch) {
-    return 'none';
-  }
+Required change:
+- Replace all listing-related API/domain usage from:
+  - `www.cheapo.com`
+- To:
+  - `m.cheapo.com`
 
-  return JSON.stringify({
-    onds: lastSearch.onds,
-    trip_type: lastSearch.trip_type,
-    passengers: lastSearch.passengers,
-    cabin_class: lastSearch.cabin_class,
-  });
-}
+Important:
+- Update only listing page / listing API related URLs.
+- Do not change unrelated domains or non-listing APIs.
+- Avoid hardcoding if there is already a config/env-based domain setup.
+- Prefer using a shared config constant if possible.
 
-const MAX_FILTER_OPTIONS_PER_GROUP = 12;
+Please verify:
+- listing API calls use the new mobile domain
+- tool URLs use the new mobile domain
+- no old `www.cheapo.com` listing URL remains
+- existing API paths/query params remain unchanged
 
-function getAvailableOptions(options = []) {
-  const list = Array.isArray(options) ? options : [];
-  return list.filter((option) => option);
-}
-
-function compactText(value) {
-  return String(value || '')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function formatFilterOption(option) {
-  const code = compactText(option.Code);
-  const label = compactText(option.Text || option.Name || option.AirportCityName);
-
-  if (!code && !label) {
-    return null;
-  }
-
-  if (!code || !label || code.toLowerCase() === label.toLowerCase()) {
-    return code || label;
-  }
-
-  return `${code}=${label}`;
-}
-
-function formatOptionList(options) {
-  const values = getAvailableOptions(options).map(formatFilterOption).filter(Boolean);
-
-  if (values.length === 0) {
-    return 'none';
-  }
-
-  const visibleValues = values.slice(0, MAX_FILTER_OPTIONS_PER_GROUP);
-  const hiddenCount = values.length - visibleValues.length;
-  return `${visibleValues.join('; ')}${hiddenCount > 0 ? `; +${hiddenCount} more` : ''}`;
-}
-
-function formatAirportOptionList(options) {
-  const availableOptions = getAvailableOptions(options);
-  const mainOptions = availableOptions.filter((option) => !option.IsNearby);
-  const nearbyOptions = availableOptions.filter((option) => option.IsNearby);
-  const parts = [];
-
-  if (mainOptions.length > 0) {
-    parts.push(`main ${formatOptionList(mainOptions)}`);
-  }
-
-  if (nearbyOptions.length > 0) {
-    parts.push(`nearby ${formatOptionList(nearbyOptions)}`);
-  }
-
-  return parts.length > 0 ? parts.join(' | ') : 'none';
-}
-
-function buildActiveFilterOptionsSummary(context) {
-  const airlineOptions = context?.airlineFilterOptions || context?.airlineFilters;
-  const layoverAirportOptions =
-    context?.layoverAirportFilterOptions || context?.layoverAirportFilters;
-  const departureAirportOptions =
-    context?.DepartAirports ||
-    context?.departureAirportFilterOptions ||
-    context?.departureAirportFilters;
-  const arrivalAirportOptions =
-    context?.DepLandAirports ||
-    context?.arrivalAirportFilterOptions ||
-    context?.arrivalAirportFilters;
-
-  return [
-    `airlines: ${formatOptionList(airlineOptions)}`,
-    `layoverAirports: ${formatOptionList(layoverAirportOptions)}`,
-    `departureAirports: ${formatAirportOptionList(departureAirportOptions)}`,
-    `arrivalAirports: ${formatAirportOptionList(arrivalAirportOptions)}`,
-  ].join('\n');
-}
-
-function buildPreviousSuggestedQuestionsSummary(context) {
-  const suggestions = context?.flight?.suggestedQuestions;
-  if (!Array.isArray(suggestions) || suggestions.length === 0) {
-    return 'none';
-  }
-
-  return suggestions
-    .map((suggestion, index) => `${index + 1}. ${compactText(suggestion)}`)
-    .join('\n');
-}
-
-export function buildFlightAgentInstructions(runContext) {
-  const context = runContext?.context || {};
-  const hasActiveSearch = Boolean(context.searchKey || context.sid);
-  const hasCurrentResults = Boolean(
-    context.filteredFlightResults?.length ||
-      context.flightResults?.length ||
-      context.generatedContracts?.length ||
-      context.contracts?.length,
-  );
-  return `${FLIGHT_PROMPT}
-
-Current search state:
-- UID is available in context.
-- Active search exists: ${hasActiveSearch ? 'yes' : 'no'}.
-- Current flight result records available in shared context: ${hasCurrentResults ? 'yes' : 'no'}.
-- Existing search parameters: ${buildActiveSearchSummary(context)}
-- Active filter source options: ${buildActiveFilterOptionsSummary(context)}
-- Previous suggested questions stored in context.flight.suggestedQuestions:
-${buildPreviousSuggestedQuestionsSummary(context)}
-- For a partial core-search change, reuse every unchanged existing search parameter above.
-- Do not ask again for origin, destination, dates, trip type, passengers, or cabin when already available above.
-- Include "Note: Prices shown are per person." only when flight_search ran in the current turn and successful new or updated cards/options are shown.
-- If the current turn called only apply_filter, never include or repeat that note, even if the previous assistant response contained it.
-- Do not include the note for validation/errors, missing-search questions, or search+filter turns with no options to show.
-- If a core-search change and supported filter are requested in the same message, call flight_search first and then apply_filter; do not merely describe the filter as highlighted.
-- For cheapest/best/compare/shortest-duration/current-option reasoning, call getGeneratedContractsContext even when cards are not shown in chat history.
-- For each new cheapest/best/compare/shortest-duration/current-option user turn, call getGeneratedContractsContext again; do not answer from the previous turn's contract summary.
-- If the user asks what airline, layover-airport, departure-airport, arrival-airport, alternate, or nearby options are available, answer from Active filter source options without calling tools.
-- If the user asks to use, apply, select, keep, or show one of those options, call apply_filter using the active searchKey.
-- If the user asks to apply/select/use/enable all departure airports, include a new apply_filter item with filterType="departureAirport", departureAirportNames=["all departure airports"], and rawUserFilter copied from the user.
-- If the user asks to apply/select/use/enable all arrival airports, include a new apply_filter item with filterType="arrivalAirport", arrivalAirportNames=["all arrival airports"], and rawUserFilter copied from the user.
-- If the user asks to apply/select/use/enable all airport options, all nearby airports, all alternate airports, or all these airports without a departure/arrival scope, include two apply_filter items: one departureAirport item and one arrivalAirport item using the user's wording in the matching names field.
-- If the user asks to use nearby/alternate arrival airports, include a new apply_filter item with filterType="arrivalAirport", arrivalAirportNames=["nearby arrival airports"], and rawUserFilter copied from the user.
-- If the user asks to use nearby/alternate departure airports, include a new apply_filter item with filterType="departureAirport", departureAirportNames=["nearby departure airports"], and rawUserFilter copied from the user.
-- Exact "change destination to X" always starts a new flight_search with X as destination; do not reinterpret it as an airport filter.
-- If the user previously gave a destination and then says "actually make it X", "make that X", or "change it to X" with a place name and no origin/from/departure wording, treat X as the updated destination. If origin/date are still missing, do not search yet; acknowledge the destination change and ask only for missing mandatory fields.
-- Exact "change departure to X only" with an active search means filter current results by departureAirport; call apply_filter.
-- Exact "change departure to X" is ambiguous unless the user says airport/only/depart from/from/origin/city; ask one clarification and do not call tools.
-- Vague "make it faster/cheaper/better" commands are clarifications, not tool calls. Ask exactly one question, e.g. "Do you want me to filter by a max duration, or recommend the fastest current option?"
-- Before your final text response, generate exactly 3 short user-side suggested questions and call update_flight_suggested_questions as the final tool call for this turn. This tool only stores your provided suggestions in context.flight.suggestedQuestions; never mention its output to the user.
-- Before calling update_flight_suggested_questions, compare your new suggestions against Previous suggested questions above. Do not send the same 3 suggestions again. Prefer 3 new suggestions; if context is truly unchanged, at most 1 exact suggestion may repeat.
-- Hard anti-stale rule: a tool call with the exact same suggestedQuestions array as Previous suggested questions is invalid. If your draft suggestions match all 3 previous strings, replace at least one suggestion before calling the tool.
-- Vary by intent, not just wording. For example, rotate between missing-detail completion, cabin, passenger, trip type, filters, and current-result reasoning depending on current search state.
-- Suggestions must reflect the latest user message and known context. If the user changes destination/origin/date/cabin/passengers, adapt suggestions to that new state.
-- Mandatory-field loop guard: never suggest actions that ask to add, provide, choose, or change origin, departure city, destination, arrival city, travel date, return date, or date range. Block examples: "Add departure city", "Add destination", "Add travel date", "Add return date", "Pick a destination", "Suggest travel dates", "Where should I fly from?".
-- If Active search exists is "no", suggestions may only be safe optional setup actions from this set or close equivalents: "Change cabin to economy", "Use premium economy", "Change cabin to business", "Make it round trip", "Make it one-way", "Add 2 adults", "Update passenger count". Do not suggest filters, comparisons, cheapest/best, fare differences, or mandatory-field actions without searchKey.
-- No-search variation rule: rotate among safe optional setup intents. Keep at most 2 exact repeats and replace the remaining slot with a different safe optional action when that action was not just requested.
-- Do not suggest the exact action the user just completed. If the user just added 2 adults, do not suggest "Add 2 adults"; if the user just made it round trip, do not suggest "Make it round trip".
-- If the user changes destination or origin while searchKey is missing, force at least one new safe optional suggestion compared with Previous suggested questions. Example: if previous was ["Change cabin to economy","Add 2 adults","Make it round trip"], use ["Use premium economy","Update passenger count","Make it one-way"] or another varied safe setup set.
-`;
-}
-
-export const FlightAgent = new Agent({
-  name: 'FlightAgent',
-  instructions: buildFlightAgentInstructions,
-  model: flightAgentConfig.model,
-  modelSettings: flightAgentConfig.modelSettings,
-  tools: flightTools,
-});
+Deliverable:
+- Update the domain.
+- Share files changed.
+- Confirm old vs new URL examples.
+- Run basic tests to ensure listing APIs still work.
+```
