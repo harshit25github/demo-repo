@@ -1,32 +1,97 @@
-```markdown
-Update listing page API domains from `www.cheapo.com` to `m.cheapo.com`.
+````markdown
+Add focused logging for Flight Agent request → context mapper → dynamic prompt flow.
 
-Scope:
-- Check the shared listing page files.
-- Check listing API integrations.
-- Check related tools/helpers where hardcoded listing URLs are used.
+Problem:
+There may be a mismatch between the incoming `/chat` payload, `searchCriteria`, mapper output, and the dynamic context finally passed to the Flight Agent prompt.
 
-Required change:
-- Replace all listing-related API/domain usage from:
-  - `www.cheapo.com`
-- To:
-  - `m.cheapo.com`
+We need focused debug logs to trace only important Flight Agent fields, not full huge payloads.
 
-Important:
-- Update only listing page / listing API related URLs.
-- Do not change unrelated domains or non-listing APIs.
-- Avoid hardcoding if there is already a config/env-based domain setup.
-- Prefer using a shared config constant if possible.
+## Flow to log
 
-Please verify:
-- listing API calls use the new mobile domain
-- tool URLs use the new mobile domain
-- no old `www.cheapo.com` listing URL remains
-- existing API paths/query params remain unchanged
+### 1. Incoming request payload
+Log only flight-relevant fields from request/searchCriteria:
 
-Deliverable:
-- Update the domain.
-- Share files changed.
-- Confirm old vs new URL examples.
-- Run basic tests to ensure listing APIs still work.
+- from/origin
+- to/destination
+- where/location if used
+- tripType
+- cabinClass
+- passengers
+- dates
+- service
+- UID
+- searchKey
+- CLTV/CNT if available
+- filters if available
+
+### 2. SearchCriteria extraction
+Log what exactly is extracted from `searchCriteria` before mapper runs.
+
+### 3. Mapper output
+Log what mapper updates into Flight context from `searchCriteria`.
+
+Compare:
+- before mapper context
+- incoming searchCriteria values
+- after mapper context
+
+Only log selected keys, not full objects.
+
+### 4. Final Flight Agent context
+Before triggering Flight Agent, log the final flight context used by the agent.
+
+### 5. Dynamic prompt/instruction context
+Inside the instruction function where dynamic context is injected into Flight Agent prompt, log the final compact context being passed.
+
+## Logging requirements
+
+Create a clean debug log group with a request/correlation id.
+
+Example:
+
+```ts
+[FlightDebug][requestId] Incoming searchCriteria
+[FlightDebug][requestId] Extracted flight fields
+[FlightDebug][requestId] Mapper before/after
+[FlightDebug][requestId] Final flight context
+[FlightDebug][requestId] Dynamic prompt context
+````
+
+Do not log:
+
+* full API responses
+* full flight contracts
+* huge filter arrays
+* sensitive user data
+* complete prompts if too large
+
+Instead, log summaries/counts:
+
+* contractsCount
+* filtersCount
+* airlineCodesCount
+* layoverLocationsCount
+* hasSearchKey
+* hasUID
+
+## Goal
+
+After logs, we should be able to verify:
+
+1. What values came in request.
+2. What values came from `searchCriteria`.
+3. What mapper changed.
+4. What Flight Agent actually received.
+5. What dynamic prompt context contained.
+6. Whether fields like service, dates, passenger, cabin, from/to, UID, searchKey are lost or overwritten.
+
+## Deliverable
+
+* Add focused debug logging for the above flow.
+* Keep logs readable and compact.
+* Add requestId/correlationId to connect all logs.
+* Share sample log output for one Flight Agent request.
+* Mention if any mismatch is found.
+
+```
 ```
