@@ -1,95 +1,47 @@
-```markdown
-Debug stale search context and round-trip contract formatting issues in Flight Agent.
+Update listing API domain and Digital API platform/user-agent config.
 
-Goal:
-Please inspect the codebase and identify if stale flight data/search context can be used anywhere, especially around `searchKey`, `searchCriteria`, apply-filter flow, and round-trip contract formatting.
+Scope:
 
-Do not blindly fix first. First debug, trace, and report the possible root cause.
+* Check listing page related files.
+* Check listing API/service files.
+* Check tools/helpers where listing URLs are used.
+* Do not change unrelated APIs.
 
-## Issue 1: Possible stale `searchKey` / stale search context
+Required changes:
 
-Current expected priority:
+1. Domain update
+   Some previous changes were reverted. Please update listing-related URLs again:
 
-1. If incoming request payload has `searchCriteria.searchKey`, use that first.
-2. If incoming request does not have `searchKey`, then use DB-saved search criteria/context.
-3. Never let old/random/stale DB searchKey override a fresh request payload searchKey.
+From:
+`www.gcode.com`
 
-Please verify:
-- Is incoming `searchCriteria.searchKey` always given highest priority?
-- Is DB searchKey used only as fallback?
-- Is there any mapper/helper where old searchKey can overwrite the latest one?
-- Is any stale field flowing from DB into current flight context?
-- Check not only `searchKey`, but also:
-  - UID
-  - service
-  - origin/from
-  - destination/to
-  - tripType
-  - departure date
-  - return date
-  - cabin
-  - passengers
-  - filters
-  - CLTV/CNT
-  - redirectUrl
+To:
+`m.gcode.com`
 
-## Issue 2: Apply filter + round-trip contract formatting
+Verify no listing-related `www.cheapoair.com` URL remains.
 
-There may be an issue when `apply_filter` returns contracts and we format them inside the apply-filter service.
+2. Digital API platform/user-agent update
+   In the Digital API service where we pass platform/user-agent details, update the values as per below:
 
-Please verify especially for round-trip:
-- Are outbound segments formatted correctly?
-- Are inbound/return segments formatted correctly?
-- Are return segments missing or mapped incorrectly?
-- Is round-trip raw API response being transformed correctly into final contracts?
-- Is apply-filter using the correct latest searchKey/searchCriteria?
-- Is there any stale context used while formatting contracts?
+```ts
+platform: "[ADD_PLATFORM_HERE]" // expected: iOS
+userAgent: "[ADD_USER_AGENT_HERE]"
+```
 
-Example scenario to test:
-1. User creates search from listing page:
-   - DEL → RST
-   - round trip
-   - return: RST → DEL on different date
-2. User enters chat and says:
-   - “Apply morning filter”
-3. Expected:
-   - Use incoming searchKey from request payload.
-   - Apply filter on that latest searchKey.
-   - Format contracts with both outbound and inbound segments correctly.
+I will provide the exact `platform` and `userAgent` values.
 
-## Required debugging
+Important:
 
-Add focused logs if needed, but keep logs compact.
+* Keep existing API paths and query params unchanged.
+* Only update domain/platform/user-agent where listing/Digital API flow requires it.
+* Prefer config/constants if available instead of hardcoding in multiple places.
 
-Log these checkpoints:
-1. Incoming request `searchCriteria`
-2. SearchKey selected and why:
-   - from request payload
-   - or fallback from DB
-3. Flight context before mapper
-4. Flight context after mapper
-5. Final context passed to Flight Agent
-6. Apply-filter request payload
-7. Apply-filter raw API response summary
-8. Formatted contract summary:
-   - contracts count
-   - outbound segments count
-   - inbound segments count
-   - tripType
-   - searchKey used
+Deliverable:
 
-Do not log full huge contracts unless needed. Log summaries and important keys only.
+* Update required files.
+* Share files changed.
+* Share old vs new URL/config examples.
+* Confirm listing/Digital API flow is using `m.gcode.com` and new platform/user-agent.
 
-## Deliverable
-
-Please provide a report with:
-
-1. Is stale searchKey possible? If yes, where?
-2. Can any other stale field flow into Flight Agent context?
-3. Is request payload searchKey always prioritized over DB searchKey?
-4. Is round-trip contract formatting correct?
-5. Are outbound/inbound segments mapped correctly after apply-filter?
-6. Root cause if issue found.
-7. Suggested fix with exact files/functions.
-8. Before/after logs or payload examples.
+```
 ```
