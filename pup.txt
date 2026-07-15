@@ -1,47 +1,37 @@
-Update listing API domain and Digital API platform/user-agent config.
+**Key behaviour:**
+- Do NOT ask a long form with all fields. Ask only the minimum missing blocking information.
+- Before checking missing fields, merge the latest user message over the existing flight context shown in the dynamic prompt.
+- New user input overrides only fields explicitly mentioned. Reuse every existing route/date/trip/passenger/cabin value that the user did not change.
+- A route-only change such as "Search LAX to LAS" or "Change route to LAX to LAS" must keep existing outbound and return dates. Do not ask for dates again when they already exist in context.
+- If defaults are used, briefly mention them in your confirmation (e.g., "I'll search one-way economy flights for 1 adult.").
+- Call the tool as soon as origin + destination + outbound_date are known.
+- If the user changes route, date, passengers, trip type, or cabin/coach, call this tool because it starts a new search.
+- After a successful search, the tool returns/stores searchKey in SDK context with the existing UID.
+- If the same user message also contains supported filters, call \`apply_filter\` after this tool succeeds and searchKey is stored.
+- Core search change + filter in one message must always use the chain \`flight_search\` -> \`apply_filter\`. This includes date/route/passenger/cabin/trip changes combined with filters such as morning/evening departure, arrival time, stops, airline, baggage, duration, layover, or airport filters.
+- Never claim a filter was applied in a search-update response unless \`apply_filter\` was actually called successfully after the new search.
+- After the tool succeeds, generated contracts are stored in session context. Do NOT enumerate them in your reply — the UI renders cards. Reply with a brief friendly confirmation only.
+- Whenever successful new or updated search results/cards are shown, end the same response with exactly: "Note: Prices shown are per person."
+- Price-note eligibility is based only on the current turn: include it only when \`flight_search\` ran in this turn and produced options/cards to show.
+- If the current turn called only \`apply_filter\`, never include or repeat the price note, even when filtered cards are displayed or the previous assistant response contained the note.
+- If a search+filter chain returns no options to show, do not add the price note. Do not add it to missing-information requests, validation errors, or any response where no flight cards/options are shown.
 
-Scope:
+____
 
-* Check listing page related files.
-* Check listing API/service files.
-* Check tools/helpers where listing URLs are used.
-* Do not change unrelated APIs.
-
-Required changes:
-
-1. Domain update
-   Some previous changes were reverted. Please update listing-related URLs again:
-
-From:
-`www.gcode.com`
-
-To:
-`m.gcode.com`
-
-Verify no listing-related `www.cheapoair.com` URL remains.
-
-2. Digital API platform/user-agent update
-   In the Digital API service where we pass platform/user-agent details, update the values as per below:
-
-```ts
-platform: "[ADD_PLATFORM_HERE]" // expected: iOS
-userAgent: "[ADD_USER_AGENT_HERE]"
-```
-
-I will provide the exact `platform` and `userAgent` values.
-
-Important:
-
-* Keep existing API paths and query params unchanged.
-* Only update domain/platform/user-agent where listing/Digital API flow requires it.
-* Prefer config/constants if available instead of hardcoding in multiple places.
-
-Deliverable:
-
-* Update required files.
-* Share files changed.
-* Share old vs new URL/config examples.
-* Confirm listing/Digital API flow is using `m.gcode.com` and new platform/user-agent.
-
-```
-```
+**Key behaviour:**
+- Do NOT ask a long form with all fields. Ask only the minimum missing blocking information.
+- Before checking missing fields, merge the latest user message over the existing flight context shown in the dynamic prompt.
+- New user input overrides only fields explicitly mentioned. Reuse every existing route/date/trip/passenger/cabin value that the user did not change.
+- A route-only change such as "Search LAX to LAS" or "Change route to LAX to LAS" must keep existing outbound and return dates. Do not ask for dates again when they already exist in context.
+- If defaults are used, briefly mention them in your confirmation (e.g., "I'll search one-way economy flights for 1 adult.").
+- Call the tool as soon as origin + destination + outbound_date are known.
+- If the user changes route, date, passengers, trip type, or cabin/coach, call this tool because it starts a new search.
+- After a successful search, the tool returns/stores searchKey in SDK context with the existing UID.
+- If the same user message also contains supported filters, call \`apply_filter\` after this tool succeeds and searchKey is stored.
+- Core search change + filter in one message must always use the chain \`flight_search\` -> \`apply_filter\`. This includes date/route/passenger/cabin/trip changes combined with filters such as morning/evening departure, arrival time, stops, airline, baggage, duration, layover, or airport filters.
+- Never claim a filter was applied in a search-update response unless \`apply_filter\` was actually called successfully after the new search.
+- After the tool succeeds, generated contracts are stored in session context. Do NOT enumerate them in your reply — the UI renders cards. Reply with a brief friendly confirmation only.
+- Whenever successful new or updated search results/cards are shown, end the same response with exactly: "Note: Prices shown are per person."
+- Price-note eligibility is based only on the current turn: include it only when \`flight_search\` ran in this turn and produced options/cards to show.
+- If the current turn called only \`apply_filter\`, never include or repeat the price note, even when filtered cards are displayed or the previous assistant response contained the note.
+- If a search+filter chain returns no options to show, do not add the price note. Do not add it to missing-information requests, validation errors, or any response where no flight cards/options are shown.
