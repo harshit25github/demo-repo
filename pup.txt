@@ -9,7 +9,105 @@ Flight Agent is now able to read current context from `searchCriteria` and conve
 - destination
 - outbound date
 - return date
-- passengers
+- passengers````markdown
+Implement Trip Planner owned `suggestedQuestions` tool like Flight Agent.
+
+Context:
+Flight Agent already has a tool that updates user-facing “You might ask” questions every time Flight Agent runs. The LLM generates the questions, and the tool only stores them in context.
+
+Trip Planner currently depends on Summary Extractor for `suggestedQuestions`, but extractor-generated questions are not context-aware and sometimes become irrelevant, e.g. asking “Add my travel dates” even when dates already exist.
+
+Required change:
+Add the same pattern to Trip Planner Agent.
+
+## Expected flow
+
+1. User request goes to Trip Planner Agent.
+2. Trip Planner completes its normal response/tools.
+3. Before finishing, Trip Planner must call a new tool like:
+
+```ts
+update_trip_planner_suggested_questions
+````
+
+4. Trip Planner/LLM should generate the questions.
+5. Tool should only update context property:
+
+```ts
+context.tripPlanner.SQ
+```
+
+or the agreed `SQ` property.
+
+Tool should not generate questions by itself.
+
+## Suggested question rules
+
+Questions should be:
+
+* from user perspective
+* short and mobile-friendly
+* relevant to current trip context
+* based on latest user message, Trip Planner response, and available context
+* not random extractor-style questions
+* not asking for already available fields like destination/dates/passengers
+
+Examples:
+
+* “Make this itinerary budget-friendly”
+* “Add food places nearby”
+* “Suggest hotels for this trip”
+* “Plan activities for day 2”
+* “Add kid-friendly places”
+* “Make it a relaxed itinerary”
+
+## Extractor integration
+
+After Summary Extractor finishes:
+
+If `lastAgent` is Flight Agent:
+
+```ts
+summaryContext.suggestedQuestions = context.flight.suggestedQuestions
+```
+
+If `lastAgent` is Trip Planner Agent:
+
+```ts
+summaryContext.suggestedQuestions = context.tripPlanner.SQ
+```
+
+For other agents:
+
+* keep existing extractor-generated `suggestedQuestions`.
+
+## Important
+
+* Take reference from existing Flight Agent suggested question implementation.
+* Do not make Summary Extractor responsible for Trip Planner suggestions.
+* Do not add Trip Planner-specific sanitizer/fallback inside extractor.
+* Trip Planner Agent owns Trip Planner suggested questions.
+* Tool only persists questions; LLM generates them.
+
+## Tests
+
+1. Trip Planner runs with destination/dates already available → suggestions should not ask to add dates/destination again.
+2. Trip Planner generates itinerary → suggestions should relate to improving/refining itinerary.
+3. Trip Planner tool updates `SQ`.
+4. After extractor completes, final `summaryContext.suggestedQuestions` should equal Trip Planner `SQ`.
+5. Flight Agent behavior should remain unchanged.
+6. Non-flight/non-trip agents should continue using extractor suggestions.
+
+Deliverable:
+
+* Add Trip Planner suggested question tool.
+* Wire tool call at end of Trip Planner turn.
+* Update extractor integration replacement logic.
+* Share files changed and before/after examples.
+
+```
+```
+
 - trip type, if available
 
 Requirement:
