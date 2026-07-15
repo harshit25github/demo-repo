@@ -1,15 +1,4 @@
 ````markdown
-Implement searchCriteria context awareness in Trip Planner Agent.
-
-Context:
-Flight Agent is now able to read current context from `searchCriteria` and converse accordingly. We need the same behavior for Trip Planner Agent.
-
-`searchCriteria` already contains useful trip context:
-- origin
-- destination
-- outbound date
-- return date
-- passengers````markdown
 Implement Trip Planner owned `suggestedQuestions` tool like Flight Agent.
 
 Context:
@@ -104,66 +93,6 @@ Deliverable:
 * Wire tool call at end of Trip Planner turn.
 * Update extractor integration replacement logic.
 * Share files changed and before/after examples.
-
-```
-```
-
-- trip type, if available
-
-Requirement:
-Trip Planner Agent should leverage this existing context before asking the user for missing details.
-
-Expected behavior:
-- If destination already exists in `searchCriteria`, Trip Planner should not ask for destination again.
-- If outbound/return dates already exist, it should use them for planning.
-- If passengers are available, it should consider them while suggesting itinerary/trip plan.
-- If origin is available, it can use it for travel context.
-- Ask only for missing details that are genuinely required.
-- Do not ignore existing `searchCriteria`.
-
-Implementation:
-1. Map relevant `searchCriteria` fields into Trip Planner context.
-2. Pass this context into Trip Planner dynamic instructions/prompt.
-3. Update Trip Planner prompt to consider existing context before asking follow-up questions.
-4. New user input should override only explicitly mentioned fields.
-5. Existing context should be reused for fields not mentioned.
-
-Example:
-Existing `searchCriteria`:
-```ts
-{
-  origin: "Delhi",
-  destination: "Bangalore",
-  outboundDate: "2026-07-15",
-  returnDate: "2026-07-20",
-  passengers: { adults: 2 }
-}
-````
-
-User says:
-
-```txt
-Plan my trip
-```
-
-Expected:
-Trip Planner should use Bangalore + dates + passengers and start planning, instead of asking again for destination/dates.
-
-Test cases:
-
-1. Full searchCriteria available + user says “Plan my trip” → Trip Planner uses existing context.
-2. Destination available + dates missing → ask only for dates.
-3. Dates available + destination missing → ask only for destination.
-4. User changes destination in message → update destination and keep existing dates/passengers.
-5. User changes dates → update dates and keep destination/passengers.
-6. No searchCriteria available → normal Trip Planner behavior.
-
-Deliverable:
-
-* Add Trip Planner context hydration from `searchCriteria`.
-* Update dynamic prompt/instructions.
-* Add tests.
-* Share before/after examples and files changed.
 
 ```
 ```
