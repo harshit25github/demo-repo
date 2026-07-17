@@ -1,49 +1,50 @@
 ```markdown
-Add logging and pytest coverage for `price_prediction_tool`.
+Improve new `price_prediction_tool` response style using old tool as reference.
 
 Scope:
-- Work only on `price_prediction_tool` and its tests.
-- Do not modify unrelated Flight Agent logic unless required.
+- Compare old price prediction tool and new `price_prediction_tool`.
+- Update only the new tool response/formatting layer unless required.
+- Do not change unrelated Flight Agent logic.
+
+Issue:
+The old price prediction tool returned structured and user-friendly prediction feedback, including:
+- clear price buckets
+- labels like Great Deal / Fair Price / Premium
+- better recommendation text
+- organized prediction summaries
+- readable output for the agent
+
+The new tool should follow the same quality/style so Flight Agent can give better answers.
 
 Task:
-Add focused debug logging inside `price_prediction_tool` so we can easily debug failures.
+1. Review old price prediction tool response formatting.
+2. Review new `price_prediction_tool` output.
+3. Bring the new tool output closer to the old tool style.
 
-Log only important checkpoints:
-- received input payload
-- validated/normalized input
-- generated ClickHouse query params
-- ClickHouse response summary
-- parsed thresholds/predictions summary
-- final output status
-- error details if any
+Expected output improvements:
+- Categorize predictions into clear buckets:
+  - Great Deal / Low
+  - Fair Price / Medium
+  - Premium / High
+- Include useful labels and summary.
+- Include best/cheapest date recommendation.
+- Include price range summary if available:
+  - lowest
+  - highest
+  - average
+- Include clean formatted response for Flight Agent to consume.
+- Keep output structured and consistent.
+- Do not expose raw DB/internal data.
 
-Do not log huge raw responses or sensitive data.
-
-## How to test
-
-I will provide the exact test steps/commands here:
-
-[ADD TEST STEPS HERE]
-
-## Pytest requirement
-
-Add pytest coverage for 4–5 scenarios:
-
-1. Valid one-way prediction
-2. Valid round-trip prediction
-3. Missing required fields
-4. Date outside supported range
-5. Unsupported route / no predictions
-
-For each test, verify:
-- expected status
-- expected output shape
-- logs are meaningful
-- no raw/internal error is exposed
+Also verify:
+- one-way output formatting
+- round-trip output formatting
+- error/fallback responses
+- unsupported/no prediction response
 
 Deliverable:
-- Add logging.
-- Add pytest tests.
-- Share sample logs.
-- Share test results.
+- Compare old vs new output.
+- Update new tool response style.
+- Share before/after sample outputs.
+- Add/update tests for formatted response, buckets, labels, and recommendation text.
 ```
