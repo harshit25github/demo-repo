@@ -1,50 +1,20 @@
-```markdown
-Improve new `price_prediction_tool` response style using old tool as reference.
+1. I’m flexible between weekdays only, DEL to BOM — tell me which weekday looks cheapest, not the weekend.
 
-Scope:
-- Compare old price prediction tool and new `price_prediction_tool`.
-- Update only the new tool response/formatting layer unless required.
-- Do not change unrelated Flight Agent logic.
+2. From JFK to LAX, I can travel any Tuesday or Wednesday next month. Which date should I pick for the lowest predicted fare?
 
-Issue:
-The old price prediction tool returned structured and user-friendly prediction feedback, including:
-- clear price buckets
-- labels like Great Deal / Fair Price / Premium
-- better recommendation text
-- organized prediction summaries
-- readable output for the agent
+3. I don’t care about exact date, just avoid Friday/Sunday expensive flights. Find me the best cheap weekday for NYC to LHR.
 
-The new tool should follow the same quality/style so Flight Agent can give better answers.
+4. Can you check if flying mid-week is actually cheaper for DEL to BOM, or should I still take Saturday?
 
-Task:
-1. Review old price prediction tool response formatting.
-2. Review new `price_prediction_tool` output.
-3. Bring the new tool output closer to the old tool style.
+5. I want to travel sometime in the next 3 weeks, but only on working days. Predict the best date for low fare.
 
-Expected output improvements:
-- Categorize predictions into clear buckets:
-  - Great Deal / Low
-  - Fair Price / Medium
-  - Premium / High
-- Include useful labels and summary.
-- Include best/cheapest date recommendation.
-- Include price range summary if available:
-  - lowest
-  - highest
-  - average
-- Include clean formatted response for Flight Agent to consume.
-- Keep output structured and consistent.
-- Do not expose raw DB/internal data.
+6. For LAX to MYR, compare Mondays vs Thursdays in the next 60 days and suggest the better travel date.
 
-Also verify:
-- one-way output formatting
-- round-trip output formatting
-- error/fallback responses
-- unsupported/no prediction response
+7. I’m planning a round trip but flexible — outbound should be weekday, return can be weekend. What dates look cheapest?
 
-Deliverable:
-- Compare old vs new output.
-- Update new tool response style.
-- Share before/after sample outputs.
-- Add/update tests for formatted response, buckets, labels, and recommendation text.
-```
+8. I need to fly next month, but avoid peak fare days. Use predictions and suggest 2–3 low-fare dates.
+
+9. If I shift my travel by 2–3 days around Aug 15, can I get a better predicted fare from JFK to LAX?
+
+10. Find me the cheapest weekday flight date in the next 90 days, but don’t suggest anything too close to today.
+I’m flexible for JFK to LAX next month, but only weekdays. Avoid Mondays if they’re expensive, compare predicted fares, and suggest the best date to travel.
