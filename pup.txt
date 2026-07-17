@@ -600,9 +600,18 @@ import {
   analyzePricePredictionDateIntent,
   buildPricePredictionDateIntentSummary,
 } from './pricePredictionDateIntent.js';
-import { getPricePredictionDateLimits } from './tools/pricePredictionTool.js';
 import { flightTools } from './tools/index.js';
-
+function getPricePredictionDateLimits(now = new Date()) {
+  const today = startOfUtcDay(now);
+  return {
+    today,
+    yesterday: addDays(today, -1),
+    maxDate: addDays(today, PRICE_PREDICTION_WINDOW_DAYS),
+    todayString: toIsoDate(today),
+    yesterdayString: toIsoDate(addDays(today, -1)),
+    maxDateString: toIsoDate(addDays(today, PRICE_PREDICTION_WINDOW_DAYS)),
+  };
+}
 assertOpenAIConfig();
 setDefaultOpenAIKey(flightAgentConfig.openaiApiKey);
 
