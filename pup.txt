@@ -1,66 +1,49 @@
 ```markdown
-Verify and complete the new `price_prediction_tool` integration.
+Add logging and pytest coverage for `price_prediction_tool`.
 
-Context:
-I have updated the Flight Agent prompt and added a new tool named `price_prediction_tool`.
-
-There was already an older price prediction tool in the codebase. The new tool currently exists, but it does not yet have the proper ClickHouse client integration.
+Scope:
+- Work only on `price_prediction_tool` and its tests.
+- Do not modify unrelated Flight Agent logic unless required.
 
 Task:
-Please compare the old price prediction tool and the new `price_prediction_tool`, then complete the new tool using the old tool as reference.
+Add focused debug logging inside `price_prediction_tool` so we can easily debug failures.
 
-Check and fix:
+Log only important checkpoints:
+- received input payload
+- validated/normalized input
+- generated ClickHouse query params
+- ClickHouse response summary
+- parsed thresholds/predictions summary
+- final output status
+- error details if any
 
-1. ClickHouse client
-- New `price_prediction_tool` should use the same ClickHouse client/setup pattern as the old tool.
-- Reuse existing client/config/helper if available.
-- Do not create duplicate connection logic unnecessarily.
+Do not log huge raw responses or sensitive data.
 
-2. Input contract
-- Compare inputs of old tool vs new tool.
-- Verify the Flight Agent is sending the correct payload to the new tool.
-- Fix any mismatch in field names, date format, trip type, origin/destination, return dates, etc.
+## How to test
 
-3. Query logic
-- Verify the ClickHouse query is built correctly.
-- Ensure required filters are used:
-  - origin city
-  - destination city
-  - trip type / round trip flag
-  - search date
-  - valid prediction window
+I will provide the exact test steps/commands here:
 
-4. Validation
-- Validate required fields.
-- Validate date range.
-- Ensure tool works only within supported prediction range.
-- Return clear structured errors for invalid/missing input.
+[ADD TEST STEPS HERE]
 
-5. Output contract
-- Verify new tool output is clean and usable by Flight Agent.
-- Ensure output includes useful prediction result, cheapest/best dates, fallback/error info if needed.
-- Do not return raw DB/internal errors to the agent.
+## Pytest requirement
 
-6. Flight Agent prompt/tool registration
-- Verify new `price_prediction_tool` is properly registered in Flight Agent tools.
-- Verify dynamic Flight Agent prompt mentions the new tool correctly.
-- Verify old price prediction tool is not accidentally being used if new tool should replace it.
+Add pytest coverage for 4–5 scenarios:
 
-7. Tests
-Test these flows:
-- valid one-way price prediction
-- valid round-trip price prediction
-- unsupported route
-- missing origin/destination
-- invalid date range
-- date outside supported range
-- flexible/vague date user query triggers price prediction
+1. Valid one-way prediction
+2. Valid round-trip prediction
+3. Missing required fields
+4. Date outside supported range
+5. Unsupported route / no predictions
+
+For each test, verify:
+- expected status
+- expected output shape
+- logs are meaningful
+- no raw/internal error is exposed
 
 Deliverable:
-- Hydrate new `price_prediction_tool` with ClickHouse client.
-- Fix input/output mismatches.
-- Verify Flight Agent uses the new tool correctly.
-- Share files changed.
-- Share before/after sample input/output.
+- Add logging.
+- Add pytest tests.
+- Share sample logs.
 - Share test results.
 ```
