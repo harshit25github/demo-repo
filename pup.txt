@@ -1,45 +1,9 @@
-```markdown
-Implement Akamai city based origin hydration for initial chat.
+We have added Akamai City as a fallback signal for user widget/origin identification. This value will be used only during new chatId creation and will not be used once the chat is already initiated.
 
-Context:
-In `/chat` API payload, we will receive `akamaiCity`, which represents the user’s current city.
+For origin identification, the priority will now be:
 
-We also may receive `searchCriteria` in the first chat itself.
+Existing priority criteria
+User message context
+Akamai City as fallback
 
-Important priority:
-`searchCriteria` has the highest priority.
-
-Priority order:
-1. Incoming `searchCriteria` origin
-2. User-provided origin in current message
-3. Existing DB/chat context origin
-4. Akamai city derived origin as fallback only
-
-Requirement:
-Use `akamaiCity` only during initial context creation when chat/context does not already exist, and only if origin is not available from `searchCriteria`.
-
-Flow:
-1. If new chat/context is being created:
-   - Check `searchCriteria` first.
-   - If `searchCriteria` has origin, use that.
-   - If `searchCriteria` does not have origin, use `akamaiCity`.
-2. Call `SearchAirportCode(akamaiCity)` to get nearest airport/IATA details.
-3. Hydrate origin details in:
-   - Flight context
-   - Summary context
-
-Do not override:
-- origin from `searchCriteria`
-- origin explicitly provided by user
-- existing DB/chat context
-
-Failure handling:
-- If `akamaiCity` is missing or `SearchAirportCode` fails, keep origin empty and let agent ask user.
-- Do not block chat.
-
-Deliverable:
-- Add Akamai city fallback origin hydration during initial chat context creation.
-- Ensure `searchCriteria` always wins over Akamai city.
-- Add logs showing which source populated origin.
-- Add tests for `searchCriteria` present, Akamai fallback, and existing context cases.
-```
+So, Akamai City will only help when stronger signals are not available during chat initialization.
