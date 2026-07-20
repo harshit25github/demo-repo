@@ -1,20 +1,45 @@
-1. I’m flexible between weekdays only, DEL to BOM — tell me which weekday looks cheapest, not the weekend.
+```markdown
+Implement Akamai city based origin hydration for initial chat.
 
-2. From JFK to LAX, I can travel any Tuesday or Wednesday next month. Which date should I pick for the lowest predicted fare?
+Context:
+In `/chat` API payload, we will receive `akamaiCity`, which represents the user’s current city.
 
-3. I don’t care about exact date, just avoid Friday/Sunday expensive flights. Find me the best cheap weekday for NYC to LHR.
+We also may receive `searchCriteria` in the first chat itself.
 
-4. Can you check if flying mid-week is actually cheaper for DEL to BOM, or should I still take Saturday?
+Important priority:
+`searchCriteria` has the highest priority.
 
-5. I want to travel sometime in the next 3 weeks, but only on working days. Predict the best date for low fare.
+Priority order:
+1. Incoming `searchCriteria` origin
+2. User-provided origin in current message
+3. Existing DB/chat context origin
+4. Akamai city derived origin as fallback only
 
-6. For LAX to MYR, compare Mondays vs Thursdays in the next 60 days and suggest the better travel date.
+Requirement:
+Use `akamaiCity` only during initial context creation when chat/context does not already exist, and only if origin is not available from `searchCriteria`.
 
-7. I’m planning a round trip but flexible — outbound should be weekday, return can be weekend. What dates look cheapest?
+Flow:
+1. If new chat/context is being created:
+   - Check `searchCriteria` first.
+   - If `searchCriteria` has origin, use that.
+   - If `searchCriteria` does not have origin, use `akamaiCity`.
+2. Call `SearchAirportCode(akamaiCity)` to get nearest airport/IATA details.
+3. Hydrate origin details in:
+   - Flight context
+   - Summary context
 
-8. I need to fly next month, but avoid peak fare days. Use predictions and suggest 2–3 low-fare dates.
+Do not override:
+- origin from `searchCriteria`
+- origin explicitly provided by user
+- existing DB/chat context
 
-9. If I shift my travel by 2–3 days around Aug 15, can I get a better predicted fare from JFK to LAX?
+Failure handling:
+- If `akamaiCity` is missing or `SearchAirportCode` fails, keep origin empty and let agent ask user.
+- Do not block chat.
 
-10. Find me the cheapest weekday flight date in the next 90 days, but don’t suggest anything too close to today.
-I’m flexible for JFK to LAX next month, but only weekdays. Avoid Mondays if they’re expensive, compare predicted fares, and suggest the best date to travel.
+Deliverable:
+- Add Akamai city fallback origin hydration during initial chat context creation.
+- Ensure `searchCriteria` always wins over Akamai city.
+- Add logs showing which source populated origin.
+- Add tests for `searchCriteria` present, Akamai fallback, and existing context cases.
+```
