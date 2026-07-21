@@ -1,9 +1,74 @@
-We have added Akamai City as a fallback signal for user widget/origin identification. This value will be used only during new chatId creation and will not be used once the chat is already initiated.
+````markdown
+Handle expired `searchKey` in `apply_filter_tool`.
 
-For origin identification, the priority will now be:
+Context:
+Flight Agent has two main tools:
+- `flight_search_tool` → starts a new flight search and returns `searchKey`
+- `apply_filter_tool` → applies filters using the existing `searchKey`
 
-Existing priority criteria
-User message context
-Akamai City as fallback
+Problem:
+Sometimes the `searchKey` expires. In that case, `apply_filter` API still returns HTTP `200`, but the response does not contain valid contracts.
 
-So, Akamai City will only help when stronger signals are not available during chat initialization.
+Expired searchKey response pattern:
+- `data` / `data.contracts` is null or missing
+- response contains `errors: []`
+- errors include something like `invalid located` / invalid locator
+
+This means the current `searchKey` is expired/invalid.
+
+Required behavior:
+When `apply_filter_tool` detects expired/invalid `searchKey`:
+
+1. Do not treat it as normal no-results.
+2. Return structured feedback to Flight Agent:
+```ts
+{
+  status: "SEARCH_KEY_EXPIRED",
+  message: "Current searchKey is expired. Start a new flight search and re-apply the requested filters.",
+  shouldRetryWithNewSearch: true,
+  originalFilters: [...]
+}
+````
+
+3. Flight Agent should then:
+
+* call `flight_search_tool` again using the latest available search criteria/context
+* get a fresh `searchKey`
+* re-apply the same user-requested filters using `apply_filter_tool`
+* respond normally after successful filter application
+
+Important:
+
+* Incoming `searchCriteria.searchKey` still has highest priority.
+* But if API confirms it is expired, we must regenerate search by running `flight_search_tool`.
+* Preserve the user’s requested filters so they can be applied again after the new search.
+* Do not drop filters during retry.
+* Avoid infinite retry loop. Retry only once for expired `searchKey`.
+
+Things to verify:
+
+* Exact expired response shape from apply-filter API.
+* Exact error property/value for invalid locator.
+* Where `data.contracts` is currently accessed.
+* Whether null contracts are causing wrong response or crash.
+* Whether Flight Agent can understand the tool feedback and trigger new search.
+
+Tests:
+
+1. Valid searchKey + filter → normal apply filter.
+2. Expired searchKey response → tool returns `SEARCH_KEY_EXPIRED`.
+3. Agent receives `SEARCH_KEY_EXPIRED` → calls `flight_search_tool`.
+4. New search returns fresh searchKey → same filter is re-applied.
+5. Retry happens only once.
+6. If new search also fails → return clean error message.
+
+Deliverable:
+
+* Add expired searchKey detection in `apply_filter_tool`.
+* Add structured feedback for Flight Agent.
+* Update Flight Agent prompt/tool handling if needed.
+* Add tests with mocked expired searchKey response.
+* Share before/after flow and payload examples.
+
+```
+```
