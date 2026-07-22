@@ -1,49 +1,47 @@
 ```markdown
-Debug and fix stale `segments` issue in Flight Agent searchCriteria update flow.
+Update Trip Planner suggested questions prompt.
 
-Problem:
-After Flight Agent flow completes, we update final `searchCriteria` from the latest context and send it back as a chunk.
+Scope:
+- Update only Trip Planner suggested questions generation.
+- Do not modify unrelated agents/tools.
 
-Most fields are updating correctly, but `searchCriteria.segments` sometimes remains stale.
+Requirement:
+Trip Planner suggested questions should never include questions related to:
+- hotels
+- cars
+- cab/taxi
+- commute/local transport
+- airport transfers
+- rentals
+- bus/train bookings
 
-Likely scenario:
-- Existing `searchCriteria` comes in request.
-- It is hydrated as base flight context.
-- User changes route/date/trip options.
-- Flight Agent updates context and runs flight search.
-- Final `searchCriteria` gets updated, but `segments` still contain old route/date values.
+Blocked examples:
+- "Find hotels for this trip"
+- "Book a cab from airport"
+- "Show car rental options"
+- "Suggest commute options"
+- "Find nearby hotels"
+- "How do I travel between cities?"
 
-Possible issue area:
-This may be happening in the flight search flow where segments are created/updated after `flight_search_tool` runs.
+Allowed suggestions should stay related to Trip Planner only:
+- itinerary refinement
+- places to visit
+- food spots
+- activities
+- budget-friendly planning
+- relaxed/fast-paced itinerary
+- family/couple/adventure preferences
+- day-wise plan improvements
 
-Please debug both areas:
-
-1. Context → searchCriteria mapper
-- Check where final `searchCriteria` is generated after stream ends.
-- Verify `segments` are mapped from latest flight context, not old request searchCriteria.
-
-2. Flight search flow
-- Check how `segments` are created/updated during `flight_search_tool`.
-- Verify updated origin/destination/date/tripType are reflected in context segments.
-- Ensure old hydrated segments are not reused after user changes route/options.
-
-Add focused logs:
-- incoming `searchCriteria.segments`
-- base flight context after hydration
-- user-requested changes
-- flight context before `flight_search_tool`
-- flight context after `flight_search_tool`
-- final generated `searchCriteria.segments`
-- final streamed searchCriteria chunk
-
-Expected behavior:
-- If user changes origin/destination/date/trip type, final `segments` must reflect latest values.
-- Old request/DB segments should not overwrite updated context.
-- One-way, round-trip, and multi-city segments should be verified.
+Examples:
+- "Make this itinerary more relaxed"
+- "Add food places nearby"
+- "Suggest activities for day 2"
+- "Make this trip budget-friendly"
+- "Add kid-friendly places"
 
 Deliverable:
-- Find where stale segments are introduced.
-- Fix segment update logic.
-- Add tests for route/date changes with existing searchCriteria.
-- Share before/after payload examples and logs.
+- Update Trip Planner suggested questions prompt.
+- Add tests to confirm no hotel/car/commute suggestions are generated.
+- Share before/after examples.
 ```
