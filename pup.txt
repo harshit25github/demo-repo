@@ -1,74 +1,91 @@
 ````markdown
-Handle expired `searchKey` in `apply_filter_tool`.
+Implement apply-filter fallback for expired searchKey inside tool/service layer.
 
 Context:
-Flight Agent has two main tools:
-- `flight_search_tool` → starts a new flight search and returns `searchKey`
-- `apply_filter_tool` → applies filters using the existing `searchKey`
+We should not ask the Flight Agent/LLM to handle expired searchKey recovery. This should be handled deterministically inside the apply-filter flow.
 
 Problem:
-Sometimes the `searchKey` expires. In that case, `apply_filter` API still returns HTTP `200`, but the response does not contain valid contracts.
+Sometimes Apply Filter API returns a valid HTTP response, but indicates the current searchKey/locator is expired.
 
-Expired searchKey response pattern:
-- `data` / `data.contracts` is null or missing
-- response contains `errors: []`
-- errors include something like `invalid located` / invalid locator
-
-This means the current `searchKey` is expired/invalid.
+When this happens:
+- contracts are not available
+- response contains expired/invalid locator/searchKey signal
+- current apply-filter call cannot continue with old searchKey
 
 Required behavior:
-When `apply_filter_tool` detects expired/invalid `searchKey`:
+When apply-filter detects expired/invalid searchKey:
 
-1. Do not treat it as normal no-results.
-2. Return structured feedback to Flight Agent:
-```ts
-{
-  status: "SEARCH_KEY_EXPIRED",
-  message: "Current searchKey is expired. Start a new flight search and re-apply the requested filters.",
-  shouldRetryWithNewSearch: true,
-  originalFilters: [...]
-}
-````
+1. Do not return this problem to the agent as a reasoning task.
+2. Use existing flight context/searchCriteria to trigger a fresh flight search through Digital Service API.
+3. From the fresh flight search response, extract only the new searchKey.
+4. Update only `context.flight.searchKey` with the new searchKey.
+5. Re-run apply-filter once using:
+   - same original filter payload
+   - same user-requested filters
+   - new searchKey
+6. Continue normal apply-filter response handling.
 
-3. Flight Agent should then:
-
-* call `flight_search_tool` again using the latest available search criteria/context
-* get a fresh `searchKey`
-* re-apply the same user-requested filters using `apply_filter_tool`
-* respond normally after successful filter application
+Reference:
+Check existing fallback logic in `getGeneratedContext`.
+It already falls back to flight search when generated flight results are missing.
+Use that pattern as reference, but do not copy extra result-processing logic unless required.
 
 Important:
+- In this fallback, we do not need to store full flight results.
+- We only need the fresh searchKey.
+- Preserve the original apply-filter payload.
+- Replace only the expired searchKey with the new one.
+- Retry only once.
+- Avoid infinite retry loops.
+- Add focused logs for each step.
 
-* Incoming `searchCriteria.searchKey` still has highest priority.
-* But if API confirms it is expired, we must regenerate search by running `flight_search_tool`.
-* Preserve the user’s requested filters so they can be applied again after the new search.
-* Do not drop filters during retry.
-* Avoid infinite retry loop. Retry only once for expired `searchKey`.
+Logging:
+Add compact logs for:
+- expired searchKey detected
+- old searchKey
+- fallback flight search triggered
+- new searchKey received
+- apply-filter retry started
+- retry success/failure
 
-Things to verify:
+Expected flow:
+```txt
+apply_filter_tool
+↓
+Apply Filter API says searchKey expired
+↓
+Call Digital Service flight search using latest flight context
+↓
+Extract new searchKey
+↓
+Update context.flight.searchKey
+↓
+Retry apply filter with same filters + new searchKey
+↓
+Return normal apply-filter result
+````
 
-* Exact expired response shape from apply-filter API.
-* Exact error property/value for invalid locator.
-* Where `data.contracts` is currently accessed.
-* Whether null contracts are causing wrong response or crash.
-* Whether Flight Agent can understand the tool feedback and trigger new search.
+Failure handling:
+
+* If fallback flight search fails, return normal clean failure.
+* If new searchKey is not found, log and return clean failure.
+* If retry apply-filter also fails, do not retry again.
 
 Tests:
 
-1. Valid searchKey + filter → normal apply filter.
-2. Expired searchKey response → tool returns `SEARCH_KEY_EXPIRED`.
-3. Agent receives `SEARCH_KEY_EXPIRED` → calls `flight_search_tool`.
-4. New search returns fresh searchKey → same filter is re-applied.
-5. Retry happens only once.
-6. If new search also fails → return clean error message.
+1. Normal apply-filter with valid searchKey → works as before.
+2. Expired searchKey → fallback search runs, new searchKey is used, same filters are reapplied.
+3. Fallback search fails → clean failure, no crash.
+4. Retry apply-filter fails → no second retry.
+5. Verify only searchKey is updated in context, not unrelated fields.
 
 Deliverable:
 
-* Add expired searchKey detection in `apply_filter_tool`.
-* Add structured feedback for Flight Agent.
-* Update Flight Agent prompt/tool handling if needed.
-* Add tests with mocked expired searchKey response.
-* Share before/after flow and payload examples.
+* Add fallback inside apply-filter tool/service layer.
+* Reuse/refactor Digital Service search fallback logic where possible.
+* Keep agent prompt simple; no LLM-driven recovery.
+* Add tests and logs.
+* Share before/after flow and files changed.
 
 ```
 ```
