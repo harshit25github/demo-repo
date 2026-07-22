@@ -1,91 +1,49 @@
-````markdown
-Implement apply-filter fallback for expired searchKey inside tool/service layer.
-
-Context:
-We should not ask the Flight Agent/LLM to handle expired searchKey recovery. This should be handled deterministically inside the apply-filter flow.
+```markdown
+Debug and fix stale `segments` issue in Flight Agent searchCriteria update flow.
 
 Problem:
-Sometimes Apply Filter API returns a valid HTTP response, but indicates the current searchKey/locator is expired.
+After Flight Agent flow completes, we update final `searchCriteria` from the latest context and send it back as a chunk.
 
-When this happens:
-- contracts are not available
-- response contains expired/invalid locator/searchKey signal
-- current apply-filter call cannot continue with old searchKey
+Most fields are updating correctly, but `searchCriteria.segments` sometimes remains stale.
 
-Required behavior:
-When apply-filter detects expired/invalid searchKey:
+Likely scenario:
+- Existing `searchCriteria` comes in request.
+- It is hydrated as base flight context.
+- User changes route/date/trip options.
+- Flight Agent updates context and runs flight search.
+- Final `searchCriteria` gets updated, but `segments` still contain old route/date values.
 
-1. Do not return this problem to the agent as a reasoning task.
-2. Use existing flight context/searchCriteria to trigger a fresh flight search through Digital Service API.
-3. From the fresh flight search response, extract only the new searchKey.
-4. Update only `context.flight.searchKey` with the new searchKey.
-5. Re-run apply-filter once using:
-   - same original filter payload
-   - same user-requested filters
-   - new searchKey
-6. Continue normal apply-filter response handling.
+Possible issue area:
+This may be happening in the flight search flow where segments are created/updated after `flight_search_tool` runs.
 
-Reference:
-Check existing fallback logic in `getGeneratedContext`.
-It already falls back to flight search when generated flight results are missing.
-Use that pattern as reference, but do not copy extra result-processing logic unless required.
+Please debug both areas:
 
-Important:
-- In this fallback, we do not need to store full flight results.
-- We only need the fresh searchKey.
-- Preserve the original apply-filter payload.
-- Replace only the expired searchKey with the new one.
-- Retry only once.
-- Avoid infinite retry loops.
-- Add focused logs for each step.
+1. Context → searchCriteria mapper
+- Check where final `searchCriteria` is generated after stream ends.
+- Verify `segments` are mapped from latest flight context, not old request searchCriteria.
 
-Logging:
-Add compact logs for:
-- expired searchKey detected
-- old searchKey
-- fallback flight search triggered
-- new searchKey received
-- apply-filter retry started
-- retry success/failure
+2. Flight search flow
+- Check how `segments` are created/updated during `flight_search_tool`.
+- Verify updated origin/destination/date/tripType are reflected in context segments.
+- Ensure old hydrated segments are not reused after user changes route/options.
 
-Expected flow:
-```txt
-apply_filter_tool
-↓
-Apply Filter API says searchKey expired
-↓
-Call Digital Service flight search using latest flight context
-↓
-Extract new searchKey
-↓
-Update context.flight.searchKey
-↓
-Retry apply filter with same filters + new searchKey
-↓
-Return normal apply-filter result
-````
+Add focused logs:
+- incoming `searchCriteria.segments`
+- base flight context after hydration
+- user-requested changes
+- flight context before `flight_search_tool`
+- flight context after `flight_search_tool`
+- final generated `searchCriteria.segments`
+- final streamed searchCriteria chunk
 
-Failure handling:
-
-* If fallback flight search fails, return normal clean failure.
-* If new searchKey is not found, log and return clean failure.
-* If retry apply-filter also fails, do not retry again.
-
-Tests:
-
-1. Normal apply-filter with valid searchKey → works as before.
-2. Expired searchKey → fallback search runs, new searchKey is used, same filters are reapplied.
-3. Fallback search fails → clean failure, no crash.
-4. Retry apply-filter fails → no second retry.
-5. Verify only searchKey is updated in context, not unrelated fields.
+Expected behavior:
+- If user changes origin/destination/date/trip type, final `segments` must reflect latest values.
+- Old request/DB segments should not overwrite updated context.
+- One-way, round-trip, and multi-city segments should be verified.
 
 Deliverable:
-
-* Add fallback inside apply-filter tool/service layer.
-* Reuse/refactor Digital Service search fallback logic where possible.
-* Keep agent prompt simple; no LLM-driven recovery.
-* Add tests and logs.
-* Share before/after flow and files changed.
-
-```
+- Find where stale segments are introduced.
+- Fix segment update logic.
+- Add tests for route/date changes with existing searchCriteria.
+- Share before/after payload examples and logs.
 ```
