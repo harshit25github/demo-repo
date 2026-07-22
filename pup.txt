@@ -1,3 +1,89 @@
 We observed a rare interruption during the OpenAI agent handoff flow. The request was initiated successfully, but no further streaming response or error was received from the API, and our service timed out after three minutes. There were no signs of an application crash in our logs.
 
 At this stage, the most likely cause is a temporary network or API streaming interruption during the handoff. The issue appears intermittent rather than a consistent application failure, and we are continuing to monitor it.
+
+
+````markdown
+Add stream interruption handling, logging, and client status chunks.
+
+Scope:
+- Update only server-side streaming/orchestration handling.
+- Do not change agent prompts or unrelated business logic.
+
+Problem:
+Sometimes the stream does not reach the normal `done/end` state. It may be:
+- abruptly closed
+- paused
+- resumed
+- disconnected before completion
+
+We need proper handling so the client knows what happened instead of silently stopping.
+
+Required behavior:
+
+1. Detect abnormal stream close
+- If stream closes before normal completion, treat it as abrupt close.
+- Send a final/error status chunk to client before cleanup if possible.
+
+Example chunk:
+```json
+{
+  "status": "stream_closed",
+  "message": "Stream closed before completion."
+}
+````
+
+2. Handle pause/resume if events are available
+
+* Add handlers/logs for pause/resume events if supported by the current stream implementation.
+* Send client status chunks when these events occur.
+
+Example:
+
+```json
+{ "status": "stream_paused", "message": "Stream paused." }
+{ "status": "stream_resumed", "message": "Stream resumed." }
+```
+
+3. Add focused logging
+   Log:
+
+* stream started
+* chunk sent
+* stream paused
+* stream resumed
+* stream closed
+* stream completed normally
+* stream closed before completion
+* error details
+
+Use requestId/conversationId if available.
+
+4. Completion tracking
+   Add a flag like:
+
+```ts
+let streamCompleted = false;
+```
+
+Set it only when normal final/done status is reached.
+
+If close/error happens and `streamCompleted === false`, send/log abrupt close.
+
+5. Client safety
+
+* Do not leave client waiting silently.
+* Ensure cleanup runs once.
+* Avoid duplicate final chunks.
+* Avoid sending after response is already closed.
+
+Deliverable:
+
+* Add stream close/pause/resume/error handling.
+* Add client status chunks.
+* Add focused logs.
+* Add tests or manual verification steps.
+* Share before/after behavior and sample logs.
+
+```
+```
