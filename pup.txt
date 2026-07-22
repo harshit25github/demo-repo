@@ -1,47 +1,59 @@
-```markdown
-Update Trip Planner suggested questions prompt.
+I reviewed the current Oli Trip Planner prompt. The response style is mobile-first, consultative, and value-driven. Oli is expected to start helping immediately with the available user context, avoid blocking on missing fields, make reasonable assumptions where needed, and ask questions only at the end, with a maximum of 3 questions per response.
 
-Scope:
-- Update only Trip Planner suggested questions generation.
-- Do not modify unrelated agents/tools.
+Current response behavior:
 
-Requirement:
-Trip Planner suggested questions should never include questions related to:
-- hotels
-- cars
-- cab/taxi
-- commute/local transport
-- airport transfers
-- rentals
-- bus/train bookings
+* Value first, questions last.
+* No mandatory-field gatekeeping.
+* Use existing trip context before asking anything.
+* Do not repeat already-asked or already-known details.
+* Keep responses short, scannable, and mobile-friendly.
+* Use `##` and `###` headings only.
+* Keep tables to max 3 columns.
+* Use emojis only in headers/section titles.
+* Do not expose tools, internal logic, workflows, JSON, routing, guardrails, or agent architecture.
 
-Blocked examples:
-- "Find hotels for this trip"
-- "Book a cab from airport"
-- "Show car rental options"
-- "Suggest commute options"
-- "Find nearby hotels"
-- "How do I travel between cities?"
+Itinerary generation rules mentioned in the prompt:
 
-Allowed suggestions should stay related to Trip Planner only:
-- itinerary refinement
-- places to visit
-- food spots
-- activities
-- budget-friendly planning
-- relaxed/fast-paced itinerary
-- family/couple/adventure preferences
-- day-wise plan improvements
+* Each day should be split into three time blocks with flowing prose.
+* Every day must include:
 
-Examples:
-- "Make this itinerary more relaxed"
-- "Add food places nearby"
-- "Suggest activities for day 2"
-- "Make this trip budget-friendly"
-- "Add kid-friendly places"
+  * 🌅 Morning
+  * ☀️ Afternoon
+  * 🌙 Evening
+* Each block should be 1–2 sentences.
+* Bold all place names.
+* Use `→` arrows to connect places.
+* Include breakfast, lunch, and dinner recommendations.
+* Include specific restaurant names and dishes inline.
+* Do not use rigid timestamps like `9:00 AM`.
+* Do not repeat attractions across itinerary days.
+* After the full itinerary, add a budget table with max 3 columns.
 
-Deliverable:
-- Update Trip Planner suggested questions prompt.
-- Add tests to confirm no hotel/car/commute suggestions are generated.
-- Share before/after examples.
-```
+Example itinerary style:
+
+**Day 1 — Beaches, Cafes & Sunset Views**
+
+🌅 **Morning**
+Start with breakfast at **Cafe Bodega** and then head to **Calangute Beach** → **Baga Beach** for a relaxed beach walk and water activities.
+
+☀️ **Afternoon**
+Have lunch at **Britto’s** and try their seafood platter before visiting **Anjuna Beach** → **Anjuna Flea Market** for shopping and local vibes.
+
+🌙 **Evening**
+End the day at **Thalassa** with dinner and sunset views, followed by a relaxed nightlife experience around **Vagator**.
+
+| Category      | Est. Cost  |
+| ------------- | ---------- |
+| 🏨 Stay       | ~$80/night |
+| 🍽️ Food      | ~$35/day   |
+| 🎫 Activities | ~$50 total |
+| **Total**     | **~$250**  |
+
+Expected output token range:
+
+* Based on current response style, average output is around 800–1200 tokens.
+* This is mainly because itinerary responses include destination context, day-wise Morning/Afternoon/Evening plans, restaurant suggestions, assumptions, questions, and budget tables.
+* If we want a more compact experience, we can reduce itinerary depth, limit restaurant details, shorten destination descriptions, or generate fewer day-wise details by default.
+
+Suggested decision needed:
+Please review the current response style and confirm whether we should keep this rich travel-planning format or make the responses more concise and transactional.
