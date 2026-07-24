@@ -1,89 +1,48 @@
-We observed a rare interruption during the OpenAI agent handoff flow. The request was initiated successfully, but no further streaming response or error was received from the API, and our service timed out after three minutes. There were no signs of an application crash in our logs.
-
-At this stage, the most likely cause is a temporary network or API streaming interruption during the handoff. The issue appears intermittent rather than a consistent application failure, and we are continuing to monitor it.
-
-
-````markdown
-Add stream interruption handling, logging, and client status chunks.
-
-Scope:
-- Update only server-side streaming/orchestration handling.
-- Do not change agent prompts or unrelated business logic.
+```markdown id="76nmpq"
+Fix routing/guardrail handling for flight booking-date intent.
 
 Problem:
-Sometimes the stream does not reach the normal `done/end` state. It may be:
-- abruptly closed
-- paused
-- resumed
-- disconnected before completion
+Queries like these should not be blocked by input/unified guardrails:
 
-We need proper handling so the client knows what happened instead of silently stopping.
+- "I want to book a flight on 12 Aug"
+- "Book my flight for next Friday"
+- "I want to fly to Delhi on this date"
+- "Find flights for this date"
+- "I want to book tickets from NYC to LAX on Sep 10"
+
+These are flight search/planning intents, not unsafe or out-of-scope intents.
+
+Scope:
+- Unified input guardrail
+- Gateway/orchestrator routing
+- Flight Agent routing rules
 
 Required behavior:
+1. Validate unified input guardrail:
+   - Ensure flight booking/search/date intent is allowed.
+   - Do not trigger rejection just because user says "book".
+   - Treat "book flight/ticket on date" as flight search intent unless user is asking for actual payment/final booking action.
 
-1. Detect abnormal stream close
-- If stream closes before normal completion, treat it as abrupt close.
-- Send a final/error status chunk to client before cleanup if possible.
+2. Update gateway routing:
+   - Route flight booking/search/date queries to Flight Agent.
+   - If query contains route/date/passenger/cabin/travel-date intent, prefer Flight Agent.
+   - Do not route these queries to Trip Planner or generic guardrail fallback.
 
-Example chunk:
-```json
-{
-  "status": "stream_closed",
-  "message": "Stream closed before completion."
-}
-````
+3. Booking word handling:
+   - "Book a flight", "book ticket", "flight on this date" = Flight Agent.
+   - Actual payment/complete booking/confirm purchase = handle according to existing booking/handoff policy.
 
-2. Handle pause/resume if events are available
-
-* Add handlers/logs for pause/resume events if supported by the current stream implementation.
-* Send client status chunks when these events occur.
-
-Example:
-
-```json
-{ "status": "stream_paused", "message": "Stream paused." }
-{ "status": "stream_resumed", "message": "Stream resumed." }
-```
-
-3. Add focused logging
-   Log:
-
-* stream started
-* chunk sent
-* stream paused
-* stream resumed
-* stream closed
-* stream completed normally
-* stream closed before completion
-* error details
-
-Use requestId/conversationId if available.
-
-4. Completion tracking
-   Add a flag like:
-
-```ts
-let streamCompleted = false;
-```
-
-Set it only when normal final/done status is reached.
-
-If close/error happens and `streamCompleted === false`, send/log abrupt close.
-
-5. Client safety
-
-* Do not leave client waiting silently.
-* Ensure cleanup runs once.
-* Avoid duplicate final chunks.
-* Avoid sending after response is already closed.
+4. Add tests:
+   - "I want to book a flight on 12 Aug"
+   - "Book ticket from Delhi to Mumbai tomorrow"
+   - "Find me flights for Sep 10"
+   - "I want to travel from NYC to LAX next Friday"
+   - "Can you complete the payment for this booking?" → should follow existing booking/payment restriction flow.
 
 Deliverable:
-
-* Add stream close/pause/resume/error handling.
-* Add client status chunks.
-* Add focused logs.
-* Add tests or manual verification steps.
-* Share before/after behavior and sample logs.
-
-```
+- Identify current guardrail/routing issue.
+- Fix unified input guardrail if it blocks these valid flight queries.
+- Fix gateway routing so these go to Flight Agent.
+- Add/update tests.
+- Share before/after behavior and files changed.
 ```
