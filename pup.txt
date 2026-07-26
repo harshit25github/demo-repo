@@ -1,48 +1,11 @@
-```markdown id="76nmpq"
-Fix routing/guardrail handling for flight booking-date intent.
-
-Problem:
-Queries like these should not be blocked by input/unified guardrails:
-
-- "I want to book a flight on 12 Aug"
-- "Book my flight for next Friday"
-- "I want to fly to Delhi on this date"
-- "Find flights for this date"
-- "I want to book tickets from NYC to LAX on Sep 10"
-
-These are flight search/planning intents, not unsafe or out-of-scope intents.
-
-Scope:
-- Unified input guardrail
-- Gateway/orchestrator routing
-- Flight Agent routing rules
-
-Required behavior:
-1. Validate unified input guardrail:
-   - Ensure flight booking/search/date intent is allowed.
-   - Do not trigger rejection just because user says "book".
-   - Treat "book flight/ticket on date" as flight search intent unless user is asking for actual payment/final booking action.
-
-2. Update gateway routing:
-   - Route flight booking/search/date queries to Flight Agent.
-   - If query contains route/date/passenger/cabin/travel-date intent, prefer Flight Agent.
-   - Do not route these queries to Trip Planner or generic guardrail fallback.
-
-3. Booking word handling:
-   - "Book a flight", "book ticket", "flight on this date" = Flight Agent.
-   - Actual payment/complete booking/confirm purchase = handle according to existing booking/handoff policy.
-
-4. Add tests:
-   - "I want to book a flight on 12 Aug"
-   - "Book ticket from Delhi to Mumbai tomorrow"
-   - "Find me flights for Sep 10"
-   - "I want to travel from NYC to LAX next Friday"
-   - "Can you complete the payment for this booking?" → should follow existing booking/payment restriction flow.
-
-Deliverable:
-- Identify current guardrail/routing issue.
-- Fix unified input guardrail if it blocks these valid flight queries.
-- Fix gateway routing so these go to Flight Agent.
-- Add/update tests.
-- Share before/after behavior and files changed.
-```
+price_prediction_tool({
+  "originCity": "JFK",
+  "destinationCity": "DEL",
+  "startDate": "2026-07-25",
+  "endDate": "2026-10-22",
+  "tripType": "roundtrip",
+  "returnStartDate": "2026-07-25",
+  "returnEndDate": "2026-10-22",
+  "tripDuration": 21,
+  "tripDurationFlexibility": null
+})
