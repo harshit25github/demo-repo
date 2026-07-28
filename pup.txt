@@ -1,7 +1,49 @@
-We can add guardrails for clear cases like prompt injection, off-topic queries, abusive content, and internal system exposure.
+```markdown id="remove-price-tags"
+Update Flight Price Prediction tool output.
 
-But complex travel-safety queries like “Is this destination safe?” or “Is this a disputed area?” should not be blocked directly. These are valid travel concerns and need proper advisory context.
+Goal:
+Remove all custom deal tagging from the price prediction flow.
 
-Since we are using a nano model for blocking, the guardrail should stay lightweight and focus on classification/routing. Adding every scenario into it will increase cost, latency, and complexity, without guaranteeing full coverage.
+Current behavior:
+- price <= lowerLimit → tagged as Great Deal
+- price between lowerLimit and upperLimit → tagged as Fair Deal
+- price > upperLimit → tagged as Premium Deal
 
-Recommended approach: use guardrails for clear block/allow decisions, and route travel-risk queries to a dedicated advisory flow with trusted sources.
+Required change:
+- Do not add any deal tags/labels anymore.
+- Remove logic that generates:
+  - Great Deal
+  - Fair Deal
+  - Premium Deal
+  - LOW/MEDIUM/HIGH bucket-based labels
+  - any emoji/rating/tag text based on thresholds
+
+Keep everything else the same:
+- threshold object handling
+- date-wise price parsing
+- sorting logic
+- cheapest date selection
+- tool response structure, unless tag fields need removal
+- error handling
+- existing validations
+
+Also update:
+- tool feedback/markdown response
+- formattedResponse
+- recommendation text
+- any schema/output fields that currently expose deal labels or ratings
+
+Expected output:
+The tool should return only clean price prediction details like:
+- date
+- predicted price
+- threshold values if needed
+- cheapest options
+- price summary
+
+No deal tag should be shown to the agent or user.
+
+Add/update tests to confirm no deal tags are present in final tool output or formatted response.
+
+Share files changed and before/after sample output.
+```
