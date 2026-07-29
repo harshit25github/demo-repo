@@ -1,96 +1,69 @@
-````markdown id="policy-suggested-questions"
-Add suggested questions flow for Policy Agent.
+````markdown id="abort-timeout-crisp"
+Analyze AbortController timeout behavior in our streaming API.
 
-Goal:
-Implement the same suggested questions pattern already used in Flight Agent and Trip Planner Agent for Policy Agent.
+Do not implement yet. Just explain current behavior and recommended fix.
 
-Reference:
-Check existing implementation in either:
-- Flight Agent suggested questions tool
-- Trip Planner suggested questions tool
-
-Follow the same architecture and style.
-
-## Required changes
-
-### 1. Add Policy Agent suggested questions tool
-
-Create a tool like:
-
-`update_policy_suggested_questions`
-
-Purpose:
-- Policy Agent generates useful follow-up questions.
-- Tool only validates and stores them.
-- Tool should not generate questions by itself.
-
-Expected storage:
-```ts
-context.policy.suggestedQuestions = [...]
+Current flow:
+```txt
+client/service → our API → OpenAI streaming API → chunks → our API forwards chunks to client
 ````
 
-Use the existing context pattern used by Flight/Trip Planner.
+Questions to clarify:
 
-### 2. Update Policy Agent prompt
+1. When does the 2-minute timeout trigger?
 
-Update Policy Agent prompt so it always calls this tool at the end of every Policy Agent turn.
+* from request start?
+* after no chunks/inactivity?
+* based on current implementation?
 
-The questions should be:
+2. What happens after timeout?
 
-* from the user’s perspective
-* short and mobile-friendly
-* related to policy/help topics only
-* context-aware
-* not repetitive or stale
+* which event/path is hit: error, close, abort, catch?
+* does stream reach normal end/done?
 
-Good examples:
+3. Client notification
 
-* "What is the cancellation policy?"
-* "Can I get a refund for this ticket?"
-* "What baggage allowance applies?"
-* "Are there any change fees?"
-* "What happens if I miss my flight?"
+* if chunks already started, can we send timeout chunk?
+* should we send final chunk like:
 
-Avoid:
-
-* unrelated trip planning questions
-* hotels/cars/commute questions
-* booking/payment completion questions
-* generic repeated questions
-
-### 3. Summary Extractor integration
-
-Currently, after extractor runs, Flight and Trip Planner override extractor-generated suggested questions with their own tool-generated questions.
-
-Apply the same logic for Policy Agent.
-
-Required behavior:
-
-```ts
-if (lastAgent === "PolicyAgent") {
-  summaryContext.suggestedQuestions = context.policy.suggestedQuestions;
+```json
+{
+  "status": "timeout",
+  "message": "Request timed out before completion."
 }
 ```
 
-Do not remove existing Flight/Trip Planner logic.
+* should we call `res.end()` after this?
+* how to avoid duplicate final chunks?
 
-### 4. Tests
+4. Cleanup
+   Verify:
 
-Add tests for:
+* OpenAI stream aborted
+* timer cleared
+* response closed safely
+* no hanging connection
+* no duplicate final response
 
-1. Policy Agent answers baggage query → updates policy suggested questions.
-2. Policy Agent answers cancellation/refund query → updates relevant questions.
-3. Extractor generates its own questions → final summaryContext uses Policy Agent tool questions instead.
-4. No stale Flight/Trip Planner questions remain after Policy Agent turn.
-5. Tool is called at the end of Policy Agent response.
+5. Logs needed
+   Check/add logs for:
 
-## Deliverable
+* request started
+* timeout started
+* timeout triggered
+* abort called
+* timeout chunk sent
+* response ended
+* normal completion
+* abrupt close
 
-* Add Policy Agent suggested questions tool.
-* Update Policy Agent prompt.
-* Update extractor/final summaryContext replacement logic.
-* Add tests.
-* Share files changed and before/after examples.
+Deliverable:
+
+* Explain current timeout behavior.
+* Show exact error/event path.
+* Confirm whether client currently gets notified.
+* Recommend safe handling flow.
+* List files/functions involved.
 
 ```
 ```
