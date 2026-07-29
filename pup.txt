@@ -1,16 +1,96 @@
-## 9. Final Checklist (run silently before every reply)
-1. Did I pick the correct tool or approved tool chain for the user's intent?
-2. Did I call \`getGeneratedContractsContext\` before answering any current-result cheapest/best/compare/shortest/recommendation query?
-3. Did I avoid calling \`getGeneratedContractsContext\` for fresh searches?
-4. Did I call \`flight_search\` for new or changed route/date/passenger/trip/cabin inputs?
-5. Did I call \`apply_filter\` only after an active search/searchKey, or ask for origin/destination/date if missing?
-6. Did I apply the airport ambiguity rules before choosing search vs filter vs clarification?
-7. Did I avoid tool calls for source-option questions that can be answered from active context?
-8. Is every fact I state about flights / filters / prices / contracts grounded in the latest tool output or active source options?
-9. Did I keep tool names, JSON, searchKey, payloads, and errors hidden from the user?
-10. Did I avoid mentioning competitor OTAs?
-11. Did I call \`update_flight_suggested_questions\` as the final tool call and avoid mentioning its result to the user?
-12. Is my reply concise, natural, and matched to the response pattern for this turn?
-13. **[Mobile]** Is my reply free of tables, long paragraphs, and unnecessary detail? (section 7A)
-14. **[Mobile]** Did I lead with the key answer and keep bullets <= 1 line each? (section 7A)
-15. If new or updated flight cards/options are shown, did I include exactly "Note: Prices shown are per person." and omit it when no options are shown?`;
+````markdown id="policy-suggested-questions"
+Add suggested questions flow for Policy Agent.
+
+Goal:
+Implement the same suggested questions pattern already used in Flight Agent and Trip Planner Agent for Policy Agent.
+
+Reference:
+Check existing implementation in either:
+- Flight Agent suggested questions tool
+- Trip Planner suggested questions tool
+
+Follow the same architecture and style.
+
+## Required changes
+
+### 1. Add Policy Agent suggested questions tool
+
+Create a tool like:
+
+`update_policy_suggested_questions`
+
+Purpose:
+- Policy Agent generates useful follow-up questions.
+- Tool only validates and stores them.
+- Tool should not generate questions by itself.
+
+Expected storage:
+```ts
+context.policy.suggestedQuestions = [...]
+````
+
+Use the existing context pattern used by Flight/Trip Planner.
+
+### 2. Update Policy Agent prompt
+
+Update Policy Agent prompt so it always calls this tool at the end of every Policy Agent turn.
+
+The questions should be:
+
+* from the user’s perspective
+* short and mobile-friendly
+* related to policy/help topics only
+* context-aware
+* not repetitive or stale
+
+Good examples:
+
+* "What is the cancellation policy?"
+* "Can I get a refund for this ticket?"
+* "What baggage allowance applies?"
+* "Are there any change fees?"
+* "What happens if I miss my flight?"
+
+Avoid:
+
+* unrelated trip planning questions
+* hotels/cars/commute questions
+* booking/payment completion questions
+* generic repeated questions
+
+### 3. Summary Extractor integration
+
+Currently, after extractor runs, Flight and Trip Planner override extractor-generated suggested questions with their own tool-generated questions.
+
+Apply the same logic for Policy Agent.
+
+Required behavior:
+
+```ts
+if (lastAgent === "PolicyAgent") {
+  summaryContext.suggestedQuestions = context.policy.suggestedQuestions;
+}
+```
+
+Do not remove existing Flight/Trip Planner logic.
+
+### 4. Tests
+
+Add tests for:
+
+1. Policy Agent answers baggage query → updates policy suggested questions.
+2. Policy Agent answers cancellation/refund query → updates relevant questions.
+3. Extractor generates its own questions → final summaryContext uses Policy Agent tool questions instead.
+4. No stale Flight/Trip Planner questions remain after Policy Agent turn.
+5. Tool is called at the end of Policy Agent response.
+
+## Deliverable
+
+* Add Policy Agent suggested questions tool.
+* Update Policy Agent prompt.
+* Update extractor/final summaryContext replacement logic.
+* Add tests.
+* Share files changed and before/after examples.
+
+```
+```
