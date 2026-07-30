@@ -1,98 +1,112 @@
-```markdown id="flight-agent-tone-update"
-Update Flight Agent prompt to make responses more natural and professional.
-
-Goal:
-Flight Agent currently sounds too robotic and direct. Update the prompt so it responds in a more natural, helpful, and professional tone.
+````markdown id="trip-planner-itinerary-quality-fix"
+Improve Trip Planner itinerary quality and formatting.
 
 Scope:
-- Flight Agent prompt
-- dynamic prompt response style rules, if needed
+- Trip Planner prompt
+- itinerary response formatting rules
+- mobile response quality rules
 
-Do not modify:
-- tool schemas
-- routing logic
-- guardrails
-- flight search logic
-- apply filter logic
-- price prediction logic
-- generated context logic
+Do not modify unrelated agents/tools unless required.
 
-## Required tone
+## Problems to fix
 
-Flight Agent should sound:
-- natural
-- professional
-- friendly
-- confident
-- concise
-- helpful
+1. Over-forcing morning/afternoon/evening blocks
+Current prompt forces every block to have a unique activity, which creates illogical filler.
 
-Avoid:
-- robotic replies
-- overly dry confirmations
-- repeated generic lines
-- too much explanation
-- unnecessary apologies
-- long paragraphs
+Examples of bad behavior:
+- adding naps unnecessarily
+- adding activities during arrival/departure when it does not make sense
+- overpacking the itinerary just to fill all blocks
 
-## Response behavior
+Required behavior:
+- Do not force every morning/afternoon/evening block if it feels unnatural.
+- Arrival/departure days can be lighter.
+- Skip blocks that do not add real value.
+- Never add naps unless user explicitly asks for rest/relaxed itinerary and it fits naturally.
 
-1. When asking missing info:
-Bad:
-“Origin? Destination? Date?”
+2. Omit empty details properly
+Each itinerary activity may include:
+- place/activity line
+- short description
+- fun/practical fact
+
+If any detail is not available or not useful, omit it completely.
+
+Do not generate:
+- empty bullets
+- empty lists
+- placeholder text
+- blank “fact” sections
+- meaningless filler
+
+3. Remove bold formatting inside itinerary blocks
+Currently the place/activity name is sometimes bold.
+
+Required:
+- In morning/afternoon/evening activity lists, do not bold place names or activity names.
+- Keep each line simple, clean, and raw.
+- Avoid markdown bold inside itinerary activity bullets.
+
+4. Make itinerary more intelligent
+Update the prompt so itinerary planning feels practical and logical:
+- account for arrival/departure timing
+- avoid overpacking
+- avoid repetitive activities
+- avoid filler activities
+- prioritize quality over filling every slot
+- keep mobile response concise
+- preserve existing no hotel/car/commute rules
+
+5. Review existing feedback
+Review any feedback already provided by the coding/QA agent and incorporate valid improvements into the prompt.
+
+## Expected behavior
 
 Good:
-“Sure — I can help with that. Where are you flying from, where are you going, and what date are you planning to travel?”
+```txt
+Day 1
+Morning: Arrive and settle in if timing allows.
+Afternoon: Explore Colosseum — a strong first stop if you reach early.
+Evening: Walk around Trastevere for food and local atmosphere.
+````
 
-2. When user gives partial info:
 Bad:
-“Date required.”
 
-Good:
-“Got it — JFK to Delhi. What date or month should I check for you?”
+```txt
+Morning: Nap
+Afternoon: Random museum
+Evening: Another forced activity
+Fun fact:
+- 
+```
 
-3. When applying filters:
-Bad:
-“Filter applied.”
+## Tests
 
-Good:
-“Done — I’ve applied the non-stop filter. Here are the best matching options.”
+Add/update tests for:
 
-4. When no result/failure:
-Bad:
-“No flights found.”
+* arrival day itinerary
+* departure day itinerary
+* relaxed itinerary
+* short 2-day trip
+* full 5-day itinerary
+* missing fun/practical fact
+* mobile response formatting
 
-Good:
-“I couldn’t find matching flights with those filters. You can try relaxing the stops, airline, or time filter.”
+Verify:
 
-5. When price prediction is used:
-Make the response helpful and conversational, not just a raw result dump.
+* no forced filler blocks
+* no unnecessary naps
+* no empty lists/details
+* no bold activity names
+* itinerary remains useful and concise
 
-## Important rules
+## Deliverable
 
-- Keep responses concise and mobile-friendly.
-- Ask only for missing required details.
-- Reuse existing flight context naturally.
-- Do not hallucinate route, date, price, or availability.
-- Tool calls and structured payloads must remain unchanged.
-- User-facing response should be natural, but backend logic should stay deterministic.
+* Update Trip Planner prompt.
+* Share files changed.
+* Share before/after examples.
+* Share test results.
+* Mention any prompt conflicts found and how they were handled.
 
-## Testing
-
-Add/update examples for:
-- missing route/date
-- partial route provided
-- flight search success
-- apply filter success
-- no results
-- price prediction response
-- multi-turn follow-up
-
-For each, compare before/after response tone.
-
-Deliverable:
-- Update Flight Agent prompt.
-- Share files changed.
-- Share before/after response examples.
-- Confirm tool behavior is unchanged.
+```
 ```
