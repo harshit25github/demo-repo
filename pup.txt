@@ -1,112 +1,67 @@
-````markdown id="trip-planner-itinerary-quality-fix"
-Improve Trip Planner itinerary quality and formatting.
+```markdown id="flight-date-inference-debug"
+Explore Flight Agent date inference issue for vague dates like “next week”, “next weekend”, and “next month”.
 
-Scope:
-- Trip Planner prompt
-- itinerary response formatting rules
-- mobile response quality rules
+Do not implement yet. First debug and suggest the best improvement plan.
 
-Do not modify unrelated agents/tools unless required.
+## Problem
 
-## Problems to fix
+Flight Agent sometimes fails to infer travel dates from vague user inputs.
 
-1. Over-forcing morning/afternoon/evening blocks
-Current prompt forces every block to have a unique activity, which creates illogical filler.
+Examples:
+- “I want to travel next weekend”
+- “Find flights for next week”
+- “I’m planning to fly next month”
+- “Show me flights around August”
+- “Maybe this Friday or weekend”
 
-Examples of bad behavior:
-- adding naps unnecessarily
-- adding activities during arrival/departure when it does not make sense
-- overpacking the itinerary just to fill all blocks
-
-Required behavior:
-- Do not force every morning/afternoon/evening block if it feels unnatural.
-- Arrival/departure days can be lighter.
-- Skip blocks that do not add real value.
-- Never add naps unless user explicitly asks for rest/relaxed itinerary and it fits naturally.
-
-2. Omit empty details properly
-Each itinerary activity may include:
-- place/activity line
-- short description
-- fun/practical fact
-
-If any detail is not available or not useful, omit it completely.
-
-Do not generate:
-- empty bullets
-- empty lists
-- placeholder text
-- blank “fact” sections
-- meaningless filler
-
-3. Remove bold formatting inside itinerary blocks
-Currently the place/activity name is sometimes bold.
-
-Required:
-- In morning/afternoon/evening activity lists, do not bold place names or activity names.
-- Keep each line simple, clean, and raw.
-- Avoid markdown bold inside itinerary activity bullets.
-
-4. Make itinerary more intelligent
-Update the prompt so itinerary planning feels practical and logical:
-- account for arrival/departure timing
-- avoid overpacking
-- avoid repetitive activities
-- avoid filler activities
-- prioritize quality over filling every slot
-- keep mobile response concise
-- preserve existing no hotel/car/commute rules
-
-5. Review existing feedback
-Review any feedback already provided by the coding/QA agent and incorporate valid improvements into the prompt.
+Current issue:
+- Agent often says price prediction is unavailable.
+- Or it keeps asking for exact date.
+- But for normal flight search, we should infer a reasonable date/range from the user’s phrase when possible.
 
 ## Expected behavior
 
-Good:
-```txt
-Day 1
-Morning: Arrive and settle in if timing allows.
-Afternoon: Explore Colosseum — a strong first stop if you reach early.
-Evening: Walk around Trastevere for food and local atmosphere.
-````
+If user gives a clear relative date intent:
+- “next weekend” → infer upcoming Saturday/Sunday window.
+- “next week” → infer next week date range or a reasonable default date.
+- “next month” → infer next month window.
+- “around August” → infer August window.
+- If exact date is required by flight search API, choose a sensible fallback date and clearly mention it.
 
-Bad:
+Do not keep asking for exact date if the user already gave a usable date hint.
 
-```txt
-Morning: Nap
-Afternoon: Random museum
-Evening: Another forced activity
-Fun fact:
-- 
-```
+## What to investigate
 
-## Tests
+1. Flight Agent prompt
+- Check if prompt asks for exact date too aggressively.
+- Check if vague date handling is missing or conflicting.
 
-Add/update tests for:
+2. Dynamic prompt/context
+- Check how date hints are stored in flight context/searchCriteria.
+- Verify whether “next week/month/weekend” is preserved across turns.
 
-* arrival day itinerary
-* departure day itinerary
-* relaxed itinerary
-* short 2-day trip
-* full 5-day itinerary
-* missing fun/practical fact
-* mobile response formatting
+3. Flight search tool payload generation
+- Check where outbound date is finalized before calling `flight_search_tool`.
+- Identify if date inference should happen before tool call or inside a small date-normalization helper.
 
-Verify:
-
-* no forced filler blocks
-* no unnecessary naps
-* no empty lists/details
-* no bold activity names
-* itinerary remains useful and concise
+4. Price prediction vs flight search routing
+- If prediction is unavailable, agent should still be able to run normal flight search using inferred date.
+- Do not stop the flow only because price prediction failed.
 
 ## Deliverable
 
-* Update Trip Planner prompt.
-* Share files changed.
-* Share before/after examples.
-* Share test results.
-* Mention any prompt conflicts found and how they were handled.
+Provide a short report with:
+1. Root cause.
+2. Where date inference currently breaks.
+3. Recommended fix location.
+4. Suggested fallback rules for:
+   - next week
+   - next weekend
+   - next month
+   - month-only input
+5. Risks/edge cases.
+6. Files/functions likely to change.
+7. Implementation plan.
 
-```
+Do not implement until the plan is reviewed.
 ```
