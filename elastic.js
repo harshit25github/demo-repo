@@ -1,255 +1,141 @@
+export const DAY_MS = 24 * 60 * 60 * 1000;
+export const PRICE_PREDICTION_WINDOW_DAYS = 89;
+export const FLIGHT_SEARCH_WINDOW_DAYS = 359;
 
-const { Client } = require('@elastic/elasticsearch');
-const client = new Client({ node: 'http://localhost:9200' });
-
-async function deleteAllDocuments(indexName) {
-  try {
-    const result = await client.deleteByQuery({
-      index: indexName,
-      body: {
-        query: {
-          match_all: {}
-        }
-      },
-      refresh: true // ensures changes are visible immediately
-    });
-
-    console.log(`🗑️ Deleted ${result.body.deleted} documents from '${indexName}'`);
-  } catch (error) {
-    console.error('❌ Failed to delete documents:', error.meta?.body || error);
-  }
+export function startOfUtcDay(value) {
+  return new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()));
 }
 
-deleteAllDocuments('your-index-name');
+export function addDays(value, days) {
+  return new Date(value.getTime() + days * DAY_MS);
+}
 
-const { Client } = require('@elastic/elasticsearch');
-require('dotenv').config(); // if using .env
-const { Client } = require('@elastic/elasticsearch');
-              "source": "doc.containsKey('error.keyword') && doc['error.keyword'].size() > 0 && doc['error.keyword'].value.length() > 1",
+export function toIsoDate(value) {
+  return value.toISOString().slice(0, 10);
+}
 
-const client = new Client({ node: 'http://localhost:9200' });
+export function parseIsoDate(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return null;
+  }
 
-async function getDocsWithErrorAndUnprocessed(index) {
-  const result = await client.search({
-    index,
-    body: {
-      query: {
-        bool: {
-          must: [
-            { term: { processed: false } },
-            {
-              script: {
-                script: {
-                  source: "doc['error.keyword'].value.length() > 1",
-                  lang: 'painless'
-                }
-              }
-            }
-          ]
-        }
-      }
-    }
+  const [year, month, day] = value.split('-').map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  if (
+    parsed.getUTCFullYear() !== year ||
+    parsed.getUTCMonth() !== month - 1 ||
+    parsed.getUTCDate() !== day
+  ) {
+    return null;
+  }
+
+  return parsed;
+}
+
+export function differenceInDays(laterDate, earlierDate) {
+  return Math.round((laterDate.getTime() - earlierDate.getTime()) / DAY_MS);
+}
+
+export function dateLimitsFromLocalDate(localDate, windowDays) {
+  const today = parseIsoDate(localDate);
+  if (!today) {
+    throw new Error('localDate must be a valid YYYY-MM-DD date.');
+  }
+
+  return {
+    today,
+    yesterday: addDays(today, -1),
+    maxDate: addDays(today, windowDays),
+    todayString: toIsoDate(today),
+    yesterdayString: toIsoDate(addDays(today, -1)),
+    maxDateString: toIsoDate(addDays(today, windowDays)),
+  };
+}
+
+export function getPricePredictionDateLimits(now = new Date()) {
+  const today = startOfUtcDay(now);
+  return dateLimitsFromLocalDate(toIsoDate(today), PRICE_PREDICTION_WINDOW_DAYS);
+}
+
+export function getFlightSearchDateLimits(localDate) {
+  return dateLimitsFromLocalDate(localDate, FLIGHT_SEARCH_WINDOW_DAYS);
+}
+
+function formatterParts(now, timeZone) {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
   });
+  const parts = Object.fromEntries(
+    formatter
+      .formatToParts(now)
+      .filter((part) => part.type !== 'literal')
+      .map((part) => [part.type, part.value]),
+  );
 
-  return result.body.hits.hits.map(doc => doc._source);
+  return {
+    year: Number(parts.year),
+    month: Number(parts.month),
+    day: Number(parts.day),
+    hour: Number(parts.hour),
+    minute: Number(parts.minute),
+    second: Number(parts.second),
+  };
 }
 
-getDocsWithErrorAndUnprocessed('your-index-name')
-  .then(docs => console.log('📄 Found:', docs.length))
-  .catch(console.error);
-
-let elasticClient = null;
-
-function getElasticClient() {
-  if (!elasticClient) {
-    elasticClient = new Client({
-      node: process.env.ELASTIC_NODE || 'http://localhost:9200',
-      auth: {
-        username: process.env.ELASTIC_USERNAME || 'elastic',
-        password: process.env.ELASTIC_PASSWORD || 'changeme'
-      }
-    });
-
-    console.log('✅ Elasticsearch client created');
-  } else {
-    console.log('ℹ️ Reusing existing Elasticsearch client');
-  }
-
-  return elasticClient;
+function formatOffset(minutes) {
+  const sign = minutes >= 0 ? '+' : '-';
+  const absolute = Math.abs(minutes);
+  const hours = String(Math.floor(absolute / 60)).padStart(2, '0');
+  const remainder = String(absolute % 60).padStart(2, '0');
+  return `${sign}${hours}:${remainder}`;
 }
 
-module.exports = { getElasticClient };
-
-
-const result = await client.search({
-  index: 'your-index',
-  body: {
-    query: {
-      bool: {
-        must: [
-          { term: { processed: false } },
-          {
-            bool: {
-              should: [
-                { term: { 'error.keyword': '' } },
-                {
-                  bool: {
-                    must_not: {
-                      exists: {
-                        field: 'error'
-                      }
-                    }
-                  }
-                }
-              ],
-              minimum_should_match: 1
-            }
-          }
-        ]
-      }
-    }
+export function createFlightTurnClock({
+  now = new Date(),
+  timeZone = process.env.FLIGHT_AGENT_TIMEZONE ||
+    Intl.DateTimeFormat().resolvedOptions().timeZone ||
+    'UTC',
+} = {}) {
+  const instant = now instanceof Date ? now : new Date(now);
+  if (Number.isNaN(instant.getTime())) {
+    throw new Error('now must be a valid date or timestamp.');
   }
-});
 
-import { Client } from '@elastic/elasticsearch';
-
-const client = new Client({
-  node: 'http://localhost:9200',
-  auth: {
-    username: 'elastic',
-    password: 'changeme'
-  }
-});
-
-/**
- * Upload a single document without specifying an ID (Elasticsearch auto-generates one).
- */
-async function uploadDocument(index: string, document: object) {
+  let parts;
   try {
-    const response = await client.index({
-      index,
-      document,
-      refresh: 'wait_for'  // ensures it's searchable immediately
-    });
-
-    console.log(`✅ Document indexed with auto ID: ${response.body._id}`);
-    return response;
-  } catch (error) {
-    console.error('❌ Error uploading document:', error.meta?.body || error);
+    parts = formatterParts(instant, timeZone);
+  } catch {
+    timeZone = 'UTC';
+    parts = formatterParts(instant, timeZone);
   }
+
+  const localDate = [parts.year, parts.month, parts.day]
+    .map((value, index) => (index === 0 ? String(value) : String(value).padStart(2, '0')))
+    .join('-');
+  const localTime = [parts.hour, parts.minute, parts.second]
+    .map((value) => String(value).padStart(2, '0'))
+    .join(':');
+  const representedUtcMs = Date.UTC(
+    parts.year,
+    parts.month - 1,
+    parts.day,
+    parts.hour,
+    parts.minute,
+    parts.second,
+  );
+  const instantAtSecond = Math.floor(instant.getTime() / 1000) * 1000;
+  const offsetMinutes = Math.round((representedUtcMs - instantAtSecond) / 60000);
+
+  return Object.freeze({
+    localDate,
+    localDateTime: `${localDate}T${localTime}${formatOffset(offsetMinutes)}`,
+    timeZone,
+  });
 }
-
-import { Client } from '@elastic/elasticsearch';
-
-const client = new Client({
-  node: 'http://localhost:9200',
-  auth: {
-    username: 'elastic',         // or from .env
-    password: 'changeme'
-  }
-});
-
-/**
- * Marks the document with given ID as processed (i.e., sets processed: true)
- */
-async function markAsProcessed(index: string, docId: string) {
-  try {
-    const response = await client.update({
-      index,
-      id: docId,
-      body: {
-        doc: {
-          processed: true
-        }
-      }
-    });
-
-    console.log(`✅ Document ${docId} updated as processed.`);
-    return response;
-  } catch (error) {
-    console.error(`❌ Failed to update document ${docId}:`, error.meta?.body || error);
-  }
-}
-
-
-
-require('dotenv').config();
-const fs = require('fs');
-const { Client } = require('@elastic/elasticsearch');
-
-// 1. Connect to Elasticsearch with basic auth
-const client = new Client({
-  node: process.env.ELASTIC_NODE, // e.g., 'http://localhost:9200'
-  auth: {
-    username: process.env.ELASTIC_USERNAME,
-    password: process.env.ELASTIC_PASSWORD
-  }
-});
-
-// 2. Index name
-const INDEX_NAME = 'courses';
-
-// 3. Create index with optional mapping (optional)
-async function createIndexIfNotExists() {
-  const exists = await client.indices.exists({ index: INDEX_NAME });
-  if (!exists.body) {
-    await client.indices.create({
-      index: INDEX_NAME,
-      body: {
-        mappings: {
-          properties: {
-            id: { type: 'keyword' },
-            title: { type: 'text' },
-            published: { type: 'boolean' }
-          }
-        }
-      }
-    });
-    console.log(`Index "${INDEX_NAME}" created.`);
-  } else {
-    console.log(`Index "${INDEX_NAME}" already exists.`);
-  }
-}
-
-// 4. Load data.json and prepare bulk payload
-function prepareBulkData(documents) {
-  const body = [];
-
-  for (const doc of documents) {
-    body.push({
-      index: { _index: INDEX_NAME, _id: doc.id }
-    });
-    body.push(doc);
-  }
-
-  return body;
-}
-
-// 5. Upload to Elasticsearch
-async function uploadData() {
-  try {
-    await createIndexIfNotExists();
-
-    const jsonData = fs.readFileSync('data.json', 'utf8');
-    const documents = JSON.parse(jsonData);
-
-    if (!Array.isArray(documents)) {
-      throw new Error('JSON file must contain an array of documents.');
-    }
-
-    const bulkBody = prepareBulkData(documents);
-
-    const { body } = await client.bulk({ refresh: true, body: bulkBody });
-
-    if (body.errors) {
-      console.error('Some documents failed to index:', body.items);
-    } else {
-      console.log(`✅ Successfully indexed ${documents.length} documents.`);
-    }
-  } catch (error) {
-    console.error('❌ Error uploading data:', error);
-  }
-}
-
-// Run
-uploadData();
