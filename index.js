@@ -1,52 +1,59 @@
-```markdown
-Remove citations and source URLs from Policy Agent responses.
+import {
+  createFlightTurnClock,
+  dateLimitsFromLocalDate,
+  FLIGHT_SEARCH_WINDOW_DAYS,
+  PRICE_PREDICTION_WINDOW_DAYS,
+} from './flightDateTime.js';
 
-Scope:
-- Update only Policy Agent response/prompt/output formatting.
-- Do not modify unrelated agents or UI.
+export function buildFlightDateIntentSummary(dateIntent) {
+  if (!dateIntent) {
+    return 'none';
+  }
 
-Issue:
-Policy Agent uses a retrieval tool and sometimes returns responses with references like:
-- `[1]`
-- `[2]`
-- `[3]`
+  return [
+    `status=${dateIntent.status || 'unknown'}`,
+    `kind=${dateIntent.kind || 'unknown'}`,
+    `state=${dateIntent.state || 'unknown'}`,
+    `range=${dateIntent.range ? `${dateIntent.range.startDate}..${dateIntent.range.endDate}` : 'none'}`,
+    `searchDate=${dateIntent.searchDate || 'none'}`,
+    `returnDate=${dateIntent.returnDate || 'none'}`,
+    `priceFallbackDate=${dateIntent.priceFallbackDate || 'none'}`,
+    `assumption=${dateIntent.assumptionLabel || 'none'}`,
+  ].join('; ');
+}
 
-And at the end it adds source URLs like:
-- `[1] https://...`
-- `[2] https://...`
+export function buildFlightDatePromptContext(context = {}) {
+  const clock = context.flight?.clock || createFlightTurnClock();
+  const predictionWindow = dateLimitsFromLocalDate(
+    clock.localDate,
+    PRICE_PREDICTION_WINDOW_DAYS,
+  );
+  const searchWindow = dateLimitsFromLocalDate(
+    clock.localDate,
+    FLIGHT_SEARCH_WINDOW_DAYS,
+  );
 
-We do not want references or links in the final Policy Agent response.
+  return {
+    clock,
+    predictionWindow: {
+      startDate: predictionWindow.todayString,
+      endDate: predictionWindow.maxDateString,
+    },
+    searchWindow: {
+      startDate: searchWindow.todayString,
+      endDate: searchWindow.maxDateString,
+    },
+    dateIntentSummary: buildFlightDateIntentSummary(context.flight?.dateIntent),
+  };
+}
 
-Required behavior:
-- Policy Agent can still use retrieved chunks internally.
-- Final user-facing response must not include:
-  - square bracket citations like `[1]`, `[2]`
-  - source/reference section
-  - raw URLs
-  - markdown links
-  - “URL 1”, “Source 1”, etc.
-- Answer should be clean, natural, and link-free.
+export function buildFlightDateDynamicPromptContext(context = {}) {
+  const dateContext = buildFlightDatePromptContext(context);
+  return [
+    `- Immutable turn clock: localDate=${dateContext.clock.localDate}; localDateTime=${dateContext.clock.localDateTime}; timeZone=${dateContext.clock.timeZone}.`,
+    `- Current price prediction window: ${dateContext.predictionWindow.startDate} through ${dateContext.predictionWindow.endDate}, inclusive.`,
+    `- Current flight-search booking window: ${dateContext.searchWindow.startDate} through ${dateContext.searchWindow.endDate}, inclusive.`,
+    `- Durable resolved date intent: ${dateContext.dateIntentSummary}`,
+  ].join('\n');
+}
 
-Update Policy Agent prompt:
-- Use retrieval content to answer.
-- Do not expose citations, references, source numbers, or URLs.
-- Do not append source list at the end.
-- If source metadata exists, ignore it in the final response.
-
-Add final sanitizer if needed:
-- Remove `[1]`, `[2]`, etc.
-- Remove raw URLs.
-- Remove markdown links.
-- Remove trailing source/reference blocks.
-
-Tests:
-1. Retrieved chunks contain URLs → final response has no URLs.
-2. Agent tries `[1]` citations → final response removes them.
-3. Multiple retrieved sources → final answer remains clean.
-4. No placeholder like `URL 1` or `Source 1`.
-
-Deliverable:
-- Update Policy Agent prompt/formatting.
-- Add sanitizer if prompt-only is not reliable.
-- Share before/after examples.
-```
