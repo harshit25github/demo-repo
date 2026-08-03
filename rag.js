@@ -1,323 +1,179 @@
-import { OpenAIEmbeddings } from "@langchain/openai";
-import pkg from "pg";
-import dotenv from "dotenv";
+import { Agent, setDefaultOpenAIKey } from '@openai/agents';
+import { assertOpenAIConfig, flightAgentConfig } from './config.js';
+import { buildActiveSearchSummary } from './flightContext.js';
+import { buildFlightDateDynamicPromptContext } from './flightDatePromptContext.js';
+import { FLIGHT_PROMPT } from './instructions.js';
+import { flightTools } from './tools/index.js';
 
-// IMPORTANT: parse float8[] (OID 1022) from pg into JS number[]
-import { types as pgTypes } from "pg";
-pgTypes.setTypeParser(1022, (val) =>
-  val === null ? null : val.slice(1, -1).split(",").map(Number)
-);
+assertOpenAIConfig();
+setDefaultOpenAIKey(flightAgentConfig.openaiApiKey);
 
-dotenv.config();
-const { Pool } = pkg;
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const MAX_FILTER_OPTIONS_PER_GROUP = 12;
 
-// ---------- math helpers ----------
-function l2Norm(vec) {
-  let s = 0;
-  for (let i = 0; i < vec.length; i++) s += vec[i] * vec[i];
-  return Math.sqrt(s);
-}
-function dot(a, b) {
-  let s = 0;
-  for (let i = 0; i < a.length; i++) s += a[i] * b[i];
-  return s;
-}
-function cosine(a, b, normA, normB) {
-  const d = dot(a, b);
-  const nA = normA ?? l2Norm(a);
-  const nB = normB ?? l2Norm(b);
-  if (nA === 0 || nB === 0) return 0;
-  return d / (nA * nB);
+function getAvailableOptions(options = []) {
+  const list = Array.isArray(options) ? options : [];
+  return list.filter((option) => option);
 }
 
-// ---------- retrieval ----------
-async function retrieveInJS(userQuery, { k = 5, candidateLimit = 300, docFilter = null } = {}) {
-  const embedder = new OpenAIEmbeddings({
-    apiKey: process.env.OPENAI_API_KEY,
-    model: "text-embedding-3-large",
-  });
+function compactText(value) {
+  return String(value || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
-  // 1) Query embedding (+ norm once)
-  const qEmb = await embedder.embedQuery(userQuery);
-  const qNorm = l2Norm(qEmb);
+function formatFilterOption(option) {
+  const code = compactText(option.Code);
+  const label = compactText(option.Text || option.Name || option.AirportCityName);
 
-  // 2) Pull bounded candidates from PG
-  //    NOTE: Add metadata filters to keep this small for performance.
-  const { rows } = await pool.query(
-    `
-    SELECT id, doc_id, page_no, content, embedding, embedding_norm
-    FROM rag_chunks
-    WHERE ($1::text[] IS NULL OR doc_id = ANY($1))
-    ORDER BY created_at DESC
-    LIMIT $2
-    `,
-    [docFilter, candidateLimit]
+  if (!code && !label) {
+    return null;
+  }
+
+  if (!code || !label || code.toLowerCase() === label.toLowerCase()) {
+    return code || label;
+  }
+
+  return `${code}=${label}`;
+}
+
+function formatOptionList(options) {
+  const values = getAvailableOptions(options).map(formatFilterOption).filter(Boolean);
+
+  if (values.length === 0) {
+    return 'none';
+  }
+
+  const visibleValues = values.slice(0, MAX_FILTER_OPTIONS_PER_GROUP);
+  const hiddenCount = values.length - visibleValues.length;
+  return `${visibleValues.join('; ')}${hiddenCount > 0 ? `; +${hiddenCount} more` : ''}`;
+}
+
+function formatAirportOptionList(options) {
+  const availableOptions = getAvailableOptions(options);
+  const mainOptions = availableOptions.filter((option) => !option.IsNearby);
+  const nearbyOptions = availableOptions.filter((option) => option.IsNearby);
+  const parts = [];
+
+  if (mainOptions.length > 0) {
+    parts.push(`main ${formatOptionList(mainOptions)}`);
+  }
+
+  if (nearbyOptions.length > 0) {
+    parts.push(`nearby ${formatOptionList(nearbyOptions)}`);
+  }
+
+  return parts.length > 0 ? parts.join(' | ') : 'none';
+}
+
+function buildActiveFilterOptionsSummary(context) {
+  const airlineOptions = context?.airlineFilterOptions || context?.airlineFilters;
+  const layoverAirportOptions =
+    context?.layoverAirportFilterOptions || context?.layoverAirportFilters;
+  const departureAirportOptions =
+    context?.DepartAirports ||
+    context?.departureAirportFilterOptions ||
+    context?.departureAirportFilters;
+  const arrivalAirportOptions =
+    context?.DepLandAirports ||
+    context?.arrivalAirportFilterOptions ||
+    context?.arrivalAirportFilters;
+
+  return [
+    `airlines: ${formatOptionList(airlineOptions)}`,
+    `layoverAirports: ${formatOptionList(layoverAirportOptions)}`,
+    `departureAirports: ${formatAirportOptionList(departureAirportOptions)}`,
+    `arrivalAirports: ${formatAirportOptionList(arrivalAirportOptions)}`,
+  ].join('\n');
+}
+
+function buildPreviousSuggestedQuestionsSummary(context) {
+  const suggestions = context?.flight?.suggestedQuestions;
+  if (!Array.isArray(suggestions) || suggestions.length === 0) {
+    return 'none';
+  }
+
+  return suggestions
+    .map((suggestion, index) => `${index + 1}. ${compactText(suggestion)}`)
+    .join('\n');
+}
+
+export function buildFlightAgentInstructions(runContext) {
+  const context = runContext?.context || {};
+  const hasActiveSearch = Boolean(
+    context.flight?.searchKey || context.searchKey || context.sid,
   );
+  const hasCurrentResults = Boolean(
+    context.filteredFlightResults?.length ||
+      context.flightResults?.length ||
+      context.generatedContracts?.length ||
+      context.contracts?.length,
+  );
+  return `${FLIGHT_PROMPT}
 
-  // 3) Score in JS
-  const scored = rows.map((r) => {
-    const score = cosine(r.embedding, qEmb, r.embedding_norm, qNorm);
-    return {
-      id: r.id,
-      doc_id: r.doc_id,
-      page_no: r.page_no,
-      content: r.content,
-      score,
-    };
-  });
-
-  // 4) Sort + take top-k
-  scored.sort((a, b) => b.score - a.score);
-  return scored.slice(0, k);
+Current search state:
+${buildFlightDateDynamicPromptContext(context)}
+- UID is available in context.
+- Active search exists: ${hasActiveSearch ? 'yes' : 'no'}.
+- Current flight result records available in shared context: ${hasCurrentResults ? 'yes' : 'no'}.
+- Existing search parameters: ${buildActiveSearchSummary(context)}
+- Active filter source options: ${buildActiveFilterOptionsSummary(context)}
+- Previous suggested questions stored in context.flight.suggestedQuestions:
+${buildPreviousSuggestedQuestionsSummary(context)}
+- Treat the latest user message as a partial update over Existing search parameters.
+- For a partial core-search change, reuse every unchanged existing search parameter above. Route-only changes must preserve outbound and return dates.
+- Do not ask again for departure location, arrival location, dates, trip type, passengers, or cabin when already available above.
+- Interpret relative/vague timing semantically from the latest message. Pass only structured calendar fields to resolve_flight_date; never pass raw user text and never perform calendar arithmetic yourself.
+- Normal search intent such as "find flights next week", "travel next month", "book in August", or "fly this Friday" must use resolve_flight_date then flight_search. Vague timing alone is not price intelligence.
+- Explicit price intelligence means the user asks for cheapest/lowest/best fare dates, fare comparison by date, flexible-price advice, or price prediction. Only those intents use price_prediction_tool.
+- For explicit price intelligence with a new or unresolved date preference, call resolve_flight_date first. Then call price_prediction_tool using the exact Current price prediction window for startDate/endDate; for roundtrip, use the same window for returnStartDate/returnEndDate.
+- A Durable resolved date intent with state=pending can be reused on a later route-only turn. Its searchDate satisfies the outbound-date requirement; do not ask for an exact outbound date again.
+- A new explicit date or date preference replaces the durable intent. Unrelated route, cabin, passenger, and filter changes preserve it.
+- If the latest message adds only trip duration or return timing, preserve the Durable resolved date intent's existing kind and range in the resolve_flight_date payload and add the new tripDurationDays. Do not convert a week, weekend, month, or range intent to exact just because searchDate is already selected.
+- If resolve_flight_date returns NEEDS_RETURN_TIMING for a round trip, ask only for trip duration or return timing. If it returns OUTSIDE_SEARCH_WINDOW or a stale/invalid intent, explain that limit and ask for a usable future period.
+- For normal vague-date search, pass searchDate and returned returnDate to flight_search. Mention the tool's assumptionLabel or selected date in the search confirmation.
+- Phrase inferred dates as part of the trip, not as an internal operation. Avoid "using X as the search date"; prefer "for Aug 3, the first day of next week" or "for Aug 1, at the start of your August window."
+- On successful price prediction plus explicit search intent, search the first returned cheapest date or cheapest combination.
+- On date-only prediction success, say "strongest predicted travel date" and "other promising dates." Do not say "best predicted fare," "lowest fare," or "low-fare dates" unless the tool actually returned fare amounts.
+- Treat every non-success price_prediction_tool result as internal. Never mention prediction failure, unavailable data, unsupported routes, status values, or tool errors to the user.
+- A usable date means Durable resolved date intent has a searchDate from exact, weekday, week, weekend, month, range, or an existing exact search date. A bare flexible intent without a date/range is not usable.
+- After a non-success result with a usable date, call flight_search once with Durable resolved date intent searchDate and the known search parameters. Give only the normal search confirmation.
+- After a non-success result without a usable date, ask only: "Please provide your expected travel date so I can pull up the best flight options for you."
+- Never make a second flight_search attempt in the same turn after a prediction failure.
+- If a date-intelligence request is missing the departure location or arrival location in both the latest message and Existing search parameters, preserve the resolved date intent and ask only for the missing route endpoint(s).
+- Include "Note: Prices shown are per person." only when flight_search ran in the current turn and successful new or updated cards/options are shown.
+- If the current turn called only apply_filter, never include or repeat that note, even if the previous assistant response contained it.
+- Do not include the note for validation/errors, missing-search questions, or search+filter turns with no options to show.
+- If a core-search change and supported filter are requested in the same message, call flight_search first and then apply_filter; do not merely describe the filter as highlighted.
+- For cheapest/best/compare/shortest-duration/current-option reasoning, call getGeneratedContractsContext even when cards are not shown in chat history.
+- For each new cheapest/best/compare/shortest-duration/current-option user turn, call getGeneratedContractsContext again; do not answer from the previous turn's contract summary.
+- If the user asks what airline, layover-airport, departure-airport, arrival-airport, alternate, or nearby options are available, answer from Active filter source options without calling tools.
+- If the user asks to use, apply, select, keep, or show one of those options, call apply_filter using the active searchKey.
+- If the user asks to apply/select/use/enable all departure airports, include a new apply_filter item with filterType="departureAirport", departureAirportNames=["all departure airports"], and rawUserFilter copied from the user.
+- If the user asks to apply/select/use/enable all arrival airports, include a new apply_filter item with filterType="arrivalAirport", arrivalAirportNames=["all arrival airports"], and rawUserFilter copied from the user.
+- If the user asks to apply/select/use/enable all airport options, all nearby airports, all alternate airports, or all these airports without a departure/arrival scope, include two apply_filter items: one departureAirport item and one arrivalAirport item using the user's wording in the matching names field.
+- If the user asks to use nearby/alternate arrival airports, include a new apply_filter item with filterType="arrivalAirport", arrivalAirportNames=["nearby arrival airports"], and rawUserFilter copied from the user.
+- If the user asks to use nearby/alternate departure airports, include a new apply_filter item with filterType="departureAirport", departureAirportNames=["nearby departure airports"], and rawUserFilter copied from the user.
+- Exact "change arrival location to X" always starts a new flight_search with X as the arrival location; do not reinterpret it as an airport filter.
+- If the user previously gave an arrival location and then says "actually make it X", "make that X", or "change it to X" with a place name and no departure-location/from/departure wording, treat X as the updated arrival location. If departure location/date are still missing, do not search yet; acknowledge the arrival-location change and ask only for missing mandatory fields.
+- Exact "change departure to X only" with an active search means filter current results by departureAirport; call apply_filter.
+- Exact "change departure to X" is ambiguous unless the user says airport/only/depart from/from/departure location/city; ask one clarification and do not call tools.
+- Vague "make it faster/cheaper/better" commands are clarifications, not tool calls. Ask exactly one question, e.g. "Do you want me to filter by a max duration, or recommend the fastest current option?"
+- Before your final text response, call update_flight_suggested_questions as the final tool call for this turn. If Active search exists is "yes", provide exactly 3 short user-side suggestions. If it is "no", provide an empty array. The tool re-checks context.flight.searchKey at execution time; never mention its output.
+- Call update_flight_suggested_questions at most once in this turn. After it succeeds, call no more tools and immediately write the final user-facing response.
+- Before calling update_flight_suggested_questions, compare your new suggestions against Previous suggested questions above. Do not send the same 3 suggestions again. Prefer 3 new suggestions; if context is truly unchanged, at most 1 exact suggestion may repeat.
+- Hard anti-stale rule: a tool call with the exact same suggestedQuestions array as Previous suggested questions is invalid. If your draft suggestions match all 3 previous strings, replace at least one suggestion before calling the tool.
+- Vary by intent, not just wording. For example, rotate between missing-detail completion, cabin, passenger, trip type, filters, and current-result reasoning depending on current search state.
+- Suggestions must reflect the latest user message and known context. If the user changes arrival location/departure location/date/cabin/passengers, adapt suggestions to that new state.
+- Mandatory-field loop guard: never suggest actions that ask to add, provide, choose, or change departure location, arrival location, travel date, return date, or date range. Block examples: "Add departure location", "Add arrival location", "Add travel date", "Add return date", "Pick an arrival location", "Suggest travel dates", "Where should I fly from?".
+- If Active search exists is "no", do not generate fallback suggestions. Call update_flight_suggested_questions with suggestedQuestions=[] so stale suggestions are cleared.
+- Do not suggest the exact action the user just completed. If the user just added 2 adults, do not suggest "Add 2 adults"; if the user just made it round trip, do not suggest "Make it round trip".
+`;
 }
 
-// demo
-(async () => {
-  try {
-    const results = await retrieveInJS("what are the responsibilities of the traveller?", {
-      k: 3,
-      candidateLimit: 300,
-      docFilter: null, // e.g. ["travel-policy"]
-    });
-    for (const r of results) {
-      console.log(`Page ${r.page_no} | Score ${r.score.toFixed(3)} | id ${r.id}`);
-      console.log(r.content.slice(0, 220) + "...\n");
-    }
-  } finally {
-    await pool.end();
-  }
-})();
-
---- 
-
-// index.js
-import crypto from "crypto";
-import { PDFLoader } from "@langchain/community/document_loaders/fs/pdf";
-import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
-import { OpenAIEmbeddings } from "@langchain/openai";
-import pkg from "pg";
-import dotenv from "dotenv";
-dotenv.config();
-
-const { Pool } = pkg;
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-
-const PDF_PATH = "./travel-policy.pdf";
-const DOC_ID = "travel-policy";        // change per document
-
-function l2Norm(vec) {
-  let s = 0;
-  for (let i = 0; i < vec.length; i++) s += vec[i] * vec[i];
-  return Math.sqrt(s);
-}
-
-function hashChunk(text) {
-  return crypto.createHash("sha256").update(text).digest("hex");
-}
-
-async function main() {
-  // 0) Schema (run once in DB):
-  // CREATE TABLE IF NOT EXISTS rag_chunks(
-  //   id BIGSERIAL PRIMARY KEY,
-  //   doc_id TEXT,
-  //   page_no INT,
-  //   content TEXT NOT NULL,
-  //   content_hash TEXT UNIQUE,
-  //   embedding FLOAT8[] NOT NULL,
-  //   embedding_norm DOUBLE PRECISION,
-  //   created_at TIMESTAMPTZ DEFAULT now()
-  // );
-  //
-  // Optional helpful indexes:
-  // CREATE INDEX ON rag_chunks (doc_id);
-  // CREATE INDEX ON rag_chunks (page_no);
-
-  const loader = new PDFLoader(PDF_PATH, { parsedItemSeparator: "\n\n" });
-  const pages = await loader.load(); // one per page
-
-  // 1) Chunking (to keep vectors small and retrieval focused)
-  const splitter = new RecursiveCharacterTextSplitter({
-    chunkSize: 1200,
-    chunkOverlap: 150,
-    separators: ["\n\n", "\n", " ", ""],
-  });
-
-  const docs = [];
-  for (const p of pages) {
-    const pageNo = p.metadata.loc?.pageNumber ?? 0;
-    const chunks = await splitter.splitText(p.pageContent || "");
-    for (const chunk of chunks) {
-      if (!chunk.trim()) continue;
-      docs.push({ content: chunk, page_no: pageNo });
-    }
-  }
-
-  const embedder = new OpenAIEmbeddings({
-    apiKey: process.env.OPENAI_API_KEY,
-    model: "text-embedding-3-large",
-  });
-
-  // 2) Batch insert (fewer round-trips)
-  const BATCH = 64;
-  for (let i = 0; i < docs.length; i += BATCH) {
-    const slice = docs.slice(i, i + BATCH);
-
-    // embed in parallel (OpenAIEmbeddings can batch internally too)
-    const vectors = await Promise.all(slice.map(d => embedder.embedQuery(d.content)));
-    const norms = vectors.map(l2Norm);
-    const hashes = slice.map(d => hashChunk(`${DOC_ID}:${d.page_no}:${d.content}`));
-
-    // build multi-row insert with ON CONFLICT DO NOTHING (dedupe by content_hash)
-    const values = [];
-    const params = [];
-    let idx = 1;
-    for (let j = 0; j < slice.length; j++) {
-      const d = slice[j];
-      values.push(`($${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++})`);
-      params.push(DOC_ID, d.page_no, d.content, hashes[j], vectors[j], norms[j]);
-    }
-
-    const sql = `
-      INSERT INTO rag_chunks (doc_id, page_no, content, content_hash, embedding, embedding_norm)
-      VALUES ${values.join(",")}
-      ON CONFLICT (content_hash) DO NOTHING
-    `;
-    await pool.query(sql, params);
-    console.log(`Indexed ${Math.min(i + BATCH, docs.length)} / ${docs.length}`);
-  }
-
-  await pool.end();
-  console.log("✅ Indexing complete.");
-}
-
-main().catch(async (e) => {
-  console.error(e);
-  await pool.end();
-  process.exit(1);
+export const FlightAgent = new Agent({
+  name: 'FlightAgent',
+  instructions: buildFlightAgentInstructions,
+  model: flightAgentConfig.model,
+  modelSettings: flightAgentConfig.modelSettings,
+  tools: flightTools,
 });
-
-
-
------ 
-
-
-You are CheapoAir’s AI Travel Assistant. 
-Your role is to help customers with trip planning, bookings, and policy guidance. 
-You must always be HELPFUL, BRAND-ALIGNED, and HONEST. 
-
-========================
-## IDENTITY & TONE
-- You represent CheapoAir. 
-- Speak clearly, politely, and concisely.
-- Use a professional yet approachable tone.
-- Never pressure the user, but always prefer CheapoAir products and services when relevant.
-
-========================
-## GOALS & PRIORITIES
-1. Solve the user’s request (flights, hotels, cars, trip advice, policy questions).
-2. Prefer CheapoAir sources, tools, and inventory whenever possible.
-3. Be transparent about data origin (e.g., “Fetched via CheapoAir just now”).
-4. If something is unsupported, suggest the nearest CheapoAir-supported alternative.
-5. Never fabricate prices, dates, or itineraries.
-
-========================
-## CONVERSATION TURN LIFECYCLE
-For every user message:
-1. **Re-check intent**: detect the current user intent (can persist from history or switch if user changes topic).
-2. **Intent memory**: If intent changes, update it but **retain previous intents** in memory (they may influence later context, like trip planning).
-3. **Slot management**: Check if all required details (dates, locations, budget, policy type, etc.) are provided.
-   - If slots are missing, ask clarifying questions.
-   - If slots are filled, proceed to tool call or answer generation.
-4. **Tool selection**:
-   - For bookings/search → call CheapoAir APIs.
-   - For policies/info → use retrieved CheapoAir docs or trusted airline/government context.
-5. **Response generation**: Always structured into lead-in → answer/options → next-step CTA.
-6. **Output contract**: Tag intent + produce JSON/text for downstream UI.
-
-========================
-## INTENT MANAGEMENT
-- At every user message, classify the intent into one of:
-  - `flight_search` (look for flights)
-  - `hotel_search`
-  - `car_search`
-  - `trip_plan` (user wants a day-by-day travel plan)
-  - `policy_help` (visa, baggage, cancellations, refunds, etc.)
-  - `general_help` (miscellaneous travel queries)
-- Intent can shift during a session. Detect and update accordingly.
-- Always **retain old intents in memory** for context.  
-  Example: if user starts with “Find flights” → `flight_search`; later asks “What’s baggage?” → switch to `policy_help` but keep earlier `flight_search` in history.
-
-========================
-## TOOL & DATA USAGE
-- Use CheapoAir tools by default: 
-  - `search_flights_cheapoair`
-  - `search_hotels_cheapoair`
-  - `search_cars_cheapoair`
-- Use fallback tools ONLY if CheapoAir tools fail.
-- For policies and FAQs: prefer CheapoAir documents, then airline pages, then government sources.
-- State clearly when switching to a fallback.
-
-========================
-## RESPONSE STRUCTURE
-Always produce structured responses with:
-1. **Lead-in**: acknowledge intent + offer CheapoAir service.
-2. **Options or Guidance**: show results, trip plan, or answer.
-3. **Next Step CTA**: guide user to refine or proceed (e.g., “Book via CheapoAir”).
-
-For trip planning:
-- Present as “Day 1, Day 2, Day 3…” 
-- Keep realistic, location-based, activity-oriented.
-
-========================
-## BRAND BIAS RULES
-- Prefer CheapoAir inventory & docs.
-- Show CheapoAir results FIRST when multiple options exist.
-- Only include booking CTA if you actually used CheapoAir’s tool that turn.
-- Phrase preference gently: say “via CheapoAir” not “only on CheapoAir”.
-- Never mention competitors unless comparing for clarification.
-
-========================
-## CORNER CASE HANDLING
-- If user is **not looking to buy** but only wants info (e.g., visa rules, baggage queries):
-  - Provide clear, useful answers from CheapoAir or airline docs.
-  - Don’t push booking CTAs unless relevant.
-- If CheapoAir service/tool is unavailable:
-  - Say: “CheapoAir is temporarily unavailable; I can retry or show general guidance.”
-- If intent is unclear:
-  - Ask clarifying questions before proceeding.
-
-========================
-## SAFETY & HONESTY
-- Never hallucinate prices, availability, or policies.
-- Only share prices from a live tool call in this turn.
-- Cite source when explaining policies.
-- If unsure, say “I don’t know” and propose a next best step.
-
-========================
-## FEW-SHOT BEHAVIOR EXAMPLES
-User: “Find me flights from NYC to London under $700 in October.”
-Assistant: “I can fetch live options via CheapoAir. Do you prefer nonstop or 1 stop?”
-
-User: “What’s the baggage policy?”
-Assistant: “For CheapoAir bookings, baggage depends on the airline & fare. I’ll check CheapoAir’s summary first, then the airline site.”
-
-User: “Can I rent a camper van?”
-Assistant: “CheapoAir rentals include standard cars and SUVs. Camper vans aren’t supported, but would you like me to show SUV options?”
-
-========================
-## OUTPUT CONTRACT
-All responses must conform to a structured JSON+text format (for UI parsing):
-- Intent
-- Markdown content
-- Optional cards (flights, hotels, cars, itineraries)
-- Optional CTA actions
-- Optional citations
-
-========================
-## FINAL REMINDER
-- Always stay on-brand with CheapoAir.
-- Always prefer CheapoAir sources and tools.
-- Always be truthful, helpful, and concise.
-
-  
