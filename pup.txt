@@ -1,67 +1,326 @@
-```markdown id="flight-date-inference-debug"
-Explore Flight Agent date inference issue for vague dates like “next week”, “next weekend”, and “next month”.
+````markdown id="flight-date-context-implementation"
+Implement Flight Agent date-context handling in the original codebase.
 
-Do not implement yet. First debug and suggest the best improvement plan.
+Goal:
+Add clean date-context support for Flight Agent so it can handle relative/vague dates, price prediction date ranges, and flight search dates without changing existing production context/tool contracts.
 
-## Problem
+## Important constraints
 
-Flight Agent sometimes fails to infer travel dates from vague user inputs.
+- Inspect the original codebase before editing.
+- Keep existing `context.flight` schema intact.
+- Do not rename existing context fields, API payloads, or tool schemas.
+- Add date runtime state separately under `context.flightDate`.
+- Do not copy or rewrite static Flight Agent prompt text.
+- Implement only:
+  - dynamic date-context hydration
+  - date lifecycle handling
+  - date resolver tool
+  - flight search date integration
+  - price prediction date integration
+- Tools must receive structured data, not raw user text.
+- Avoid unnecessary fallback layers.
+- Do not store tool-call logs in context unless already required by the project.
+- Preserve existing business behavior and unrelated tools.
 
-Examples:
-- “I want to travel next weekend”
-- “Find flights for next week”
-- “I’m planning to fly next month”
-- “Show me flights around August”
-- “Maybe this Friday or weekend”
+## Required date context
 
-Current issue:
-- Agent often says price prediction is unavailable.
-- Or it keeps asking for exact date.
-- But for normal flight search, we should infer a reasonable date/range from the user’s phrase when possible.
+Add a separate date state like:
 
-## Expected behavior
+```ts
+context.flightDate = {
+  clock: {
+    localDate: string,
+    localDateTime: string,
+    timeZone: string
+  },
+  dateIntent?: {
+    status: "RESOLVED" | "NEEDS_RETURN_TIMING" | "OUTSIDE_SEARCH_WINDOW" | "INVALID_INTENT",
+    kind: "exact" | "weekday" | "week" | "weekend" | "month" | "range" | "flexible",
+    range: { startDate: string, endDate: string } | null,
+    searchDate: string | null,
+    returnDate: string | null,
+    priceFallbackDate: string | null,
+    timeZone: string,
+    resolvedFromDate: string,
+    assumptionLabel: string,
+    state: "pending" | "used" | "stale" | "invalid",
+    stale: boolean,
+    usedAtRequestId?: string | null
+  },
+  routing: {
+    pricePredictionStatus: string | null,
+    priceFallbackDate: string | null,
+    fallbackSearchAttempted: boolean
+  }
+}
+````
 
-If user gives a clear relative date intent:
-- “next weekend” → infer upcoming Saturday/Sunday window.
-- “next week” → infer next week date range or a reasonable default date.
-- “next month” → infer next month window.
-- “around August” → infer August window.
-- If exact date is required by flight search API, choose a sensible fallback date and clearly mention it.
+## Date lifecycle rules
 
-Do not keep asking for exact date if the user already gave a usable date hint.
+* Regenerate `clock` on every request using current local date/time and real user timezone.
+* Reset `routing` on every request.
+* Preserve `dateIntent` across unrelated turns.
+* Do not create `dateIntent` on an empty first turn.
+* If exact outbound date already exists but `dateIntent` is missing, hydrate an exact used intent.
+* Explicit new date intent replaces previous intent.
+* Route/passenger/cabin/filter changes should preserve existing date intent.
+* Mark date intent stale if `searchDate` is before current local date.
+* One-way change may clear old return date.
+* Do not hardcode one timezone for all users.
 
-## What to investigate
+## Request flow
 
-1. Flight Agent prompt
-- Check if prompt asks for exact date too aggressively.
-- Check if vague date handling is missing or conflicting.
+Implement this flow:
 
-2. Dynamic prompt/context
-- Check how date hints are stored in flight context/searchCriteria.
-- Verify whether “next week/month/weekend” is preserved across turns.
+```txt
+request starts
+↓
+load/create appContext
+↓
+normalize existing context.flight
+↓
+set request/session metadata if available
+↓
+create fresh flightDate.clock
+↓
+reset flightDate.routing
+↓
+hydrate/preserve/validate flightDate.dateIntent
+↓
+build compact dynamic date context
+↓
+run Flight Agent/tools
+↓
+return/persist updated context
+```
 
-3. Flight search tool payload generation
-- Check where outbound date is finalized before calling `flight_search_tool`.
-- Identify if date inference should happen before tool call or inside a small date-normalization helper.
+For streaming, persist context only after stream completion.
 
-4. Price prediction vs flight search routing
-- If prediction is unavailable, agent should still be able to run normal flight search using inferred date.
-- Do not stop the flow only because price prediction failed.
+## Resolver tool
+
+Create/register a tool named:
+
+```txt
+resolve_flight_date
+```
+
+Input schema:
+
+```ts
+{
+  kind: "exact" | "weekday" | "week" | "weekend" | "month" | "range" | "flexible",
+  relation: "this" | "next" | null,
+  offset: number | null,
+  weekday: "sunday" | "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | null,
+  month: number | null,
+  year: number | null,
+  exactDate: string | null,
+  rangeStart: string | null,
+  rangeEnd: string | null,
+  tripDurationDays: number | null
+}
+```
+
+Rules:
+
+* Agent interprets natural language and sends structured payload.
+* Tool must not parse raw user text.
+* Tool uses `context.flightDate.clock`.
+* Tool may use existing flight search context for trip duration/return date.
+* Tool updates `context.flightDate.dateIntent`.
+* Tool returns resolved date feedback to the agent.
+
+## Date resolution policy
+
+Implement these behaviors:
+
+* `next week` → next Monday to Sunday; search Monday.
+* `this weekend` → nearest upcoming Saturday/Sunday; search Saturday.
+* `next weekend` → following Saturday/Sunday; search Saturday.
+* `next month` → full next calendar month; search first day.
+* named month → next valid occurrence; clip past dates.
+* weekday → resolve from current local date.
+* explicit range → preserve range; search range start.
+* flexible → today through today + 89 days.
+* flight search booking limit → 359 days.
+* price prediction limit → 89 days.
+* return date → `searchDate + tripDurationDays`.
+* reuse existing outbound-return duration when available.
+* round trip without return timing/duration → return `NEEDS_RETURN_TIMING`.
+
+## Dynamic date context hydration
+
+Add a dynamic date-context builder.
+
+Inject only compact date info:
+
+* `clock.localDate`
+* `clock.localDateTime`
+* `clock.timeZone`
+* 89-day prediction window
+* 359-day search window
+* date intent status/kind/state/range
+* `searchDate`
+* `returnDate`
+* `priceFallbackDate`
+* `assumptionLabel`
+* compact existing search summary
+
+Do not inject:
+
+* full appContext
+* full search results
+* full previous prediction result
+* routing internals
+* request/session metadata
+* tool-call history
+
+Attach this generated block through the existing dynamic instruction builder. Do not replace static prompt content.
+
+## Flight search integration
+
+* Agent should create the existing structured `flight_search` payload.
+* Use `dateIntent.searchDate` as outbound date.
+* Use `dateIntent.returnDate` as return date when available.
+* After successful search:
+
+  * update active flight search context
+  * mark matching date intent as `used`
+* If search uses a predicted best date, store it as a new exact used intent.
+* Do not ask exact date again if a non-stale `dateIntent.searchDate` exists.
+* User response should clearly mention inferred date/assumption naturally.
+
+## Price prediction integration
+
+Use price prediction only for explicit price-intelligence intent:
+
+* cheapest date
+* best fare date
+* lowest fare
+* compare dates
+* flexible-price advice
+* prediction requests
+
+Normal vague search should follow:
+
+```txt
+resolve_flight_date → flight_search
+```
+
+Price-intelligence flow should follow:
+
+```txt
+resolve_flight_date → price_prediction_tool
+```
+
+Implement a temporary adapter that builds price prediction input from `dateIntent`.
+
+Rules:
+
+* Query full today-to-89-day prediction window.
+* Also preserve requested/effective user range.
+* Filter returned predictions to requested month/range after the tool result.
+* Store result in `context.flight.lastPricePrediction`.
+* Store only routing status/fallback info in `context.flightDate.routing`.
+* Never expose `NO_PREDICTIONS`, unsupported route, internal errors, or raw tool messages to user.
+* If usable search date exists and normal-search continuation applies, call `flight_search` once.
+* Use `fallbackSearchAttempted` to prevent loops.
+* Predicted date becomes durable only after actual flight search.
+
+## Required implementation areas
+
+Before editing, locate equivalent areas in the original codebase for:
+
+* request runner / agent runner
+* appContext creation
+* flight context hydration
+* tool runtime context initialization
+* dynamic prompt/context builder
+* date resolver/helper
+* date resolver tool registration
+* flight search tool execution
+* price prediction tool execution
+* price prediction input normalization
+* price prediction failure response handling
+* active search context update
+* suggested questions tool ordering
+
+Do not invent new parallel flows if equivalent project functions already exist.
+
+## Testing
+
+Use fixed clock:
+
+```txt
+localDate = 2026-08-04
+localDateTime = 2026-08-04T15:30:00+05:30
+timeZone = Asia/Kolkata
+```
+
+Test cases:
+
+1. `JFK to Delhi next weekend`
+
+* resolve Aug 15–16
+* search Aug 15
+* do not call prediction
+
+2. `next month` → `DEL to BOM`
+
+* turn 1 stores Sep 1–30 pending intent
+* turn 2 searches Sep 1 without asking date again
+
+3. `cheapest fare next month from JFK to DEL`
+
+* resolve Sep 1–30
+* prediction payload uses full Aug 4–Nov 1 window
+* recommendations filtered to September
+
+4. `JFK to Delhi in August` → `round trip` → `21 days`
+
+* preserve August range
+* ask only return timing if duration missing
+* after duration, resolve return date correctly
+* search round trip
+
+5. Prediction `NO_PREDICTIONS` / error
+
+* do not expose internal failure
+* use one normal search when usable date exists
+* prevent repeated fallback calls
+
+6. Exact date after vague date
+
+* exact date replaces old intent
+
+7. Route change without new date
+
+* existing outbound/return dates remain unchanged
+
+Also test:
+
+* timezone midnight
+* stale dates
+* year boundaries
+* 89-day prediction limit
+* 359-day search limit
+* latest searchKey
+* suggested-question tool ordering
 
 ## Deliverable
 
-Provide a short report with:
-1. Root cause.
-2. Where date inference currently breaks.
-3. Recommended fix location.
-4. Suggested fallback rules for:
-   - next week
-   - next weekend
-   - next month
-   - month-only input
-5. Risks/edge cases.
-6. Files/functions likely to change.
-7. Implementation plan.
+Return:
 
-Do not implement until the plan is reviewed.
+* files changed
+* original-code areas mapped before implementation
+* date context before/after examples
+* tool payload examples
+* dynamic date-context example
+* tests added
+* commands run
+* pass/fail results
+* confirmation static prompts were not changed
+* confirmation unrelated business logic was not changed
+
+```
 ```
