@@ -2,6 +2,10 @@ import { Agent, setDefaultOpenAIKey } from '@openai/agents';
 import { assertOpenAIConfig, flightAgentConfig } from './config.js';
 import { buildActiveSearchSummary } from './flightContext.js';
 import { buildFlightDateDynamicPromptContext } from './flightDatePromptContext.js';
+import {
+  getFlightRequestClock,
+  getFlightRequestState,
+} from './flightRequestContext.js';
 import { FLIGHT_PROMPT } from './instructions.js';
 import { flightTools } from './tools/index.js';
 
@@ -104,13 +108,15 @@ function buildPreviousSuggestedQuestionsSummary(context) {
 }
 
 export function buildFlightAgentInstructions(runContext) {
-  const context = runContext?.context || {};
+  const requestContext = runContext?.context || {};
+  const context = getFlightRequestState(requestContext) || {};
+  const clock = getFlightRequestClock(requestContext);
   const hasActiveSearch = Boolean(context.flight?.searchKey);
   const hasCurrentResults = hasFlightResultRecords(context.flight?.searchResults);
   return `${FLIGHT_PROMPT}
 
 Current search state:
-${buildFlightDateDynamicPromptContext(context)}
+${buildFlightDateDynamicPromptContext(clock)}
 - UID is available in context.
 - Active search exists: ${hasActiveSearch ? 'yes' : 'no'}.
 - Current flight result records available in shared context: ${hasCurrentResults ? 'yes' : 'no'}.
@@ -122,25 +128,25 @@ ${buildPreviousSuggestedQuestionsSummary(context)}
 - For a partial core-search change, reuse every unchanged existing search parameter above. Route-only changes must preserve outbound and return dates.
 - Do not ask again for departure location, arrival location, dates, trip type, passengers, or cabin when already available above.
 - Interpret relative/vague timing semantically from the latest message. Pass only structured calendar fields to resolve_flight_date; never pass raw user text and never perform calendar arithmetic yourself.
-- For "after N days/weeks", call resolve_flight_date with kind="exact", offset set to the total days, and exactDate=null.
+- Always include tripType in resolve_flight_date input when it is known; otherwise pass null. For "after N days/weeks", use kind="exact", offset set to the total days, and exactDate=null.
 - Normal search intent such as "find flights next week", "travel next month", "book in August", or "fly this Friday" must use resolve_flight_date then flight_search. Vague timing alone is not price intelligence.
 - Explicit price intelligence means the user asks for cheapest/lowest/best fare dates, fare comparison by date, flexible-price advice, or price prediction. Only those intents use price_prediction_tool.
-- For explicit price intelligence with a new or unresolved date preference, call resolve_flight_date first. Then call price_prediction_tool using the exact Current price prediction window for startDate/endDate; for roundtrip, use the same window for returnStartDate/returnEndDate.
-- A Durable resolved date intent with state=pending can be reused on a later route-only turn. Its searchDate satisfies the outbound-date requirement; do not ask for an exact outbound date again.
-- A new explicit date or date preference replaces the durable intent. Unrelated route, cabin, passenger, and filter changes preserve it.
-- If the latest message adds only trip duration or return timing, preserve the Durable resolved date intent's existing kind, pass its range as rangeStart/rangeEnd, and add the new tripDurationDays. Do not convert a week, weekend, month, or range intent to exact just because searchDate is already selected.
-- When the latest message contains relative, vague, month, range, or flexible timing but route details are missing, resolve and persist that timing before asking for the missing departure or arrival location. Do not rely on conversation history alone to carry unresolved timing.
-- If resolve_flight_date returns NEEDS_RETURN_TIMING for a round trip, ask only for trip duration or return timing. If it returns OUTSIDE_SEARCH_WINDOW or a stale/invalid intent, explain that limit and ask for a usable future period.
+- For explicit price intelligence with vague timing, call resolve_flight_date first. Pass its returned range directly as price_prediction_tool startDate/endDate. For roundtrip, use the resolved outbound/return range and duration available from the user or existing search.
+- resolve_flight_date is stateless: use its returned fields immediately and never assume it updated context. Previous resolver feedback may be reused only when it is present in the SDK conversation history for this session.
+- When a later message supplies only the route, reuse the latest resolver searchDate from conversation history. A new explicit date or date preference overrides older resolver feedback.
+- If the latest message adds only trip duration or return timing, reuse the latest resolver range from conversation history and call the resolver again with rangeStart/rangeEnd plus tripDurationDays. Do not collapse a week, weekend, month, or range into kind="exact".
+- When relative, vague, month, range, or flexible timing is supplied before the route, call the resolver, then ask only for the missing departure or arrival location. The next turn relies on the session's prior resolver result, not hidden date context.
+- If resolve_flight_date returns NEEDS_RETURN_TIMING for a round trip, ask only for trip duration or return timing. If it returns OUTSIDE_SEARCH_WINDOW or INVALID_INTENT, explain that limit and ask for a usable future period.
 - For normal vague-date search, pass searchDate and returned returnDate to flight_search. Mention the tool's assumptionLabel or selected date in the search confirmation.
 - Phrase inferred dates as part of the trip, not as an internal operation. Avoid "using X as the search date"; prefer "for Aug 3, the first day of next week" or "for Aug 1, at the start of your August window."
 - On successful price prediction plus explicit search intent, search the first returned cheapest date or cheapest combination.
 - On date-only prediction success, say "strongest predicted travel date" and "other promising dates." Do not say "best predicted fare," "lowest fare," or "low-fare dates" unless the tool actually returned fare amounts.
 - Treat every non-success price_prediction_tool result as internal. Never mention prediction failure, unavailable data, unsupported routes, status values, or tool errors to the user.
-- A usable date means Durable resolved date intent has a searchDate from exact, weekday, week, weekend, month, range, or an existing exact search date. A bare flexible intent without a date/range is not usable.
-- After a non-success result with a usable date, call flight_search once with Durable resolved date intent searchDate and the known search parameters. Give only the normal search confirmation.
+- A usable date means the current-turn resolver returned searchDate, the current conversation contains an unambiguous latest resolver searchDate, or Existing search parameters contain an exact outbound date. A bare flexible intent without a selected date is not usable.
+- After a non-success result, call flight_search once only when the user also requested flight results and a usable date is available. Otherwise ask for the expected travel date. Give only the normal search confirmation after a fallback search.
 - After a non-success result without a usable date, ask only: "Please provide your expected travel date so I can pull up the best flight options for you."
 - Never make a second flight_search attempt in the same turn after a prediction failure.
-- If a date-intelligence request is missing the departure location or arrival location in both the latest message and Existing search parameters, preserve the resolved date intent and ask only for the missing route endpoint(s).
+- If a date-intelligence request is missing the departure location or arrival location in both the latest message and Existing search parameters, resolve any supplied vague timing first and ask only for the missing route endpoint(s).
 - In user-facing responses, never label route fields as origin, destination, departure city, or destination city. Use departure location and arrival location, or natural phrasing such as where the user is flying from and where they are going.
 - If both route endpoints are missing after date resolution, ask exactly: "Please share your departure location and arrival location."
 - Include "Note: Prices shown are per person." only when flight_search ran in the current turn and successful new or updated cards/options are shown.
