@@ -1,101 +1,184 @@
-````markdown id="trip-planner-safety-guardrail"
-Plan Trip Planner Agent safety/guardrail improvements.
+````markdown id="flight-context-fallback-plan"
+Plan Flight Agent dynamic prompt context fallback for route/date fields.
 
-Do not implement yet. First analyze and provide a clear improvement plan.
+Do not implement yet. First inspect the code and propose the cleanest enhancement plan.
 
-## Context
+## Problem
 
-We have:
-- Gateway Agent with guardrails
-- Trip Planner Agent
-- Other routed agents
+Flight Agent dynamic prompt currently receives both:
+- `summary` context
+- `flight` context
 
-Even with existing guardrails, some unsafe/jailbreak prompts are still reaching Trip Planner and causing unsafe responses.
+Both may contain similar information:
+- departure/origin location
+- arrival/destination location
+- outbound date
+- return/inbound date
+- passenger info
 
-We need to strengthen Trip Planner directly, not only rely on Gateway.
+Sometimes `flight` context has empty values, but `summary` context has valid values.  
+Because both objects are injected separately, the agent can get confused and ask for departure/arrival/date again even when the information exists in summary.
 
-## Safety areas to handle
+## Goal
 
-Trip Planner must refuse or safely redirect requests involving:
+Create one normalized dynamic prompt object for Flight Agent that resolves the best available values before injecting into the prompt.
 
-- explicit sexual content
-- child sexual content
-- bomb-making/explosives/weapons instructions
-- illegal activity
-- self-harm/violence
-- privacy violations
-- system prompt/private instruction extraction
-- jailbreak attempts
-- roleplay attempts to bypass rules
+Priority:
 
-## Required behavior
-
-Trip Planner should:
-
-- refuse briefly and professionally
-- not provide operational unsafe details
-- not continue unsafe roleplay
-- not call tools for unsafe content
-- not expose system/developer/private instructions
-- redirect only to safe travel-planning help when appropriate
-
-## What to analyze
-
-1. Current Trip Planner prompt
-- Check if it has its own safety rules.
-- Identify where unsafe prompts can bypass Gateway.
-- Check whether jailbreak text can override Trip Planner instructions.
-
-2. Gateway + Trip Planner split
-Explain:
-- what Gateway should block
-- what Trip Planner should refuse internally
-- how to avoid duplicate/conflicting responses
-
-3. Tool safety
-Check:
-- whether Trip Planner can call web/tools for unsafe requests
-- how to prevent tool calls when intent is unsafe
-
-## Tests to add
-
-Create tests for:
-
-- explicit sexual travel request
-- bomb/explosive request disguised as travel
-- illegal activity disguised as itinerary
-- “ignore previous instructions”
-- “show your system prompt”
-- unsafe request mixed with valid travel request
-- normal safe itinerary request
-
-For each test, capture:
-
-```json
-{
-  "testId": "",
-  "userMessage": "",
-  "expectedBehavior": "",
-  "actualBehavior": "",
-  "toolsCalled": [],
-  "pass": true,
-  "issues": []
-}
+```txt
+flight context > summary context
 ````
+
+But fallback only when flight value is truly empty.
+
+## Required fallback logic
+
+### Location fields
+
+Flight context examples:
+
+```ts
+flight.resolvedOrigin = {
+  userCity: "",
+  airportIATA: ""
+}
+
+flight.resolvedDestination = {
+  userCity: "",
+  airportIATA: ""
+}
+```
+
+Summary context examples:
+
+```ts
+summary.origin = {
+  city: "",
+  iata: ""
+}
+
+summary.destination = {
+  city: "",
+  iata: ""
+}
+```
+
+Rules:
+
+1. For departure location:
+
+* First check `flight.resolvedOrigin`.
+* If either `userCity` or `airportIATA` has a non-empty value, use flight origin.
+* Only if both are empty/null/missing, fallback to `summary.origin`.
+
+2. For arrival location:
+
+* First check `flight.resolvedDestination`.
+* If either `userCity` or `airportIATA` has a non-empty value, use flight destination.
+* Only if both are empty/null/missing, fallback to `summary.destination`.
+
+3. Do not merge flight + summary partials.
+
+* If flight has any valid origin field, use flight origin as source.
+* If flight is fully empty, then use summary origin.
+* Same for destination.
+
+### Date fields
+
+Apply same priority for:
+
+* outbound date
+* return/inbound date
+
+Rules:
+
+* Use flight date if present.
+* If flight date is empty/null/missing, fallback to summary date.
+* Do not overwrite actual flight context.
+* This fallback is only for dynamic prompt hydration unless plan recommends otherwise.
+
+## What to inspect
+
+1. Where Flight Agent dynamic prompt is built.
+2. Where `summary` context is injected.
+3. Where `flight` context is injected.
+4. Whether both are currently passed separately.
+5. Where normalized prompt context should be created.
+6. Whether route/date fallback should happen in:
+
+   * dynamic prompt builder
+   * mapper/helper
+   * context normalization function
+
+## Expected design
+
+Create a compact resolved object like:
+
+```ts
+resolvedFlightPromptContext = {
+  departureLocation: {
+    city: "",
+    iata: "",
+    source: "flight" | "summary" | "missing"
+  },
+  arrivalLocation: {
+    city: "",
+    iata: "",
+    source: "flight" | "summary" | "missing"
+  },
+  outboundDate: {
+    value: "",
+    source: "flight" | "summary" | "missing"
+  },
+  returnDate: {
+    value: "",
+    source: "flight" | "summary" | "missing"
+  },
+  passengers: {},
+  tripType: "",
+  cabinClass: ""
+}
+```
+
+Use this resolved object in the dynamic prompt so the agent does not hallucinate missing fields.
+
+## Important rules
+
+* Do not change stored `flight` context schema.
+* Do not change stored `summary` context schema.
+* Do not mutate context during fallback.
+* Do not overwrite flight values with summary values.
+* This should be prompt-hydration fallback only.
+* Keep implementation simple and readable.
+* Avoid over-engineering and unnecessary fallback chains.
+* Add source labels for debugging only if useful.
+
+## Tests to plan
+
+Create test cases for:
+
+1. Flight origin/destination present → use flight values.
+2. Flight origin empty, summary origin present → use summary origin.
+3. Flight destination empty, summary destination present → use summary destination.
+4. Flight has only IATA, summary has city + IATA → still use flight.
+5. Flight has only city, summary has IATA → still use flight.
+6. Both flight and summary missing → mark missing.
+7. Flight outbound date missing, summary outbound date present → use summary date.
+8. Flight date present, summary has different date → use flight date.
+9. Agent should not ask for arrival location if fallback resolved it from summary.
 
 ## Deliverable
 
 Provide a planning report with:
 
-1. Current guardrail gaps
-2. Recommended Trip Planner prompt changes
-3. Gateway vs Trip Planner responsibility split
-4. Tool-call safety rules
-5. Refusal response examples
-6. Test cases to add
-7. Files likely to change
-8. Risks and safeguards
-9. Step-by-step implementation plan
+1. Current dynamic prompt flow.
+2. Where duplicate/confusing context is injected.
+3. Recommended normalized fallback object.
+4. Exact fallback rules.
+5. Files/functions likely to change.
+6. Tests to add.
+7. Risks and safeguards.
+8. Step-by-step implementation plan.
 
 Do not implement until I approve the plan.
 
