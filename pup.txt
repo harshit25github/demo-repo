@@ -1,1 +1,125 @@
-Existing search parameters: route: departure_location: city: Delhi iata: DEL arrival_location: city: Dubai iata: DXB outbound_date: 2026-08-10 return_date: null passengers: adults: 2 seniors: 0 children: 0 childrenAges[0|]: seatInfants: 0 lapInfants: 0 total: 2 source: flight tripType: oneway cabinClass: economy segments: null bookingStatus: results_shown generatedContracts: available: true count: 5 note: Use the getGeneratedContractsContext tool to fetch contract details when the user asks about them. page: null
+````markdown id="soft-handoff-followup-plan"
+Plan soft human handoff follow-up handling.
+
+Do not implement yet. First inspect current flow and propose the cleanest fix.
+
+## Problem
+
+We have a soft handoff flow:
+
+1. User first asks to connect with a human/live agent.
+2. Assistant does not immediately handoff and replies with a soft message:
+   “I can help you plan this right here. Once your destination is finalized, I can connect you with an agent for booking.”
+3. If user asks again or confirms handoff, we should trigger the human-agent tripwire/handoff.
+
+Current issue:
+Second-turn confirmation is not detected reliably.
+
+Examples that should trigger handoff after the soft handoff message:
+- “yes”
+- “yes please”
+- “please connect”
+- “connect me”
+- “connect to an agent”
+- “please connect me to an agent”
+- “I still want an agent”
+- “handoff”
+- “go ahead”
+- “yes, go ahead”
+- “chat with an agent”
+- “talk to a human”
+
+## What to analyze
+
+1. Current soft handoff logic
+- Where first human-agent request is detected.
+- Where soft denial/message is generated.
+- Where tripwire/handoff is triggered.
+- Whether previous assistant handoff-offer state is stored anywhere.
+
+2. Follow-up intent handling
+Check why follow-up messages like “yes” or “please connect” are not triggering handoff.
+
+Important:
+A plain “yes” should trigger handoff only if the previous assistant turn offered agent/human handoff.
+
+3. State/context requirement
+Plan how to track that handoff was offered, for example:
+```ts
+context.handoff = {
+  softHandoffOffered: true,
+  offeredAtTurnId: "",
+  target: "human_agent"
+}
+````
+
+Use existing context pattern if available.
+
+4. Routing/tripwire rules
+   Plan deterministic rules:
+
+* First human-agent request → soft handoff response.
+* Follow-up confirmation after soft handoff → trigger tripwire/handoff.
+* Repeated direct human-agent request → trigger tripwire/handoff.
+* Normal “yes” unrelated to handoff → do not trigger.
+
+5. Wording
+   Ensure user-facing text uses “agent”, not “expert”.
+
+## Tests to add
+
+Create tests for:
+
+1. First request:
+
+```txt
+User: connect me with a live agent
+Expected: soft handoff message, no tripwire yet
+```
+
+2. Follow-up confirmation:
+
+```txt
+Assistant: ...I can connect you with an agent...
+User: yes please
+Expected: tripwire/handoff
+```
+
+3. Follow-up direct:
+
+```txt
+User: please connect me to an agent
+Expected: tripwire/handoff
+```
+
+4. Repeated request:
+
+```txt
+User: I still want to talk to a human
+Expected: tripwire/handoff
+```
+
+5. Unrelated yes:
+
+```txt
+Assistant asks: Do you want a 3-day itinerary?
+User: yes
+Expected: no human handoff
+```
+
+## Deliverable
+
+Provide a planning report with:
+
+* current flow
+* root cause
+* recommended state/context flag
+* routing/tripwire rules
+* files/functions likely to change
+* test cases
+* step-by-step implementation plan
+
+Do not implement until approved.
+
+```
+```
