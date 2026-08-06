@@ -1,186 +1,109 @@
-````markdown id="flight-context-fallback-plan"
-Plan Flight Agent dynamic prompt context fallback for route/date fields.
+````markdown id="trip-planner-no-urgency-tone"
+Update Trip Planner Agent tone to remove urgency/pushy language.
 
-Do not implement yet. First inspect the code and propose the cleanest enhancement plan.
+Goal:
+Trip Planner responses should feel relaxed, comfortable, and helpful. The agent should not push the user to decide quickly or create unnecessary urgency.
 
 ## Problem
 
-Flight Agent dynamic prompt currently receives both:
-- `summary` context
-- `flight` context
+Current responses sometimes sound too rushed or pushy.
 
-Both may contain similar information:
-- departure/origin location
-- arrival/destination location
-- outbound date
-- return/inbound date
-- passenger info
+Examples to avoid:
+- “Quick picks”
+- “Don’t overthink it”
+- “Pick fast”
+- “Choose quickly”
+- “Let’s lock this now”
+- Any wording that pressures the user to decide immediately
 
-Sometimes `flight` context has empty values, but `summary` context has valid values.  
-Because both objects are injected separately, the agent can get confused and ask for departure/arrival/date again even when the information exists in summary.
+## Required tone
 
-## Goal
+Trip Planner should sound:
+- calm
+- relaxed
+- professional
+- friendly
+- patient
+- comfortable
+- user-led
 
-Create one normalized dynamic prompt object for Flight Agent that resolves the best available values before injecting into the prompt.
+The user should feel they can explore options at their own pace.
 
-Priority:
+## Response behavior
 
+Replace urgency with relaxed guidance.
+
+Bad:
 ```txt
-flight context > summary context
+Quick picks so you don’t overthink it.
 ````
 
-But fallback only when flight value is truly empty.
+Good:
 
-## Required fallback logic
-
-### Location fields
-
-Flight context examples:
-
-```ts
-flight.resolvedOrigin = {
-  userCity: "",
-  airportIATA: ""
-}
-
-flight.resolvedDestination = {
-  userCity: "",
-  airportIATA: ""
-}
+```txt
+Here are a few easy options to consider.
 ```
 
-Summary context examples:
+Bad:
 
-```ts
-summary.origin = {
-  city: "",
-  iata: ""
-}
-
-summary.destination = {
-  city: "",
-  iata: ""
-}
+```txt
+Pick fast from these three.
 ```
 
-Rules:
+Good:
 
-1. For departure location:
-
-* First check `flight.resolvedOrigin`.
-* If either `userCity` or `airportIATA` has a non-empty value, use flight origin.
-* Only if both are empty/null/missing, fallback to `summary.origin`.
-
-2. For arrival location:
-
-* First check `flight.resolvedDestination`.
-* If either `userCity` or `airportIATA` has a non-empty value, use flight destination.
-* Only if both are empty/null/missing, fallback to `summary.destination`.
-
-3. Do not merge flight + summary partials.
-
-* If flight has any valid origin field, use flight origin as source.
-* If flight is fully empty, then use summary origin.
-* Same for destination.
-
-### Date fields
-
-Apply same priority for:
-
-* outbound date
-* return/inbound date
-
-Rules:
-
-* Use flight date if present.
-* If flight date is empty/null/missing, fallback to summary date.
-* Do not overwrite actual flight context.
-* This fallback is only for dynamic prompt hydration unless plan recommends otherwise.
-
-## What to inspect
-
-1. Where Flight Agent dynamic prompt is built.
-2. Where `summary` context is injected.
-3. Where `flight` context is injected.
-4. Whether both are currently passed separately.
-5. Where normalized prompt context should be created.
-6. Whether route/date fallback should happen in:
-
-   * dynamic prompt builder
-   * mapper/helper
-   * context normalization function
-
-## Expected design
-
-Create a compact resolved object like:
-
-```ts
-resolvedFlightPromptContext = {
-  departureLocation: {
-    city: "",
-    iata: "",
-    source: "flight" | "summary" | "missing"
-  },
-  arrivalLocation: {
-    city: "",
-    iata: "",
-    source: "flight" | "summary" | "missing"
-  },
-  outboundDate: {
-    value: "",
-    source: "flight" | "summary" | "missing"
-  },
-  returnDate: {
-    value: "",
-    source: "flight" | "summary" | "missing"
-  },
-  passengers: {},
-  tripType: "",
-  cabinClass: ""
-}
+```txt
+You can choose whichever style feels right for this trip.
 ```
 
-Use this resolved object in the dynamic prompt so the agent does not hallucinate missing fields.
+Bad:
 
-## Important rules
+```txt
+Let’s finalize this now.
+```
 
-* Do not change stored `flight` context schema.
-* Do not change stored `summary` context schema.
-* Do not mutate context during fallback.
-* Do not overwrite flight values with summary values.
-* This should be prompt-hydration fallback only.
-* Keep implementation simple and readable.
-* Avoid over-engineering and unnecessary fallback chains.
-* Add source labels for debugging only if useful.
+Good:
 
-## Tests to plan
+```txt
+Once you like one option, I can shape the itinerary around it.
+```
 
-Create test cases for:
+## Scope
 
-1. Flight origin/destination present → use flight values.
-2. Flight origin empty, summary origin present → use summary origin.
-3. Flight destination empty, summary destination present → use summary destination.
-4. Flight has only IATA, summary has city + IATA → still use flight.
-5. Flight has only city, summary has IATA → still use flight.
-6. Both flight and summary missing → mark missing.
-7. Flight outbound date missing, summary outbound date present → use summary date.
-8. Flight date present, summary has different date → use flight date.
-9. Agent should not ask for arrival location if fallback resolved it from summary.
+Update only:
+
+* Trip Planner prompt
+* tone/style instructions
+* response examples if needed
+
+Do not modify:
+
+* tools
+* routing
+* guardrails
+* context logic
+* web search logic
+* hotel/car/commute restrictions
+
+## Tests
+
+Add/update tests using the screenshots/examples I provide.
+
+Verify:
+
+* no urgency/pushy wording
+* no “quick picks”
+* no “don’t overthink it”
+* no “pick fast”
+* response remains concise and mobile-friendly
+* tone feels relaxed and user-controlled
 
 ## Deliverable
 
-Provide a planning report with:
-
-1. Current dynamic prompt flow.
-2. Where duplicate/confusing context is injected.
-3. Recommended normalized fallback object.
-4. Exact fallback rules.
-5. Files/functions likely to change.
-6. Tests to add.
-7. Risks and safeguards.
-8. Step-by-step implementation plan.
-
-Do not implement until I approve the plan.
+* Update Trip Planner prompt.
+* Share files changed.
+* Share before/after examples.
+* Confirm urgency/pushy language is removed.
 
 ```
 ```
