@@ -1,123 +1,186 @@
-````markdown id="soft-handoff-followup-plan"
-Plan soft human handoff follow-up handling.
+````markdown id="flight-applied-filter-suggested-questions-plan"
+Plan Flight Agent applied-filter context for suggested questions.
 
-Do not implement yet. First inspect current flow and propose the cleanest fix.
+Do not implement yet. First inspect current flow and propose the cleanest plan.
 
 ## Problem
 
-We have a soft handoff flow:
+When user applies a filter during flight search, the same filter should not appear again in “You might ask” / suggested questions.
 
-1. User first asks to connect with a human/live agent.
-2. Assistant does not immediately handoff and replies with a soft message:
-   “I can help you plan this right here. Once your destination is finalized, I can connect you with an agent for booking.”
-3. If user asks again or confirms handoff, we should trigger the human-agent tripwire/handoff.
+Example:
+User: “Delhi to Mumbai on 12 August, only morning flights.”
 
-Current issue:
-Second-turn confirmation is not detected reliably.
+Flow:
+- `flight_search_tool` runs.
+- `apply_filter_tool` applies morning filter.
+- Morning filter is now active.
+- Suggested questions should not include:
+  - “Show me morning flights”
+  - “Filter by morning departure”
+  - or any duplicate already-applied filter suggestion.
 
-Examples that should trigger handoff after the soft handoff message:
-- “yes”
-- “yes please”
-- “please connect”
-- “connect me”
-- “connect to an agent”
-- “please connect me to an agent”
-- “I still want an agent”
-- “handoff”
-- “go ahead”
-- “yes, go ahead”
-- “chat with an agent”
-- “talk to a human”
+## Goal
 
-## What to analyze
+Track applied filters in Flight Agent context and expose them in dynamic prompt so the agent avoids generating suggested questions for filters already applied.
 
-1. Current soft handoff logic
-- Where first human-agent request is detected.
-- Where soft denial/message is generated.
-- Where tripwire/handoff is triggered.
-- Whether previous assistant handoff-offer state is stored anywhere.
+## Required behavior
 
-2. Follow-up intent handling
-Check why follow-up messages like “yes” or “please connect” are not triggering handoff.
+### 1. Store applied filters after apply_filter
 
-Important:
-A plain “yes” should trigger handoff only if the previous assistant turn offered agent/human handoff.
+Whenever `apply_filter_tool` successfully applies filters:
+- capture the array/list of applied filters
+- store it in Flight context
 
-3. State/context requirement
-Plan how to track that handoff was offered, for example:
+Example shape can be planned as:
+
 ```ts
-context.handoff = {
-  softHandoffOffered: true,
-  offeredAtTurnId: "",
-  target: "human_agent"
-}
+context.flight.appliedFilters = [
+  {
+    filterType: "departtimeslotfilter",
+    values: ["morning"],
+    label: "Morning flights"
+  }
+]
 ````
 
-Use existing context pattern if available.
+Use existing context style if a better structure already exists.
 
-4. Routing/tripwire rules
-   Plan deterministic rules:
+### 2. Reset applied filters on new search
 
-* First human-agent request → soft handoff response.
-* Follow-up confirmation after soft handoff → trigger tripwire/handoff.
-* Repeated direct human-agent request → trigger tripwire/handoff.
-* Normal “yes” unrelated to handoff → do not trigger.
+Whenever a new flight search is initiated and a new `searchKey` is created:
 
-5. Wording
-   Ensure user-facing text uses “agent”, not “expert”.
+* reset applied filters to empty array
+* avoid carrying filters from old searchKey to new search
 
-## Tests to add
+Expected:
 
-Create tests for:
-
-1. First request:
-
-```txt
-User: connect me with a live agent
-Expected: soft handoff message, no tripwire yet
+```ts
+context.flight.appliedFilters = []
 ```
 
-2. Follow-up confirmation:
+### 3. Dynamic prompt hydration
+
+When Flight Agent dynamic prompt is created:
+
+* include compact applied filter summary
+* clearly tell agent these filters are already active
+* tell agent not to generate suggested questions for already-applied filters
+
+Example dynamic prompt data:
 
 ```txt
-Assistant: ...I can connect you with an agent...
-User: yes please
-Expected: tripwire/handoff
+Already applied filters:
+- Morning flights
+- Non-stop
+- Emirates
+
+Do not suggest these same filters again in suggested questions.
 ```
 
-3. Follow-up direct:
+### 4. Suggested questions behavior
 
-```txt
-User: please connect me to an agent
-Expected: tripwire/handoff
-```
+Update Flight Agent suggested question instructions so:
 
-4. Repeated request:
+* suggestions must not repeat active filters
+* suggestions should focus on useful next actions not already applied
+* if all common filters are applied, suggest result reasoning or alternative useful actions instead
 
-```txt
-User: I still want to talk to a human
-Expected: tripwire/handoff
-```
+Good:
 
-5. Unrelated yes:
+* “Show me the cheapest option”
+* “Compare the top 3 flights”
+* “Show shorter-duration options”
 
-```txt
-Assistant asks: Do you want a 3-day itinerary?
-User: yes
-Expected: no human handoff
-```
+Bad if already applied:
+
+* “Show morning flights”
+* “Apply morning filter”
+* “Only show non-stop flights”
+
+## What to inspect
+
+1. `apply_filter_tool`
+
+* where filter payload is received
+* where filter result is returned
+* where context is updated
+* what applied filter info is available
+
+2. `flight_search_tool`
+
+* where new `searchKey` is created
+* where context is updated after search
+* where filters should be reset
+
+3. Flight context persistence
+
+* where context is saved to DB
+* ensure `appliedFilters` persists across turns for same searchKey
+
+4. Dynamic prompt builder
+
+* where flight context is hydrated into prompt
+* where applied filter summary should be added
+
+5. Suggested questions tool/prompt
+
+* where `update_flight_suggested_questions` is called
+* how prompt can prevent duplicate filter suggestions
+
+## Important rules
+
+* Do not change tool schemas unless required.
+* Do not modify unrelated agents.
+* Do not change apply-filter API contract.
+* Keep applied filter context compact.
+* Do not store huge filter response payloads.
+* Reset filters only when new search/searchKey happens.
+* Preserve filters across pure follow-up turns for the same searchKey.
+
+## Tests to plan
+
+Add tests for:
+
+1. Search + morning filter
+
+* appliedFilters contains morning
+* suggested questions do not mention morning filter
+
+2. Search + non-stop filter
+
+* suggested questions do not mention non-stop again
+
+3. Multiple filters applied
+
+* airline + stops + time filter are stored
+* suggestions avoid all active filters
+
+4. New search after filters
+
+* appliedFilters resets to empty
+
+5. Same search follow-up
+
+* appliedFilters persists
+
+6. Apply filter failure
+
+* do not store failed filter as applied
 
 ## Deliverable
 
 Provide a planning report with:
 
-* current flow
-* root cause
-* recommended state/context flag
-* routing/tripwire rules
-* files/functions likely to change
-* test cases
-* step-by-step implementation plan
+1. Current filter/context flow.
+2. Where applied filters should be stored.
+3. Recommended context shape.
+4. Reset rules for new searchKey.
+5. Dynamic prompt update plan.
+6. Suggested questions prompt update plan.
+7. Files/functions likely to change.
+8. Tests to add.
+9. Risks and safeguards.
+10. Step-by-step implementation plan.
 
 Do not implement until approved.
 
