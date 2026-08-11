@@ -1,188 +1,28 @@
-````markdown id="flight-applied-filter-suggested-questions-plan"
-Plan Flight Agent applied-filter context for suggested questions.
+```markdown id="searchcriteria-skip-when-missing"
+Update `/chat` searchCriteria handling.
 
-Do not implement yet. First inspect current flow and propose the cleanest plan.
+Requirement:
+If `searchCriteria` is not present in the incoming `/chat` request payload:
 
-## Problem
+- Do not create/generate `searchCriteria` from live/context data.
+- Do not send the final `searchCriteria` chunk.
+- Do not fallback to old context just to build `searchCriteria`.
 
-When user applies a filter during flight search, the same filter should not appear again in “You might ask” / suggested questions.
+Only create/update/send `searchCriteria` when it exists in the original request payload.
 
-Example:
-User: “Delhi to Mumbai on 12 August, only morning flights.”
+Expected behavior:
+- Request has `searchCriteria` → update it and send searchCriteria chunk.
+- Request does not have `searchCriteria` → skip searchCriteria creation and skip searchCriteria chunk.
 
-Flow:
-- `flight_search_tool` runs.
-- `apply_filter_tool` applies morning filter.
-- Morning filter is now active.
-- Suggested questions should not include:
-  - “Show me morning flights”
-  - “Filter by morning departure”
-  - or any duplicate already-applied filter suggestion.
+Scope:
+- `/chat` request handling
+- final context/searchCriteria mapper
+- streaming chunk emission
 
-## Goal
+Do not modify unrelated agent/tool logic.
 
-Track applied filters in Flight Agent context and expose them in dynamic prompt so the agent avoids generating suggested questions for filters already applied.
-
-## Required behavior
-
-### 1. Store applied filters after apply_filter
-
-Whenever `apply_filter_tool` successfully applies filters:
-- capture the array/list of applied filters
-- store it in Flight context
-
-Example shape can be planned as:
-
-```ts
-context.flight.appliedFilters = [
-  {
-    filterType: "departtimeslotfilter",
-    values: ["morning"],
-    label: "Morning flights"
-  }
-]
-````
-
-Use existing context style if a better structure already exists.
-
-### 2. Reset applied filters on new search
-
-Whenever a new flight search is initiated and a new `searchKey` is created:
-
-* reset applied filters to empty array
-* avoid carrying filters from old searchKey to new search
-
-Expected:
-
-```ts
-context.flight.appliedFilters = []
-```
-
-### 3. Dynamic prompt hydration
-
-When Flight Agent dynamic prompt is created:
-
-* include compact applied filter summary
-* clearly tell agent these filters are already active
-* tell agent not to generate suggested questions for already-applied filters
-
-Example dynamic prompt data:
-
-```txt
-Already applied filters:
-- Morning flights
-- Non-stop
-- Emirates
-
-Do not suggest these same filters again in suggested questions.
-```
-
-### 4. Suggested questions behavior
-
-Update Flight Agent suggested question instructions so:
-
-* suggestions must not repeat active filters
-* suggestions should focus on useful next actions not already applied
-* if all common filters are applied, suggest result reasoning or alternative useful actions instead
-
-Good:
-
-* “Show me the cheapest option”
-* “Compare the top 3 flights”
-* “Show shorter-duration options”
-
-Bad if already applied:
-
-* “Show morning flights”
-* “Apply morning filter”
-* “Only show non-stop flights”
-
-## What to inspect
-
-1. `apply_filter_tool`
-
-* where filter payload is received
-* where filter result is returned
-* where context is updated
-* what applied filter info is available
-
-2. `flight_search_tool`
-
-* where new `searchKey` is created
-* where context is updated after search
-* where filters should be reset
-
-3. Flight context persistence
-
-* where context is saved to DB
-* ensure `appliedFilters` persists across turns for same searchKey
-
-4. Dynamic prompt builder
-
-* where flight context is hydrated into prompt
-* where applied filter summary should be added
-
-5. Suggested questions tool/prompt
-
-* where `update_flight_suggested_questions` is called
-* how prompt can prevent duplicate filter suggestions
-
-## Important rules
-
-* Do not change tool schemas unless required.
-* Do not modify unrelated agents.
-* Do not change apply-filter API contract.
-* Keep applied filter context compact.
-* Do not store huge filter response payloads.
-* Reset filters only when new search/searchKey happens.
-* Preserve filters across pure follow-up turns for the same searchKey.
-
-## Tests to plan
-
-Add tests for:
-
-1. Search + morning filter
-
-* appliedFilters contains morning
-* suggested questions do not mention morning filter
-
-2. Search + non-stop filter
-
-* suggested questions do not mention non-stop again
-
-3. Multiple filters applied
-
-* airline + stops + time filter are stored
-* suggestions avoid all active filters
-
-4. New search after filters
-
-* appliedFilters resets to empty
-
-5. Same search follow-up
-
-* appliedFilters persists
-
-6. Apply filter failure
-
-* do not store failed filter as applied
-
-## Deliverable
-
-Provide a planning report with:
-
-1. Current filter/context flow.
-2. Where applied filters should be stored.
-3. Recommended context shape.
-4. Reset rules for new searchKey.
-5. Dynamic prompt update plan.
-6. Suggested questions prompt update plan.
-7. Files/functions likely to change.
-8. Tests to add.
-9. Risks and safeguards.
-10. Step-by-step implementation plan.
-
-Do not implement until approved.
-
-```
+Deliverable:
+- Add this conditional handling.
+- Share files changed.
+- Add test for request with and without `searchCriteria`.
 ```
