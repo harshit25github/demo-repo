@@ -1,28 +1,33 @@
-```markdown id="searchcriteria-skip-when-missing"
-Update `/chat` searchCriteria handling.
+```markdown id="dynamic-prompt-searchcriteria-debug"
+Debug Flight Agent dynamic prompt hydration issue.
 
-Requirement:
-If `searchCriteria` is not present in the incoming `/chat` request payload:
-
-- Do not create/generate `searchCriteria` from live/context data.
-- Do not send the final `searchCriteria` chunk.
-- Do not fallback to old context just to build `searchCriteria`.
-
-Only create/update/send `searchCriteria` when it exists in the original request payload.
-
-Expected behavior:
-- Request has `searchCriteria` → update it and send searchCriteria chunk.
-- Request does not have `searchCriteria` → skip searchCriteria creation and skip searchCriteria chunk.
+Problem:
+`searchCriteria` is correctly updating Flight context, but the updated values are not appearing in the Flight Agent dynamic prompt.
 
 Scope:
-- `/chat` request handling
-- final context/searchCriteria mapper
-- streaming chunk emission
+- searchCriteria → Flight context mapping
+- Flight context hydration
+- dynamic prompt builder
 
-Do not modify unrelated agent/tool logic.
+Check:
+1. Is updated `searchCriteria` correctly mapped into `context.flight`?
+2. Is dynamic prompt using latest `context.flight` or stale context?
+3. Is any old context overwriting updated values before prompt creation?
+4. Are route/date/passenger/trip fields missing only in prompt or also in context?
+5. Which function builds the Flight Agent dynamic prompt?
+
+Add focused logs:
+- incoming `searchCriteria`
+- mapped `context.flight`
+- context used before dynamic prompt
+- final dynamic prompt hydrated values
+
+Expected:
+Flight Agent dynamic prompt should always use the latest updated Flight context derived from request `searchCriteria`.
 
 Deliverable:
-- Add this conditional handling.
+- Identify root cause.
+- Fix hydration issue.
 - Share files changed.
-- Add test for request with and without `searchCriteria`.
+- Add before/after logs.
 ```
