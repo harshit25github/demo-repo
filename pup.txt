@@ -1,2 +1,7 @@
-Existing search parameters: route: departure_location: city: Mumbai iata: BOM arrival_location: city: DXB iata: DXB outbound_date: 2026-10-05 return_date: null passengers: adults: 1 seniors: 0 children: 0 childrenAges[0|]: seatInfants: 0 lapInfants: 0 total: 1 source: flight tripType: oneway cabinClass: economy segments[2|]{origin|destination|date}: DEL|LAX|2026-08-27 LAX|DEL|2026-08-28 bookingStatus: results_shown generatedContracts: available: true count: 5 note: Use the getGeneratedContractsContext tool to fetch contract details when the user asks about them. page: null
-Active filter source options: airlines: KC=Air Astana; AI=Air India; AI+=Air India; EK=Emirates; EK+=Emirates; ET=Ethiopian; FZ=Flydubai; GF=Gulf Air; H1=Hahn Air Systems; 6E=IndiGo; KQ=Kenya Airways; WY=Oman Air; +7 more layoverAirports: ADD=Addis Ababa; AMD=Ahmedabad; ALA=Almaty; AMM=Amman; ATQ=Amritsar; BAH=Bahrain; BLR=Bengaluru; IXC=Chandigarh; MAA=Chennai; CMB=Colombo; DOH=Doha Hamad International Airport; HYD=Hyderabad; +12 more departureAirports: main BOM=Mumbai arrivalAirports: main DXB=Dubai
+The current 400 errors are happening because incomplete search criteria is getting initialized and sent back in the request flow.
+
+As per the expected flow, search criteria should be initialized only when it comes from the app/listing page, because that contains complete search details. From the AI side, the search criteria can be partial during the initial conversation, as the user may not have provided all required details yet.
+
+It looks like there may have been a recent change where the chat layer is also initializing the partial search criteria received from AI. Because of this, the same incomplete criteria is coming back to us and failing the request body schema validation.
+
+Can we please check this flow and ensure initialization happens only for app-provided search criteria, not for partial AI-generated criteria?
