@@ -1,7 +1,112 @@
-The current 400 errors are happening because incomplete search criteria is getting initialized and sent back in the request flow.
+# Prioritize Current Search Parameters
 
-As per the expected flow, search criteria should be initialized only when it comes from the app/listing page, because that contains complete search details. From the AI side, the search criteria can be partial during the initial conversation, as the user may not have provided all required details yet.
+Update Flight Agent prompt/dynamic prompt so the latest existing search parameters always override older chat history.
 
-It looks like there may have been a recent change where the chat layer is also initializing the partial search criteria received from AI. Because of this, the same incomplete criteria is coming back to us and failing the request body schema validation.
+## Problem
 
-Can we please check this flow and ensure initialization happens only for app-provided search criteria, not for partial AI-generated criteria?
+Current search parameters are correctly hydrated in the dynamic prompt, but the agent sometimes still follows older conversation history.
+
+Also, active filters can confuse the agent if they are not tied to the current route/date/search.
+
+## Required behavior
+
+### 1. Source of truth
+
+Priority must be:
+
+1. Current existing search parameters / searchCriteria
+2. Current hydrated flight context
+3. Latest user message
+4. Older chat history only if it does not conflict
+
+If old history conflicts with current search parameters, ignore old history.
+
+Current search parameters include:
+
+* departure location
+* arrival location
+* outbound date
+* return date
+* passengers
+* trip type
+* cabin class
+* segments
+* booking/page state
+* generated contracts availability
+
+Label this section clearly in dynamic prompt:
+
+```txt
+Current Existing Search Parameters — Source of Truth
+```
+
+## Active filters
+
+Do not inject active filters loosely.
+
+Either:
+
+* remove active filters from dynamic prompt for now, or
+* include them only if they clearly belong to the current route/date/passenger/cabin search.
+
+If included, store/filter them with scope:
+
+```ts
+{
+  label: "Departure time: Evening",
+  filterType: "departtimeslotfilter",
+  values: ["evening"],
+  appliesTo: {
+    departureLocation: "LAX",
+    arrivalLocation: "LAS",
+    outboundDate: "2026-09-03",
+    returnDate: "2026-09-10",
+    tripType: "roundtrip",
+    passengers: 1,
+    cabinClass: "economy"
+  }
+}
+```
+
+Only show filters in prompt if `appliesTo` matches the current search.
+Do not expose `searchKey` in prompt for this.
+
+## Prompt instruction to add
+
+```txt
+Always use Current Existing Search Parameters as the source of truth.
+Do not override them with older conversation history.
+Only use older history for missing fields.
+Already-applied filters are valid only when they belong to the same current route/date/passenger/cabin search.
+```
+
+## Scope
+
+Update:
+
+* Flight Agent dynamic prompt builder
+* Flight Agent prompt only if needed
+* applied filter prompt hydration if needed
+
+Do not change:
+
+* tool schemas
+* search/filter API contracts
+* unrelated agents
+
+## Tests
+
+Add tests for:
+
+* old history JFK → DEL, current search LAX → LAS
+* old date conflicts with current date
+* follow-up “show cheapest option” uses current search
+* active filter matches current search → included
+* active filter belongs to old search → excluded
+* new listing-page search should not use old filters
+
+## Deliverable
+
+* Update prompt/context hydration.
+* Share before/after dynamic prompt examples.
+* Add tests and results.
