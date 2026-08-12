@@ -1,112 +1,44 @@
-# Prioritize Current Search Parameters
+## Midterm Review — Jan to June 2026
 
-Update Flight Agent prompt/dynamic prompt so the latest existing search parameters always override older chat history.
+### 1. Achievement Against Goals and KPIs
 
-## Problem
+During Jan–June 2026, I worked on building and enhancing the agentic backend system for the pre-booking travel experience. The goal was to support users with trip planning, flight-related queries, policy information, page-related queries, and contextual travel assistance through an AI-powered workflow.
 
-Current search parameters are correctly hydrated in the dynamic prompt, but the agent sometimes still follows older conversation history.
+Key achievements:
 
-Also, active filters can confuse the agent if they are not tied to the current route/date/search.
+* Built a multi-agent backend system to support trip planning, flight assistance, policy queries, and page-level user queries.
+* Integrated app-level user context with the AI agent flow to improve continuity between the app and chatbot experience.
+* Enabled strong context-building and memory handling so the agent can understand user preferences, app activity, flight search criteria, filters, and previous interactions.
+* Improved personalization by using user activity and search behavior to provide more relevant responses instead of restarting the conversation from scratch.
+* Worked on advanced flight search handling, multi-filter support, and contextual search continuation between the listing page and AI workflow.
+* Implemented backend-level controls such as rate limiting, guardrails, routing, and human handoff support to make the system more reliable and controlled.
 
-## Required behavior
+### 2. Contribution Beyond Core KPIs
 
-### 1. Source of truth
+Beyond the core delivery, I contributed to the overall architecture and improvement of the AI travel experience.
 
-Priority must be:
+Additional contributions:
 
-1. Current existing search parameters / searchCriteria
-2. Current hydrated flight context
-3. Latest user message
-4. Older chat history only if it does not conflict
+* Designed and implemented a scalable multi-agent architecture for handling different travel-related domains.
+* Built a RAG-based policy support layer to help users with CheapoAir-related policy information such as cancellation, baggage, airline policies, and general support queries.
+* Improved the app-to-agent and agent-to-app continuity model, helping users continue their journey without losing context.
+* Worked on business-focused improvements that enhance user experience during the pre-booking journey.
+* Participated in technical discussions, grooming sessions, and architecture decisions to align the implementation with product expectations.
+* Helped identify edge cases, schema issues, routing gaps, guardrail handling, and context-sharing improvements across AI, chat, and app teams.
 
-If old history conflicts with current search parameters, ignore old history.
+### 3. Leadership, Learning, and Capability Building
 
-Current search parameters include:
+This project required continuous learning because building an agentic AI backend system is complex and involves multiple moving parts such as memory, context, routing, guardrails, tool usage, streaming, and response quality.
 
-* departure location
-* arrival location
-* outbound date
-* return date
-* passengers
-* trip type
-* cabin class
-* segments
-* booking/page state
-* generated contracts availability
+Leadership and learning contributions:
 
-Label this section clearly in dynamic prompt:
+* Consistently learned and applied new approaches for building reliable agentic AI workflows.
+* Took ownership of complex backend challenges and worked on practical solutions for context management, routing, search criteria handling, and user journey continuity.
+* Supported peers in understanding the agentic backend flow so they can contribute effectively.
+* Shared technical thoughts and participated actively in architecture-level discussions.
+* Helped bridge understanding between AI, chat, and app teams by explaining flow dependencies, expected behavior, and integration challenges.
+* Continued improving the system with a focus on scalability, reliability, personalization, and better user experience.
 
-```txt
-Current Existing Search Parameters — Source of Truth
-```
+### Summary
 
-## Active filters
-
-Do not inject active filters loosely.
-
-Either:
-
-* remove active filters from dynamic prompt for now, or
-* include them only if they clearly belong to the current route/date/passenger/cabin search.
-
-If included, store/filter them with scope:
-
-```ts
-{
-  label: "Departure time: Evening",
-  filterType: "departtimeslotfilter",
-  values: ["evening"],
-  appliesTo: {
-    departureLocation: "LAX",
-    arrivalLocation: "LAS",
-    outboundDate: "2026-09-03",
-    returnDate: "2026-09-10",
-    tripType: "roundtrip",
-    passengers: 1,
-    cabinClass: "economy"
-  }
-}
-```
-
-Only show filters in prompt if `appliesTo` matches the current search.
-Do not expose `searchKey` in prompt for this.
-
-## Prompt instruction to add
-
-```txt
-Always use Current Existing Search Parameters as the source of truth.
-Do not override them with older conversation history.
-Only use older history for missing fields.
-Already-applied filters are valid only when they belong to the same current route/date/passenger/cabin search.
-```
-
-## Scope
-
-Update:
-
-* Flight Agent dynamic prompt builder
-* Flight Agent prompt only if needed
-* applied filter prompt hydration if needed
-
-Do not change:
-
-* tool schemas
-* search/filter API contracts
-* unrelated agents
-
-## Tests
-
-Add tests for:
-
-* old history JFK → DEL, current search LAX → LAS
-* old date conflicts with current date
-* follow-up “show cheapest option” uses current search
-* active filter matches current search → included
-* active filter belongs to old search → excluded
-* new listing-page search should not use old filters
-
-## Deliverable
-
-* Update prompt/context hydration.
-* Share before/after dynamic prompt examples.
-* Add tests and results.
+Overall, during Jan–June 2026, I contributed to building a strong foundation for an AI-powered pre-booking travel assistant. The work improved trip planning, flight search continuity, policy assistance, user personalization, and backend reliability. Along with delivery, I also contributed to architecture discussions, peer enablement, and continuous learning to strengthen the overall agentic AI capability.
