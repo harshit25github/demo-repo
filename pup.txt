@@ -1,82 +1,58 @@
-# Plan DB Migration from PG to Drizzle
+import {
+  Agent,
+  retryPolicies,
+} from '@openai/agents';
 
-Analyze the current DB layer and repository usage, then plan migration from direct PG usage to Drizzle.
+const transientRetryPolicy = retryPolicies.any(
+  retryPolicies.providerSuggested(),
+  retryPolicies.retryAfter(),
+  retryPolicies.networkError(),
+  retryPolicies.httpStatus([
+    408,
+    409,
+    429,
+    500,
+    502,
+    503,
+    504,
+  ]),
+);
 
-Do not implement yet. First inspect and provide a clear migration plan.
+const flightAgent = new Agent({
+  name: 'Flight Specialist Agent',
 
-## Goal
+  // model,
+  // instructions,
+  // tools,
 
-We currently use a `db` folder for:
+  modelSettings: {
+    // Maximum time for EACH individual /v1/responses model call.
+    // 1 min 20 sec = 80 sec
+    timeoutMs: 80_000,
 
-* DB connections
-* queries/functions
-* migrations
-* utilities/helpers
+    retry: {
+      // Initial request + 1 retry = max 2 attempts
+      maxRetries: 1,
 
-We also have repositories like:
+      backoff: {
+        initialDelayMs: 500,
+        maxDelayMs: 2_000,
+        multiplier: 2,
+        jitter: true,
+      },
 
-* chat repository
-* user repository
-* message-related repositories
-* any other DB-facing repositories
+      policy: async (ctx) => {
+        // Retry when our 80-second model timeout occurs
+        if (ctx.normalized.errorCode === 'ETIMEDOUT') {
+          return {
+            retry: true,
+            reason: `Flight model timed out on attempt ${ctx.attempt}`,
+          };
+        }
 
-We want to migrate DB handling to Drizzle so future queries, schema changes, and migrations are managed cleanly through Drizzle.
-
-## What to inspect
-
-1. `db` folder
-
-* list DB-related files
-* explain purpose of each file
-* identify active vs unused files
-
-2. Current PG usage
-   Find where we use:
-
-* `pg`
-* raw SQL
-* connection pools/clients
-* manual migrations
-* DB helper functions
-
-3. Repository layer
-   Review repositories such as chat/user/message repositories:
-
-* list methods currently used
-* identify what DB utilities/client they depend on
-* check how they should use the Drizzle client
-* identify duplicate or unused repository methods
-
-4. Drizzle migration plan
-   Suggest how to move:
-
-* schema definitions to Drizzle
-* migrations to Drizzle
-* DB client setup to Drizzle
-* repository methods to Drizzle queries
-* raw SQL only where truly needed
-
-5. Cleanup
-   Identify:
-
-* unused DB files
-* unused repository methods
-* duplicate helpers
-* old migration files
-* dead code safe to remove later
-
-## Deliverable
-
-Provide a short report with:
-
-1. Current DB/repository architecture
-2. Files and methods currently used
-3. Files/methods likely unused
-4. Current PG usage map
-5. Recommended Drizzle structure
-6. Migration steps
-7. Files likely to change
-8. Risks and safeguards
-9. Suggested implementation order
-
-Do not make changes until I approve the plan.
+        // Retry normal transient OpenAI/network failures
+        return transientRetryPolicy(ctx);
+      },
+    },
+  },
+});
