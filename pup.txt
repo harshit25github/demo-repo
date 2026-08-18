@@ -1,5 +1,82 @@
-For the Gurgaon to Bangalore flight search, the issue is happening because the Intelli Suggest API is not resolving Gurgaon to the expected nearest airport/location.
+# Plan DB Migration from PG to Drizzle
 
-Instead of identifying Delhi as the nearest valid airport, the API is returning CDR — Chadron, Nebraska, United States. Because of this incorrect origin mapping, the search key is getting generated, but no valid contracts/flights are available for Bangalore on 7/10 or even for alternate nearby dates.
+Analyze the current DB layer and repository usage, then plan migration from direct PG usage to Drizzle.
 
-So the main issue is with the location inference from the suggest API, where the user’s origin is not being mapped to the correct nearest airport.
+Do not implement yet. First inspect and provide a clear migration plan.
+
+## Goal
+
+We currently use a `db` folder for:
+
+* DB connections
+* queries/functions
+* migrations
+* utilities/helpers
+
+We also have repositories like:
+
+* chat repository
+* user repository
+* message-related repositories
+* any other DB-facing repositories
+
+We want to migrate DB handling to Drizzle so future queries, schema changes, and migrations are managed cleanly through Drizzle.
+
+## What to inspect
+
+1. `db` folder
+
+* list DB-related files
+* explain purpose of each file
+* identify active vs unused files
+
+2. Current PG usage
+   Find where we use:
+
+* `pg`
+* raw SQL
+* connection pools/clients
+* manual migrations
+* DB helper functions
+
+3. Repository layer
+   Review repositories such as chat/user/message repositories:
+
+* list methods currently used
+* identify what DB utilities/client they depend on
+* check how they should use the Drizzle client
+* identify duplicate or unused repository methods
+
+4. Drizzle migration plan
+   Suggest how to move:
+
+* schema definitions to Drizzle
+* migrations to Drizzle
+* DB client setup to Drizzle
+* repository methods to Drizzle queries
+* raw SQL only where truly needed
+
+5. Cleanup
+   Identify:
+
+* unused DB files
+* unused repository methods
+* duplicate helpers
+* old migration files
+* dead code safe to remove later
+
+## Deliverable
+
+Provide a short report with:
+
+1. Current DB/repository architecture
+2. Files and methods currently used
+3. Files/methods likely unused
+4. Current PG usage map
+5. Recommended Drizzle structure
+6. Migration steps
+7. Files likely to change
+8. Risks and safeguards
+9. Suggested implementation order
+
+Do not make changes until I approve the plan.
