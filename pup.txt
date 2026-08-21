@@ -1,45 +1,84 @@
-import {
-  ModelTimeoutError,
-  retryPolicies,
-} from '@openai/agents';
+import { ModelTimeoutError, retryPolicies } from '@openai/agents';
+import { log } from './logger.js';
 
-policy: async (ctx) => {
-  console.log('[Flight Retry Debug]', {
-    attempt: ctx.attempt,
-    maxRetries: ctx.maxRetries,
+const standardGatewayRetryPolicy = retryPolicies.any(
+  retryPolicies.providerSuggested(),
+  retryPolicies.retryAfter(),
+  retryPolicies.networkError(),
+  retryPolicies.httpStatus([408, 409, 429, 500, 502, 503, 504]),
+);
 
-    errorName:
-      ctx.error instanceof Error
-        ? ctx.error.name
-        : undefined,
+export function isModelTimeoutError(error) {
+  return (
+    error instanceof ModelTimeoutError ||
+    (error?.name === 'ModelTimeoutError' && error?.code === 'ETIMEDOUT')
+  );
+}
 
-    errorMessage:
-      ctx.error instanceof Error
-        ? ctx.error.message
-        : undefined,
-
-    errorCode: ctx.normalized?.errorCode,
-
-    stream: ctx.stream,
-    responseStarted: ctx.responseStarted,
-    replaySafety: ctx.replaySafety,
-    statefulRequest: ctx.statefulRequest,
-
-    providerAdvice: ctx.providerAdvice,
-  });
-
-  const isTimeout =
-    ctx.error instanceof ModelTimeoutError ||
-    ctx.normalized?.errorCode === 'ETIMEDOUT';
-
-  if (isTimeout) {
-    console.log('[Flight Retry] Timeout detected → retry requested');
-
-    return {
-      retry: true,
-      reason: 'Flight model timed out after 80 seconds',
-    };
+export function buildTerminalModelTimeoutDetails(
+  error,
+  { requestId, sessionId, sdkEventCount = 0, lastSdkEventType = null } = {},
+) {
+  if (!isModelTimeoutError(error)) {
+    return null;
   }
 
-  return transientRetryPolicy(ctx);
-},
+  return {
+    requestId,
+    sessionId,
+    errorName: error.name,
+    errorCode: error.code || null,
+    timeoutMs: error.timeoutMs || null,
+    sdkEventCount,
+    lastSdkEventType,
+    diagnosis:
+      sdkEventCount > 0
+        ? 'events_observed_before_terminal_timeout'
+        : 'retry_exhausted_or_policy_rejected',
+  };
+}
+
+function normalizeRetryDecision(decision) {
+  if (typeof decision === 'boolean') {
+    return { retry: decision };
+  }
+  return decision || { retry: false };
+}
+
+export async function gatewayModelRetryPolicy(context) {
+  const decision = isModelTimeoutError(context.error)
+    ? {
+        retry: true,
+        approveUnsafeReplay: true,
+        reason: 'flight model timed out before stream output',
+      }
+    : await standardGatewayRetryPolicy(context);
+  const normalizedDecision = normalizeRetryDecision(decision);
+
+  log('info', 'model_retry_decision', {
+    attempt: context.attempt,
+    maxRetries: context.maxRetries,
+    errorName: context.error?.name || 'UnknownError',
+    errorCode: context.normalized?.errorCode || context.error?.code || null,
+    stream: Boolean(context.stream),
+    responseStarted: context.responseStarted ?? null,
+    replaySafety: context.replaySafety || 'unknown',
+    statefulRequest: Boolean(context.statefulRequest),
+    retry: Boolean(normalizedDecision.retry),
+    delayMs: normalizedDecision.delayMs ?? null,
+    reason: normalizedDecision.reason || null,
+  });
+
+  return decision;
+}
+
+export const gatewayModelRetrySettings = {
+  maxRetries: 1,
+  backoff: {
+    initialDelayMs: 500,
+    maxDelayMs: 2_000,
+    multiplier: 2,
+    jitter: true,
+  },
+  policy: gatewayModelRetryPolicy,
+};
