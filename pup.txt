@@ -1,58 +1,609 @@
-import {
-  Agent,
-  retryPolicies,
-} from '@openai/agents';
-
-const transientRetryPolicy = retryPolicies.any(
-  retryPolicies.providerSuggested(),
-  retryPolicies.retryAfter(),
-  retryPolicies.networkError(),
-  retryPolicies.httpStatus([
-    408,
-    409,
-    429,
-    500,
-    502,
-    503,
-    504,
-  ]),
-);
-
-const flightAgent = new Agent({
-  name: 'Flight Specialist Agent',
-
-  // model,
-  // instructions,
-  // tools,
-
-  modelSettings: {
-    // Maximum time for EACH individual /v1/responses model call.
-    // 1 min 20 sec = 80 sec
-    timeoutMs: 80_000,
-
-    retry: {
-      // Initial request + 1 retry = max 2 attempts
-      maxRetries: 1,
-
-      backoff: {
-        initialDelayMs: 500,
-        maxDelayMs: 2_000,
-        multiplier: 2,
-        jitter: true,
+[
+  {
+    "journeyName": "Warm family trip from JFK with gradual planning",
+    "turns": [
+      {
+        "turnNumber": 1,
+        "category": "destination discovery",
+        "userMessage": "somewhere warm, not crazy hot",
+        "passCriteria": "The response should correctly interpret the user message \"somewhere warm, not crazy hot\" and reflect every explicit addition, correction, or preference. There is no earlier journey context. Offer a small set of relevant destination choices grounded in the established constraints. Do not ask again for known information; ask only for the next genuinely useful missing detail."
       },
-
-      policy: async (ctx) => {
-        // Retry when our 80-second model timeout occurs
-        if (ctx.normalized.errorCode === 'ETIMEDOUT') {
-          return {
-            retry: true,
-            reason: `Flight model timed out on attempt ${ctx.attempt}`,
-          };
-        }
-
-        // Retry normal transient OpenAI/network failures
-        return transientRetryPolicy(ctx);
+      {
+        "turnNumber": 2,
+        "category": "destination discovery",
+        "userMessage": "with wife and kid, he's 7",
+        "passCriteria": "The response should correctly interpret the user message \"with wife and kid, he's 7\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Offer a small set of relevant destination choices grounded in the established constraints. Do not ask again for known information; ask only for the next genuinely useful missing detail."
       },
-    },
+      {
+        "turnNumber": 3,
+        "category": "destination discovery",
+        "userMessage": "from jfk, maybe september, not too costly",
+        "passCriteria": "The response should correctly interpret the user message \"from jfk, maybe september, not too costly\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Offer a small set of relevant destination choices grounded in the established constraints. Do not ask again for known information; ask only for the next genuinely useful missing detail."
+      },
+      {
+        "turnNumber": 4,
+        "category": "destination discovery",
+        "userMessage": "lisbon sounds good, 6 days",
+        "passCriteria": "The response should correctly interpret the user message \"lisbon sounds good, 6 days\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Evaluate or confirm the named destination against the established constraints. Do not ask again for known information; ask only for the next genuinely useful missing detail."
+      },
+      {
+        "turnNumber": 5,
+        "category": "itinerary planning",
+        "userMessage": "make it relaxed, food places too",
+        "passCriteria": "The response should correctly interpret the user message \"make it relaxed, food places too\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Update only the affected itinerary days or preferences and keep unrelated plan sections unchanged. Keep the response focused on places, food, and activities."
+      },
+      {
+        "turnNumber": 6,
+        "category": "itinerary planning",
+        "userMessage": "skip most museums, kid stuff for one day",
+        "passCriteria": "The response should correctly interpret the user message \"skip most museums, kid stuff for one day\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Update only the affected itinerary days or preferences and keep unrelated plan sections unchanged. Keep the response focused on places, food, and activities."
+      },
+      {
+        "turnNumber": 7,
+        "category": "flight discovery",
+        "userMessage": "any cheaper dates in september before you search?",
+        "passCriteria": "The response should recognize \"any cheaper dates in september before you search?\" as an explicit price-intelligence request, preserve the route, party, cabin, trip type, duration, and date window established earlier, and use price prediction rather than starting a normal flight search immediately. It should return only grounded predicted date choices, avoid inventing exact fares when none are provided, briefly explain the strongest date, and make the next flight-search step clear."
+      },
+      {
+        "turnNumber": 8,
+        "category": "flight discovery",
+        "userMessage": "show flights also, economy",
+        "passCriteria": "The response should correctly interpret the user message \"show flights also, economy\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Proceed with flight discovery when departure, arrival, and a usable date are available. Carry forward trip type, passengers, cabin, and selected date; ask only for a truly missing mandatory detail and state any inferred date naturally."
+      },
+      {
+        "turnNumber": 9,
+        "category": "flight discovery",
+        "userMessage": "2 checked bags, nonstop if possible",
+        "passCriteria": "The response should correctly interpret the user message \"2 checked bags, nonstop if possible\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Preserve the active route, dates, trip type, passengers, and cabin while applying only the newly requested flight preference. Do not restart context collection or claim unavailable results."
+      }
+    ]
   },
-});
+  {
+    "journeyName": "Tokyo anniversary plan with date and cabin corrections",
+    "turns": [
+      {
+        "turnNumber": 1,
+        "category": "itinerary planning",
+        "userMessage": "plan something for tokyo",
+        "passCriteria": "The response should correctly interpret the user message \"plan something for tokyo\" and reflect every explicit addition, correction, or preference. There is no earlier journey context. When destination and duration are sufficient, provide a concise, realistic day-wise plan tailored to the established party, pace, budget, and interests; otherwise ask only for essential missing planning information. Keep the response focused on places, food, and activities."
+      },
+      {
+        "turnNumber": 2,
+        "category": "itinerary planning",
+        "userMessage": "oct 10 to 16, 2 ppl",
+        "passCriteria": "The response should correctly interpret the user message \"oct 10 to 16, 2 ppl\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. When destination and duration are sufficient, provide a concise, realistic day-wise plan tailored to the established party, pace, budget, and interests; otherwise ask only for essential missing planning information. Keep the response focused on places, food, and activities."
+      },
+      {
+        "turnNumber": 3,
+        "category": "destination discovery",
+        "userMessage": "with wife, anniversary vibe, any good areas?",
+        "passCriteria": "The response should correctly interpret the user message \"with wife, anniversary vibe, any good areas?\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Offer a small set of relevant destination choices grounded in the established constraints. Do not ask again for known information; ask only for the next genuinely useful missing detail."
+      },
+      {
+        "turnNumber": 4,
+        "category": "itinerary planning",
+        "userMessage": "food focused and not packed pls",
+        "passCriteria": "The response should correctly interpret the user message \"food focused and not packed pls\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. When destination and duration are sufficient, provide a concise, realistic day-wise plan tailored to the established party, pace, budget, and interests; otherwise ask only for essential missing planning information. Keep the response focused on places, food, and activities."
+      },
+      {
+        "turnNumber": 5,
+        "category": "itinerary planning",
+        "userMessage": "day 4 make it anime stuff",
+        "passCriteria": "The response should correctly interpret the user message \"day 4 make it anime stuff\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Update only the affected itinerary days or preferences and keep unrelated plan sections unchanged. Keep the response focused on places, food, and activities."
+      },
+      {
+        "turnNumber": 6,
+        "category": "flight discovery",
+        "userMessage": "any cheaper nearby dates around oct 10?",
+        "passCriteria": "The response should recognize \"any cheaper nearby dates around oct 10?\" as an explicit price-intelligence request, preserve the route, party, cabin, trip type, duration, and date window established earlier, and use price prediction rather than starting a normal flight search immediately. It should return only grounded predicted date choices, avoid inventing exact fares when none are provided, briefly explain the strongest date, and make the next flight-search step clear."
+      },
+      {
+        "turnNumber": 7,
+        "category": "flight discovery",
+        "userMessage": "actually fly oct 11, return still 16",
+        "passCriteria": "The response should correctly interpret the user message \"actually fly oct 11, return still 16\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Treat the message as a flight-search update, apply the latest correction, preserve every unchanged search field, and continue without asking again for known details."
+      },
+      {
+        "turnNumber": 8,
+        "category": "flight discovery",
+        "userMessage": "show premium economy flights",
+        "passCriteria": "The response should correctly interpret the user message \"show premium economy flights\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Treat the message as a flight-search update, apply the latest correction, preserve every unchanged search field, and continue without asking again for known details."
+      },
+      {
+        "turnNumber": 9,
+        "category": "itinerary planning",
+        "userMessage": "make the last day super light",
+        "passCriteria": "The response should correctly interpret the user message \"make the last day super light\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Update only the affected itinerary days or preferences and keep unrelated plan sections unchanged. Keep the response focused on places, food, and activities."
+      }
+    ]
+  },
+  {
+    "journeyName": "Budget solo history and food trip from Delhi",
+    "turns": [
+      {
+        "turnNumber": 1,
+        "category": "destination discovery",
+        "userMessage": "want history and food, outside india",
+        "passCriteria": "The response should correctly interpret the user message \"want history and food, outside india\" and reflect every explicit addition, correction, or preference. There is no earlier journey context. Offer a small set of relevant destination choices grounded in the established constraints. Do not ask again for known information; ask only for the next genuinely useful missing detail."
+      },
+      {
+        "turnNumber": 2,
+        "category": "destination discovery",
+        "userMessage": "from del, solo, under 1 lakh total",
+        "passCriteria": "The response should correctly interpret the user message \"from del, solo, under 1 lakh total\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Offer a small set of relevant destination choices grounded in the established constraints. Do not ask again for known information; ask only for the next genuinely useful missing detail."
+      },
+      {
+        "turnNumber": 3,
+        "category": "destination discovery",
+        "userMessage": "november maybe 5 days",
+        "passCriteria": "The response should correctly interpret the user message \"november maybe 5 days\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Offer a small set of relevant destination choices grounded in the established constraints. Do not ask again for known information; ask only for the next genuinely useful missing detail."
+      },
+      {
+        "turnNumber": 4,
+        "category": "destination discovery",
+        "userMessage": "istanbul maybe? is that a fit",
+        "passCriteria": "The response should correctly interpret the user message \"istanbul maybe? is that a fit\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Evaluate or confirm the named destination against the established constraints. Do not ask again for known information; ask only for the next genuinely useful missing detail."
+      },
+      {
+        "turnNumber": 5,
+        "category": "itinerary planning",
+        "userMessage": "yes do istanbul, medium pace",
+        "passCriteria": "The response should correctly interpret the user message \"yes do istanbul, medium pace\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. When destination and duration are sufficient, provide a concise, realistic day-wise plan tailored to the established party, pace, budget, and interests; otherwise ask only for essential missing planning information. Keep the response focused on places, food, and activities."
+      },
+      {
+        "turnNumber": 6,
+        "category": "itinerary planning",
+        "userMessage": "add one adventurous day but keep rest easy",
+        "passCriteria": "The response should correctly interpret the user message \"add one adventurous day but keep rest easy\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Update only the affected itinerary days or preferences and keep unrelated plan sections unchanged. Keep the response focused on places, food, and activities."
+      },
+      {
+        "turnNumber": 7,
+        "category": "flight discovery",
+        "userMessage": "show cheapest dates that month",
+        "passCriteria": "The response should correctly interpret the user message \"show cheapest dates that month\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Recognize explicit price-date intelligence, use the established route and date window, and do not invent fares or cheapest dates. Present only grounded date guidance and carry a selected date into flight discovery when requested."
+      },
+      {
+        "turnNumber": 8,
+        "category": "flight discovery",
+        "userMessage": "okay show flights for the best date, morning departure",
+        "passCriteria": "The response should correctly interpret the user message \"okay show flights for the best date, morning departure\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Recognize explicit price-date intelligence, use the established route and date window, and do not invent fares or cheapest dates. Present only grounded date guidance and carry a selected date into flight discovery when requested."
+      }
+    ]
+  },
+  {
+    "journeyName": "Family beach trip with a date change",
+    "turns": [
+      {
+        "turnNumber": 1,
+        "category": "destination discovery",
+        "userMessage": "need a beach place for family",
+        "passCriteria": "The response should correctly interpret the user message \"need a beach place for family\" and reflect every explicit addition, correction, or preference. There is no earlier journey context. Offer a small set of relevant destination choices grounded in the established constraints. Do not ask again for known information; ask only for the next genuinely useful missing detail."
+      },
+      {
+        "turnNumber": 2,
+        "category": "destination discovery",
+        "userMessage": "from toronto, 2 adults and kid age 4",
+        "passCriteria": "The response should correctly interpret the user message \"from toronto, 2 adults and kid age 4\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Offer a small set of relevant destination choices grounded in the established constraints. Do not ask again for known information; ask only for the next genuinely useful missing detail."
+      },
+      {
+        "turnNumber": 3,
+        "category": "destination discovery",
+        "userMessage": "6 days around christmas, not too costly",
+        "passCriteria": "The response should correctly interpret the user message \"6 days around christmas, not too costly\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Offer a small set of relevant destination choices grounded in the established constraints. Do not ask again for known information; ask only for the next genuinely useful missing detail."
+      },
+      {
+        "turnNumber": 4,
+        "category": "destination discovery",
+        "userMessage": "cancun, but jan 12 to 18 instead",
+        "passCriteria": "The response should correctly interpret the user message \"cancun, but jan 12 to 18 instead\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Evaluate or confirm the named destination against the established constraints. Do not ask again for known information; ask only for the next genuinely useful missing detail."
+      },
+      {
+        "turnNumber": 5,
+        "category": "itinerary planning",
+        "userMessage": "plan it, easy days and good local food",
+        "passCriteria": "The response should correctly interpret the user message \"plan it, easy days and good local food\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. When destination and duration are sufficient, provide a concise, realistic day-wise plan tailored to the established party, pace, budget, and interests; otherwise ask only for essential missing planning information. Keep the response focused on places, food, and activities."
+      },
+      {
+        "turnNumber": 6,
+        "category": "itinerary planning",
+        "userMessage": "one nature day, rest mostly relaxed",
+        "passCriteria": "The response should correctly interpret the user message \"one nature day, rest mostly relaxed\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Update only the affected itinerary days or preferences and keep unrelated plan sections unchanged. Keep the response focused on places, food, and activities."
+      },
+      {
+        "turnNumber": 7,
+        "category": "flight discovery",
+        "userMessage": "could jan 11 or 13 be cheaper than jan 12?",
+        "passCriteria": "The response should recognize \"could jan 11 or 13 be cheaper than jan 12?\" as an explicit price-intelligence request, preserve the route, party, cabin, trip type, duration, and date window established earlier, and use price prediction rather than starting a normal flight search immediately. It should return only grounded predicted date choices, avoid inventing exact fares when none are provided, briefly explain the strongest date, and make the next flight-search step clear."
+      },
+      {
+        "turnNumber": 8,
+        "category": "flight discovery",
+        "userMessage": "show round trip economy flights",
+        "passCriteria": "The response should correctly interpret the user message \"show round trip economy flights\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Proceed with flight discovery when departure, arrival, and a usable date are available. Carry forward trip type, passengers, cabin, and selected date; ask only for a truly missing mandatory detail and state any inferred date naturally."
+      }
+    ]
+  },
+  {
+    "journeyName": "Rome plan changed to Paris while preserving context",
+    "turns": [
+      {
+        "turnNumber": 1,
+        "category": "itinerary planning",
+        "userMessage": "plan my trip",
+        "passCriteria": "The response should correctly interpret the user message \"plan my trip\" and reflect every explicit addition, correction, or preference. There is no earlier journey context. When destination and duration are sufficient, provide a concise, realistic day-wise plan tailored to the established party, pace, budget, and interests; otherwise ask only for essential missing planning information. Keep the response focused on places, food, and activities."
+      },
+      {
+        "turnNumber": 2,
+        "category": "itinerary planning",
+        "userMessage": "more food, fewer monuments",
+        "passCriteria": "The response should correctly interpret the user message \"more food, fewer monuments\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Update only the affected itinerary days or preferences and keep unrelated plan sections unchanged. Keep the response focused on places, food, and activities."
+      },
+      {
+        "turnNumber": 3,
+        "category": "destination discovery",
+        "userMessage": "actually change it to paris",
+        "passCriteria": "The response should correctly interpret the user message \"actually change it to paris\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Evaluate or confirm the named destination against the established constraints. Do not ask again for known information; ask only for the next genuinely useful missing detail."
+      },
+      {
+        "turnNumber": 4,
+        "category": "itinerary planning",
+        "userMessage": "same dates and budget, make it romantic",
+        "passCriteria": "The response should correctly interpret the user message \"same dates and budget, make it romantic\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Update only the affected itinerary days or preferences and keep unrelated plan sections unchanged. Keep the response focused on places, food, and activities."
+      },
+      {
+        "turnNumber": 5,
+        "category": "itinerary planning",
+        "userMessage": "day 2 too much, make it chill",
+        "passCriteria": "The response should correctly interpret the user message \"day 2 too much, make it chill\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Update only the affected itinerary days or preferences and keep unrelated plan sections unchanged. Keep the response focused on places, food, and activities."
+      },
+      {
+        "turnNumber": 6,
+        "category": "flight discovery",
+        "userMessage": "which departure date around oct 3 has the best fare?",
+        "passCriteria": "The response should recognize \"which departure date around oct 3 has the best fare?\" as an explicit price-intelligence request, preserve the route, party, cabin, trip type, duration, and date window established earlier, and use price prediction rather than starting a normal flight search immediately. It should return only grounded predicted date choices, avoid inventing exact fares when none are provided, briefly explain the strongest date, and make the next flight-search step clear."
+      },
+      {
+        "turnNumber": 7,
+        "category": "flight discovery",
+        "userMessage": "show flights from bom for those dates",
+        "passCriteria": "The response should correctly interpret the user message \"show flights from bom for those dates\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Proceed with flight discovery when departure, arrival, and a usable date are available. Carry forward trip type, passengers, cabin, and selected date; ask only for a truly missing mandatory detail and state any inferred date naturally."
+      },
+      {
+        "turnNumber": 8,
+        "category": "flight discovery",
+        "userMessage": "business class? no wait premium economy",
+        "passCriteria": "The response should correctly interpret the user message \"business class? no wait premium economy\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Treat the message as a flight-search update, apply the latest correction, preserve every unchanged search field, and continue without asking again for known details."
+      }
+    ]
+  },
+  {
+    "journeyName": "Flexible warm escape from LAX with fare comparison",
+    "turns": [
+      {
+        "turnNumber": 1,
+        "category": "destination discovery",
+        "userMessage": "somewhere warm in october",
+        "passCriteria": "The response should correctly interpret the user message \"somewhere warm in october\" and reflect every explicit addition, correction, or preference. There is no earlier journey context. Offer a small set of relevant destination choices grounded in the established constraints. Do not ask again for known information; ask only for the next genuinely useful missing detail."
+      },
+      {
+        "turnNumber": 2,
+        "category": "destination discovery",
+        "userMessage": "solo, beach and food, not too far",
+        "passCriteria": "The response should correctly interpret the user message \"solo, beach and food, not too far\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Offer a small set of relevant destination choices grounded in the established constraints. Do not ask again for known information; ask only for the next genuinely useful missing detail."
+      },
+      {
+        "turnNumber": 3,
+        "category": "destination discovery",
+        "userMessage": "honolulu works",
+        "passCriteria": "The response should correctly interpret the user message \"honolulu works\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Evaluate or confirm the named destination against the established constraints. Do not ask again for known information; ask only for the next genuinely useful missing detail."
+      },
+      {
+        "turnNumber": 4,
+        "category": "flight discovery",
+        "userMessage": "oct 8 to 13, which date around there is cheapest?",
+        "passCriteria": "The response should correctly interpret the user message \"oct 8 to 13, which date around there is cheapest?\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Recognize explicit price-date intelligence, use the established route and date window, and do not invent fares or cheapest dates. Present only grounded date guidance and carry a selected date into flight discovery when requested."
+      },
+      {
+        "turnNumber": 5,
+        "category": "flight discovery",
+        "userMessage": "okay search the best one, economy",
+        "passCriteria": "The response should correctly interpret the user message \"okay search the best one, economy\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Recognize explicit price-date intelligence, use the established route and date window, and do not invent fares or cheapest dates. Present only grounded date guidance and carry a selected date into flight discovery when requested."
+      },
+      {
+        "turnNumber": 6,
+        "category": "itinerary planning",
+        "userMessage": "need beaches and food plan too",
+        "passCriteria": "The response should correctly interpret the user message \"need beaches and food plan too\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. When destination and duration are sufficient, provide a concise, realistic day-wise plan tailored to the established party, pace, budget, and interests; otherwise ask only for essential missing planning information. Keep the response focused on places, food, and activities."
+      },
+      {
+        "turnNumber": 7,
+        "category": "itinerary planning",
+        "userMessage": "make day 3 empty-ish, I want rest",
+        "passCriteria": "The response should correctly interpret the user message \"make day 3 empty-ish, I want rest\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Update only the affected itinerary days or preferences and keep unrelated plan sections unchanged. Keep the response focused on places, food, and activities."
+      }
+    ]
+  },
+  {
+    "journeyName": "Japan spring trip expanded from Kyoto to Osaka",
+    "turns": [
+      {
+        "turnNumber": 1,
+        "category": "destination discovery",
+        "userMessage": "next spring, cherry blossom-ish",
+        "passCriteria": "The response should correctly interpret the user message \"next spring, cherry blossom-ish\" and reflect every explicit addition, correction, or preference. There is no earlier journey context. Offer a small set of relevant destination choices grounded in the established constraints. Do not ask again for known information; ask only for the next genuinely useful missing detail."
+      },
+      {
+        "turnNumber": 2,
+        "category": "itinerary planning",
+        "userMessage": "8 days",
+        "passCriteria": "The response should correctly interpret the user message \"8 days\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Update only the affected itinerary days or preferences and keep unrelated plan sections unchanged. Keep the response focused on places, food, and activities."
+      },
+      {
+        "turnNumber": 3,
+        "category": "destination discovery",
+        "userMessage": "not kyoto only, add osaka too",
+        "passCriteria": "The response should correctly interpret the user message \"not kyoto only, add osaka too\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Offer a small set of relevant destination choices grounded in the established constraints. Do not ask again for known information; ask only for the next genuinely useful missing detail."
+      },
+      {
+        "turnNumber": 4,
+        "category": "itinerary planning",
+        "userMessage": "food and temples, medium pace",
+        "passCriteria": "The response should correctly interpret the user message \"food and temples, medium pace\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. When destination and duration are sufficient, provide a concise, realistic day-wise plan tailored to the established party, pace, budget, and interests; otherwise ask only for essential missing planning information. Keep the response focused on places, food, and activities."
+      },
+      {
+        "turnNumber": 5,
+        "category": "itinerary planning",
+        "userMessage": "2 ppl actually, with my brother",
+        "passCriteria": "The response should correctly interpret the user message \"2 ppl actually, with my brother\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. When destination and duration are sufficient, provide a concise, realistic day-wise plan tailored to the established party, pace, budget, and interests; otherwise ask only for essential missing planning information. Keep the response focused on places, food, and activities."
+      },
+      {
+        "turnNumber": 6,
+        "category": "itinerary planning",
+        "userMessage": "plan it, keep final day light",
+        "passCriteria": "The response should correctly interpret the user message \"plan it, keep final day light\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. When destination and duration are sufficient, provide a concise, realistic day-wise plan tailored to the established party, pace, budget, and interests; otherwise ask only for essential missing planning information. Keep the response focused on places, food, and activities."
+      },
+      {
+        "turnNumber": 7,
+        "category": "flight discovery",
+        "userMessage": "best fare date around early april from sea to kix?",
+        "passCriteria": "The response should recognize \"best fare date around early april from sea to kix?\" as an explicit price-intelligence request, preserve the route, party, cabin, trip type, duration, and date window established earlier, and use price prediction rather than starting a normal flight search immediately. It should return only grounded predicted date choices, avoid inventing exact fares when none are provided, briefly explain the strongest date, and make the next flight-search step clear."
+      },
+      {
+        "turnNumber": 8,
+        "category": "flight discovery",
+        "userMessage": "show flights sea to kix around april 1",
+        "passCriteria": "The response should correctly interpret the user message \"show flights sea to kix around april 1\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Proceed with flight discovery when departure, arrival, and a usable date are available. Carry forward trip type, passengers, cabin, and selected date; ask only for a truly missing mandatory detail and state any inferred date naturally."
+      },
+      {
+        "turnNumber": 9,
+        "category": "flight discovery",
+        "userMessage": "return 8 days later, economy",
+        "passCriteria": "The response should correctly interpret the user message \"return 8 days later, economy\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Treat the message as a flight-search update, apply the latest correction, preserve every unchanged search field, and continue without asking again for known details."
+      }
+    ]
+  },
+  {
+    "journeyName": "Northern lights couple trip with mixed pace",
+    "turns": [
+      {
+        "turnNumber": 1,
+        "category": "destination discovery",
+        "userMessage": "want northern lights but not only that",
+        "passCriteria": "The response should correctly interpret the user message \"want northern lights but not only that\" and reflect every explicit addition, correction, or preference. There is no earlier journey context. Offer a small set of relevant destination choices grounded in the established constraints. Do not ask again for known information; ask only for the next genuinely useful missing detail."
+      },
+      {
+        "turnNumber": 2,
+        "category": "destination discovery",
+        "userMessage": "from london, with partner, feb",
+        "passCriteria": "The response should correctly interpret the user message \"from london, with partner, feb\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Offer a small set of relevant destination choices grounded in the established constraints. Do not ask again for known information; ask only for the next genuinely useful missing detail."
+      },
+      {
+        "turnNumber": 3,
+        "category": "destination discovery",
+        "userMessage": "reykjavik maybe, 5 nights",
+        "passCriteria": "The response should correctly interpret the user message \"reykjavik maybe, 5 nights\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Evaluate or confirm the named destination against the established constraints. Do not ask again for known information; ask only for the next genuinely useful missing detail."
+      },
+      {
+        "turnNumber": 4,
+        "category": "itinerary planning",
+        "userMessage": "yes, adventure but with rest days",
+        "passCriteria": "The response should correctly interpret the user message \"yes, adventure but with rest days\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Update only the affected itinerary days or preferences and keep unrelated plan sections unchanged. Keep the response focused on places, food, and activities."
+      },
+      {
+        "turnNumber": 5,
+        "category": "itinerary planning",
+        "userMessage": "add local food and one easy culture day",
+        "passCriteria": "The response should correctly interpret the user message \"add local food and one easy culture day\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Update only the affected itinerary days or preferences and keep unrelated plan sections unchanged. Keep the response focused on places, food, and activities."
+      },
+      {
+        "turnNumber": 6,
+        "category": "flight discovery",
+        "userMessage": "best fare dates in first half of feb?",
+        "passCriteria": "The response should correctly interpret the user message \"best fare dates in first half of feb?\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Recognize explicit price-date intelligence, use the established route and date window, and do not invent fares or cheapest dates. Present only grounded date guidance and carry a selected date into flight discovery when requested."
+      },
+      {
+        "turnNumber": 7,
+        "category": "flight discovery",
+        "userMessage": "search that date, premium economy... actually economy",
+        "passCriteria": "The response should correctly interpret the user message \"search that date, premium economy... actually economy\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Proceed with flight discovery when departure, arrival, and a usable date are available. Carry forward trip type, passengers, cabin, and selected date; ask only for a truly missing mandatory detail and state any inferred date naturally."
+      }
+    ]
+  },
+  {
+    "journeyName": "Spain and Portugal multi-city food journey",
+    "turns": [
+      {
+        "turnNumber": 1,
+        "category": "destination discovery",
+        "userMessage": "spain or portugal, got 9 days",
+        "passCriteria": "The response should correctly interpret the user message \"spain or portugal, got 9 days\" and reflect every explicit addition, correction, or preference. There is no earlier journey context. Offer a small set of relevant destination choices grounded in the established constraints. Do not ask again for known information; ask only for the next genuinely useful missing detail."
+      },
+      {
+        "turnNumber": 2,
+        "category": "destination discovery",
+        "userMessage": "from chicago, with wife",
+        "passCriteria": "The response should correctly interpret the user message \"from chicago, with wife\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Offer a small set of relevant destination choices grounded in the established constraints. Do not ask again for known information; ask only for the next genuinely useful missing detail."
+      },
+      {
+        "turnNumber": 3,
+        "category": "destination discovery",
+        "userMessage": "food, beaches, little history",
+        "passCriteria": "The response should correctly interpret the user message \"food, beaches, little history\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Offer a small set of relevant destination choices grounded in the established constraints. Do not ask again for known information; ask only for the next genuinely useful missing detail."
+      },
+      {
+        "turnNumber": 4,
+        "category": "destination discovery",
+        "userMessage": "do both, madrid then lisbon",
+        "passCriteria": "The response should correctly interpret the user message \"do both, madrid then lisbon\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Evaluate or confirm the named destination against the established constraints. Do not ask again for known information; ask only for the next genuinely useful missing detail."
+      },
+      {
+        "turnNumber": 5,
+        "category": "itinerary planning",
+        "userMessage": "march 5 to 13, balanced pace",
+        "passCriteria": "The response should correctly interpret the user message \"march 5 to 13, balanced pace\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. When destination and duration are sufficient, provide a concise, realistic day-wise plan tailored to the established party, pace, budget, and interests; otherwise ask only for essential missing planning information. Keep the response focused on places, food, and activities."
+      },
+      {
+        "turnNumber": 6,
+        "category": "itinerary planning",
+        "userMessage": "plan the days, more food than history",
+        "passCriteria": "The response should correctly interpret the user message \"plan the days, more food than history\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. When destination and duration are sufficient, provide a concise, realistic day-wise plan tailored to the established party, pace, budget, and interests; otherwise ask only for essential missing planning information. Keep the response focused on places, food, and activities."
+      },
+      {
+        "turnNumber": 7,
+        "category": "flight discovery",
+        "userMessage": "is march 5 the cheapest day to fly ord to madrid?",
+        "passCriteria": "The response should recognize \"is march 5 the cheapest day to fly ord to madrid?\" as an explicit price-intelligence request, preserve the route, party, cabin, trip type, duration, and date window established earlier, and use price prediction rather than starting a normal flight search immediately. It should return only grounded predicted date choices, avoid inventing exact fares when none are provided, briefly explain the strongest date, and make the next flight-search step clear."
+      },
+      {
+        "turnNumber": 8,
+        "category": "flight discovery",
+        "userMessage": "multi city flights: ord to mad, lis back ord",
+        "passCriteria": "The response should correctly interpret the user message \"multi city flights: ord to mad, lis back ord\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Proceed with flight discovery when departure, arrival, and a usable date are available. Carry forward trip type, passengers, cabin, and selected date; ask only for a truly missing mandatory detail and state any inferred date naturally."
+      },
+      {
+        "turnNumber": 9,
+        "category": "flight discovery",
+        "userMessage": "economy 2 adults, one checked bag each",
+        "passCriteria": "The response should correctly interpret the user message \"economy 2 adults, one checked bag each\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Preserve the active route, dates, trip type, passengers, and cabin while applying only the newly requested flight preference. Do not restart context collection or claim unavailable results."
+      }
+    ]
+  },
+  {
+    "journeyName": "Messy Boston solo journey with destination and date correction",
+    "turns": [
+      {
+        "turnNumber": 1,
+        "category": "destination discovery",
+        "userMessage": "wanna go smwhr warm n food",
+        "passCriteria": "The response should correctly interpret the user message \"wanna go smwhr warm n food\" and reflect every explicit addition, correction, or preference. There is no earlier journey context. Offer a small set of relevant destination choices grounded in the established constraints. Do not ask again for known information; ask only for the next genuinely useful missing detail."
+      },
+      {
+        "turnNumber": 2,
+        "category": "destination discovery",
+        "userMessage": "frm bos, solo",
+        "passCriteria": "The response should correctly interpret the user message \"frm bos, solo\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Offer a small set of relevant destination choices grounded in the established constraints. Do not ask again for known information; ask only for the next genuinely useful missing detail."
+      },
+      {
+        "turnNumber": 3,
+        "category": "destination discovery",
+        "userMessage": "feb maybe 1 wk, not costly",
+        "passCriteria": "The response should correctly interpret the user message \"feb maybe 1 wk, not costly\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Offer a small set of relevant destination choices grounded in the established constraints. Do not ask again for known information; ask only for the next genuinely useful missing detail."
+      },
+      {
+        "turnNumber": 4,
+        "category": "destination discovery",
+        "userMessage": "mexico city?",
+        "passCriteria": "The response should correctly interpret the user message \"mexico city?\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Evaluate or confirm the named destination against the established constraints. Do not ask again for known information; ask only for the next genuinely useful missing detail."
+      },
+      {
+        "turnNumber": 5,
+        "category": "itinerary planning",
+        "userMessage": "yea plan it, chill pace",
+        "passCriteria": "The response should correctly interpret the user message \"yea plan it, chill pace\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. When destination and duration are sufficient, provide a concise, realistic day-wise plan tailored to the established party, pace, budget, and interests; otherwise ask only for essential missing planning information. Keep the response focused on places, food, and activities."
+      },
+      {
+        "turnNumber": 6,
+        "category": "itinerary planning",
+        "userMessage": "not all food, add art and markets",
+        "passCriteria": "The response should correctly interpret the user message \"not all food, add art and markets\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Update only the affected itinerary days or preferences and keep unrelated plan sections unchanged. Keep the response focused on places, food, and activities."
+      },
+      {
+        "turnNumber": 7,
+        "category": "flight discovery",
+        "userMessage": "cheapest dates in feb from bos to mexico city?",
+        "passCriteria": "The response should recognize \"cheapest dates in feb from bos to mexico city?\" as an explicit price-intelligence request, preserve the route, party, cabin, trip type, duration, and date window established earlier, and use price prediction rather than starting a normal flight search immediately. It should return only grounded predicted date choices, avoid inventing exact fares when none are provided, briefly explain the strongest date, and make the next flight-search step clear."
+      },
+      {
+        "turnNumber": 8,
+        "category": "flight discovery",
+        "userMessage": "show flights",
+        "passCriteria": "The response should correctly interpret the user message \"show flights\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Proceed with flight discovery when departure, arrival, and a usable date are available. Carry forward trip type, passengers, cabin, and selected date; ask only for a truly missing mandatory detail and state any inferred date naturally."
+      },
+      {
+        "turnNumber": 9,
+        "category": "flight discovery",
+        "userMessage": "actually mar 3 to 9, economy",
+        "passCriteria": "The response should correctly interpret the user message \"actually mar 3 to 9, economy\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Treat the message as a flight-search update, apply the latest correction, preserve every unchanged search field, and continue without asking again for known details."
+      }
+    ]
+  },
+  {
+    "journeyName": "Dubai family celebration with preference reversals",
+    "turns": [
+      {
+        "turnNumber": 1,
+        "category": "destination discovery",
+        "userMessage": "family celebration somewhere lively",
+        "passCriteria": "The response should correctly interpret the user message \"family celebration somewhere lively\" and reflect every explicit addition, correction, or preference. There is no earlier journey context. Offer a small set of relevant destination choices grounded in the established constraints. Do not ask again for known information; ask only for the next genuinely useful missing detail."
+      },
+      {
+        "turnNumber": 2,
+        "category": "destination discovery",
+        "userMessage": "from hyd, 4 adults, december",
+        "passCriteria": "The response should correctly interpret the user message \"from hyd, 4 adults, december\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Offer a small set of relevant destination choices grounded in the established constraints. Do not ask again for known information; ask only for the next genuinely useful missing detail."
+      },
+      {
+        "turnNumber": 3,
+        "category": "destination discovery",
+        "userMessage": "dubai maybe, 5 days",
+        "passCriteria": "The response should correctly interpret the user message \"dubai maybe, 5 days\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Evaluate or confirm the named destination against the established constraints. Do not ask again for known information; ask only for the next genuinely useful missing detail."
+      },
+      {
+        "turnNumber": 4,
+        "category": "itinerary planning",
+        "userMessage": "do it, shopping and adventure",
+        "passCriteria": "The response should correctly interpret the user message \"do it, shopping and adventure\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. When destination and duration are sufficient, provide a concise, realistic day-wise plan tailored to the established party, pace, budget, and interests; otherwise ask only for essential missing planning information. Keep the response focused on places, food, and activities."
+      },
+      {
+        "turnNumber": 5,
+        "category": "itinerary planning",
+        "userMessage": "too packed, make mornings easy",
+        "passCriteria": "The response should correctly interpret the user message \"too packed, make mornings easy\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Update only the affected itinerary days or preferences and keep unrelated plan sections unchanged. Keep the response focused on places, food, and activities."
+      },
+      {
+        "turnNumber": 6,
+        "category": "itinerary planning",
+        "userMessage": "skip shopping, more food and views",
+        "passCriteria": "The response should correctly interpret the user message \"skip shopping, more food and views\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Update only the affected itinerary days or preferences and keep unrelated plan sections unchanged. Keep the response focused on places, food, and activities."
+      },
+      {
+        "turnNumber": 7,
+        "category": "flight discovery",
+        "userMessage": "any cheaper 5-day dates in december?",
+        "passCriteria": "The response should recognize \"any cheaper 5-day dates in december?\" as an explicit price-intelligence request, preserve the route, party, cabin, trip type, duration, and date window established earlier, and use price prediction rather than starting a normal flight search immediately. It should return only grounded predicted date choices, avoid inventing exact fares when none are provided, briefly explain the strongest date, and make the next flight-search step clear."
+      },
+      {
+        "turnNumber": 8,
+        "category": "flight discovery",
+        "userMessage": "find flights dec 12, back dec 16",
+        "passCriteria": "The response should correctly interpret the user message \"find flights dec 12, back dec 16\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Proceed with flight discovery when departure, arrival, and a usable date are available. Carry forward trip type, passengers, cabin, and selected date; ask only for a truly missing mandatory detail and state any inferred date naturally."
+      },
+      {
+        "turnNumber": 9,
+        "category": "flight discovery",
+        "userMessage": "economy, nonstop only",
+        "passCriteria": "The response should correctly interpret the user message \"economy, nonstop only\" and reflect every explicit addition, correction, or preference. Retain all route, date, duration, passenger, budget, pace, and interest details established in earlier turns unless this message explicitly changes them. Preserve the active route, dates, trip type, passengers, and cabin while applying only the newly requested flight preference. Do not restart context collection or claim unavailable results."
+      }
+    ]
+  }
+]
