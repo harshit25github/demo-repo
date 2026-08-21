@@ -1,32 +1,45 @@
+import {
+  ModelTimeoutError,
+  retryPolicies,
+} from '@openai/agents';
+
 policy: async (ctx) => {
-  console.log('MODEL RETRY CONTEXT', {
+  console.log('[Flight Retry Debug]', {
     attempt: ctx.attempt,
     maxRetries: ctx.maxRetries,
+
+    errorName:
+      ctx.error instanceof Error
+        ? ctx.error.name
+        : undefined,
+
+    errorMessage:
+      ctx.error instanceof Error
+        ? ctx.error.message
+        : undefined,
+
+    errorCode: ctx.normalized?.errorCode,
 
     stream: ctx.stream,
     responseStarted: ctx.responseStarted,
     replaySafety: ctx.replaySafety,
     statefulRequest: ctx.statefulRequest,
 
-    errorCode: ctx.normalized.errorCode,
-    isAbort: ctx.normalized.isAbort,
-
-    errorName:
-      ctx.error instanceof Error
-        ? ctx.error.constructor.name
-        : undefined,
-
     providerAdvice: ctx.providerAdvice,
   });
 
-  if (ctx.normalized.errorCode === 'ETIMEDOUT') {
-    console.log('TIMEOUT → requesting retry');
+  const isTimeout =
+    ctx.error instanceof ModelTimeoutError ||
+    ctx.normalized?.errorCode === 'ETIMEDOUT';
+
+  if (isTimeout) {
+    console.log('[Flight Retry] Timeout detected → retry requested');
 
     return {
       retry: true,
-      reason: 'Flight model timed out',
+      reason: 'Flight model timed out after 80 seconds',
     };
   }
 
   return transientRetryPolicy(ctx);
-}
+},
