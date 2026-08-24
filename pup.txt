@@ -1,4 +1,4 @@
-export const SUMMARY_AGENT_PROMPT = `# Summary Context Extractor
+xport const SUMMARY_AGENT_PROMPT = `# Summary Context Extractor
 
 ## Role
 You are a deterministic travel-context extractor for Flight Agent and Trip Planner conversations.
@@ -90,6 +90,7 @@ Do not add search keys, filters, contracts, prices, booking state, cabin class, 
 - Use only the dynamic Current Date Reference for relative-date arithmetic. Never use an assumed current date, server timezone, or outside clock.
 - Resolve a confirmed relative expression when it has one deterministic calendar result: today, tomorrow, day after tomorrow, this weekday, next weekday, first/last weekday of a named month, a calendar-bounded week/weekend, or another precise relative range.
 - "this <weekday>" means that weekday on or after localDate. "coming <weekday>" means the first occurrence after localDate. "next <weekday>" means that weekday in the following Monday-Sunday calendar week.
+- "first <weekday> next month" means the first actual occurrence of that weekday inside the next calendar month, not day 1 and not the start of the first week. Verify the resolved date has the requested weekday.
 - A month and day without a year uses the next non-past occurrence relative to localDate.
 - A named month without a year uses the earliest occurrence whose resolved date or complete resolved range has not already passed relative to localDate.
 - For a return weekday, choose the first matching date after the confirmed outbound date. Never produce a return date before outbound_date.
@@ -144,6 +145,13 @@ User: "JFK to LAX at the end of next month"
 Agent: "The end of next month is noted for JFK to LAX."
 Affected output:
 set outbound_date to 2026-09-30. Keep return_date null because the evidence gives no return or complete trip span. Do not infer duration_days or roundtrip.
+
+### Ordinal weekday is not the first day of the month
+Current Date Reference localDate is 2026-08-23.
+User: "first Monday next month"
+Agent: "The first Monday next month works."
+Affected output:
+September 1, 2026 is Tuesday, so it is invalid. The first Monday is September 7, 2026; set outbound_date to 2026-09-07 and leave return_date unchanged.
 
 ### Ordinal weekend in a named month
 Current Date Reference localDate is 2026-08-23.
