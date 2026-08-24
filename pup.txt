@@ -1,15 +1,41 @@
-function buildAgentInput(previousSummary, userMessage, agentResponse) {
-  const oldSummaryContextToon = encode(previousSummary);
-  return {
-    oldSummaryContextToon,
-    input: `Old Summary Context (TOON):
-\`\`\`toon
-${oldSummaryContextToon}
-\`\`\`
-
-Current User Message:
-${userMessage}
-
-Current Agent Response:
-${agentResponse}`,
-  };
+{
+  "summary": {
+    "origin": {
+      "city": "Delhi",
+      "iata": "DEL"
+    },
+    "destination": {
+      "city": "Paris",
+      "iata": "PAR"
+    },
+    "outbound_date": "2026-11-04",
+    "return_date": "2026-11-10",
+    "duration_days": 6,
+    "budget": {
+      "amount": 2400,
+      "currency": "EUR",
+      "per_person": false,
+      "total": 2400
+    },
+    "tripType": [
+      "couple",
+      "cultural",
+      "balanced"
+    ],
+    "placesOfInterest": [
+      {
+        "placeName": "Louvre Museum",
+        "description": "A confirmed place in the existing Paris plan."
+      }
+    ],
+    "passengerData": {
+      "total": 2,
+      "adults": 2,
+      "seniors": 0,
+      "children": 0,
+      "lapInfants": 0,
+      "seatInfants": 0,
+      "childrenAges": []
+    }
+  }
+}
