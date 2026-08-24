@@ -1,145 +1,311 @@
-# Implement Streaming `ModelTimeoutError` Recovery
+import { Agent } from '@openai/agents';
+import { z } from 'zod';
+import { createFlightTurnClock } from './flightDateTime.js';
 
-## Context
+const nullableText = z.string().trim().min(1).nullable();
+const nullableCount = z.number().int().nonnegative().nullable();
+const nullableAmount = z.number().nonnegative().nullable();
+const nullableIsoDate = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/)
+  .nullable();
+const nullableIata = z
+  .string()
+  .regex(/^[A-Z]{3}$/)
+  .nullable();
+const nullableCurrency = z
+  .string()
+  .regex(/^[A-Z]{3}$/)
+  .nullable();
 
-The application uses `@openai/agents` with a Gateway Agent, specialist
-handoffs, and a Node text stream:
+export const summaryAgentInputSchema = z
+  .object({
+    oldSummaryContext: z.string().min(1).describe('Previous summary context encoded as TOON.'),
+    currentUserMessage: z.string(),
+    currentAgentResponse: z.string(),
+  })
+  .strict();
 
-```js
-const result = await runner.run(GatewayAgent, input, {
-  context,
-  session,
-  maxTurns,
-  stream: true,
-});
+export const summaryAgentPassengerDataSchema = z
+  .object({
+    total: nullableCount,
+    adults: nullableCount,
+    seniors: nullableCount,
+    children: nullableCount,
+    lapInfants: nullableCount,
+    seatInfants: nullableCount,
+    childrenAges: z.array(z.number().int().nonnegative()),
+  })
+  .strict()
+  .superRefine((passengers, context) => {
+    const breakdown = [
+      passengers.adults,
+      passengers.seniors,
+      passengers.children,
+      passengers.lapInfants,
+      passengers.seatInfants,
+    ];
+    if (breakdown.every((count) => count !== null)) {
+      const calculatedTotal = breakdown.reduce((sum, count) => sum + count, 0);
+      if (passengers.total !== calculatedTotal) {
+        context.addIssue({
+          code: 'custom',
+          path: ['total'],
+          message: 'total must equal the complete passenger breakdown',
+        });
+      }
+    }
+    if (
+      passengers.children !== null &&
+      passengers.childrenAges.length > 0 &&
+      passengers.childrenAges.length !== passengers.children
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['childrenAges'],
+        message: 'childrenAges must match the confirmed children count',
+      });
+    }
+  });
 
-const textStream = result.toTextStream({
-  compatibleWithNodeStreams: true,
-});
-```
+export const summaryAgentContextSchema = z
+  .object({
+    origin: z
+      .object({
+        city: nullableText.describe('Explicitly supplied city only; never derive it from IATA.'),
+        iata: nullableIata,
+      })
+      .strict(),
+    destination: z
+      .object({
+        city: nullableText.describe('Explicitly supplied city only; never derive it from IATA.'),
+        iata: nullableIata,
+      })
+      .strict(),
+    outbound_date: nullableIsoDate.describe(
+      'Confirmed exact outbound date, including deterministic relative dates resolved from the supplied clock.',
+    ),
+    return_date: nullableIsoDate.describe(
+      'Confirmed exact return date, including deterministic relative dates resolved from the supplied clock and outbound date.',
+    ),
+    duration_days: z
+      .number()
+      .int()
+      .positive()
+      .nullable()
+      .describe('Trip duration; preserve it when only flight journey type or return date changes.'),
+    budget: z
+      .object({
+        amount: nullableAmount.describe('Confirmed budget amount only, never a tentative proposal.'),
+        currency: nullableCurrency,
+        per_person: z
+          .boolean()
+          .nullable()
+          .describe('Budget basis only; flight-card price disclaimers are not budget evidence.'),
+        total: nullableAmount,
+      })
+      .strict(),
+    tripType: z
+      .array(z.string().trim().min(1))
+      .describe(
+        'Journey type, party style, pace, and interests. Preserve unrelated values; use oneway and roundtrip as canonical journey-type values.',
+      ),
+    placesOfInterest: z.array(
+      z
+        .object({
+          placeName: z.string().trim().min(1),
+          description: z.string().trim().min(1),
+        })
+        .strict(),
+    ),
+    passengerData: summaryAgentPassengerDataSchema,
+  })
+  .strict();
 
-SDK `modelSettings.retry` already exists. Keep it unchanged. This task adds a
-fallback for a `ModelTimeoutError` that reaches the streaming error path.
+export const summaryAgentOutputSchema = z
+  .object({ summary: summaryAgentContextSchema })
+  .strict();
 
-Use this reference:
-
-```text
-docs/examples/gateway-text-stream-timeout-recovery.example.js
-```
-
-## Required Recovery Flow
-
-When `ModelTimeoutError` reaches `toTextStream()`:
-
-1. Do not immediately close the HTTP response.
-2. Confirm that no user-visible text has been emitted.
-3. Confirm that `result.state` exists and the recovery limit is not exhausted.
-4. Increase the timeout for the next model attempt.
-5. Resume the unfinished turn with `result.state`:
-
-   ```js
-   runner.run(GatewayAgent, result.state, {
-     context,
-     session,
-     maxTurns,
-     stream: true,
-   });
-   ```
-
-6. Forward the resumed output through the same client-facing stream.
-7. Stop immediately when an attempt succeeds.
-8. If recovery is exhausted, let the existing API catch close the response
-   once:
-
-   ```js
-   if (!res.writableEnded && !res.destroyed) {
-     res.end();
-   }
-   ```
-
-Never resend the original user message. `result.state` preserves the active
-specialist, completed handoffs, completed tools, context, and unfinished turn.
-Restarting with the original input could repeat those operations.
-
-## Increasing Timeout Per Recovery
-
-Use request-local values:
-
-```js
-let timeoutMs = 80_000;
-let recoveries = 0;
-
-// Before each RunState recovery:
-recoveries += 1;
-timeoutMs += 4_000;
-```
-
-For four allowed recoveries, the sequence is:
-
-```text
-Initial attempt: 80000ms
-Recovery 1:     84000ms
-Recovery 2:     88000ms
-Recovery 3:     92000ms
-Recovery 4:     96000ms
-```
-
-Create/use a request-scoped Runner with the calculated timeout for each attempt.
-Keep existing retry and model settings on that Runner:
-
-```js
-const runner = new Runner({
-  model,
-  modelSettings: {
-    ...existingModelSettings,
-    timeoutMs,
-    retry: existingSdkRetrySettings,
+export const SUMMARY_AGENT_OUTPUT_FORMAT_EXAMPLE = {
+  summary: {
+    origin: { city: 'New York', iata: 'JFK' },
+    destination: { city: 'Delhi', iata: 'DEL' },
+    outbound_date: '2026-09-10',
+    return_date: '2026-09-15',
+    duration_days: 5,
+    budget: {
+      amount: 1500,
+      currency: 'USD',
+      per_person: true,
+      total: 3000,
+    },
+    tripType: ['roundtrip', 'food', 'relaxed'],
+    placesOfInterest: [
+      {
+        placeName: 'India Gate',
+        description: 'A confirmed stop in the delivered Delhi itinerary.',
+      },
+      {
+        placeName: 'Humayun\'s Tomb',
+        description: 'A confirmed heritage stop in the delivered Delhi itinerary.',
+      },
+    ],
+    passengerData: {
+      total: 2,
+      adults: 2,
+      seniors: 0,
+      children: 0,
+      lapInfants: 0,
+      seatInfants: 0,
+      childrenAges: [],
+    },
   },
+};
+
+export const SUMMARY_AGENT_PROMPT = `# Summary Context Extractor
+
+## Role
+You are a deterministic travel-context extractor for Flight Agent and Trip Planner conversations.
+
+Read Old Context (TOON), Current User Message, and Current Agent Response. Return one complete merged JSON object that matches the required schema exactly.
+
+You are not a conversational assistant. Do not ask questions, explain your work, browse the web, call tools, enrich data, or use outside knowledge. Output JSON only.
+
+## Evidence Priority
+1. An explicit correction or confirmation in the current user message.
+2. A fact clearly applied or tool-grounded in the current agent response.
+3. A valid value already present in Old Context.
+4. The schema default: null or an empty array.
+
+When evidence conflicts, use the highest-priority reliable source. The agent response may canonicalize a user value, such as adding an IATA code or confirming the exact date actually searched, but it must not override an explicit user correction.
+
+Tentative user language such as maybe, perhaps, around, or a question is not a confirmed update when the agent asks for clarification. An agent question never confirms the values it repeats.
+
+## Output Schema
+Return exactly:
+{
+  "summary": {
+    "origin": {"city": null, "iata": null},
+    "destination": {"city": null, "iata": null},
+    "outbound_date": null,
+    "return_date": null,
+    "duration_days": null,
+    "budget": {"amount": null, "currency": null, "per_person": null, "total": null},
+    "tripType": [],
+    "placesOfInterest": [],
+    "passengerData": {
+      "total": null,
+      "adults": null,
+      "seniors": null,
+      "children": null,
+      "lapInfants": null,
+      "seatInfants": null,
+      "childrenAges": []
+    }
+  }
+}
+
+Do not output pax or upcomingEvents. If legacy Old Context contains pax and passengerData.total is missing, copy pax into passengerData.total once. Ignore legacy upcomingEvents.
+
+Do not add search keys, filters, contracts, prices, booking state, cabin class, tool payloads, tool results, or runtime metadata.
+
+## Merge Rules
+- Start from Old Context and preserve every supported valid value not changed by reliable current evidence.
+- Do not erase a field merely because the latest exchange does not mention it.
+- Clear a field only when the user explicitly removes it or a confirmed change makes it incompatible.
+- When destination changes, clear old placesOfInterest. Preserve origin, dates, passengers, budget, and unrelated preferences.
+- Questions, examples, hypothetical values, rejected options, and unselected recommendations are not updates.
+- A delivered itinerary is confirmed agent output. Extract its named places when they belong to the selected destination. Do not extract places from an unselected destination comparison.
+- Do not infer tripType from destination stereotypes. Capture every explicitly stated or clearly applied journey type, party style, pace, and interest. Do not keep only the party style while dropping stated interests.
+- Canonicalize confirmed flight journey type to exactly oneway or roundtrip. Never output one-way, one way, round-trip, or round trip as tripType values.
+- A flight request with only an outbound date does not confirm oneway. Add oneway only when the user or agent explicitly confirms it.
+- For mutually exclusive tripType values, replace only the old value in that same category and preserve every unrelated value. Examples: oneway replaces only roundtrip; relaxed replaces only balanced; family replaces only couple.
+- A Flight Agent confirmation of one-way or round-trip results must update tripType even when the user refers only to "this trip" or "these flights".
+- Never drop an existing interest or party style merely because a later turn confirms route, dates, flight journey type, passengers, or places. Remove it only through explicit evidence or a clear incompatibility rule below.
+
+## Passenger Rules
+- passengerData.total is the only total traveler field.
+- The user plus one explicitly named companion means total=2 when no other travelers are mentioned. This confirms only the total, not adult or age categories.
+- If only a total is known, update total and keep unknown category counts null. Never assume all travelers are adults.
+- Populate adults, seniors, children, lapInfants, seatInfants, and childrenAges only from explicit evidence.
+- When a complete breakdown is known, total equals the sum of all passenger categories.
+- If total changes without a new breakdown, do not preserve a now-incompatible old breakdown.
+- If passengerData.total becomes greater than 1, remove the incompatible solo tripType. If it becomes greater than 2, also remove the incompatible couple tripType. Preserve unrelated interests and journey type.
+- Keep childrenAges only for explicitly supplied ages. Do not invent ages.
+
+## Date Rules
+- Store confirmed exact dates as YYYY-MM-DD.
+- An exact date confirmed as searched or applied by the agent is reliable.
+- Use only the dynamic Current Date Reference for relative-date arithmetic. Never use an assumed current date, server timezone, or outside clock.
+- Resolve a confirmed relative expression when it has one deterministic calendar result: today, tomorrow, day after tomorrow, this weekday, next weekday, first/last weekday of a named month, or a precise relative range.
+- "this <weekday>" means that weekday on or after localDate. "coming <weekday>" means the first occurrence after localDate. "next <weekday>" means that weekday in the following Monday-Sunday calendar week.
+- A month and day without a year uses the next non-past occurrence relative to localDate.
+- For a return weekday, choose the first matching date after the confirmed outbound date. Never produce a return date before outbound_date.
+- Treat "next weekend" as Saturday-Sunday of the following calendar week. Use Saturday as outbound_date; set Sunday as return_date only when the wording or confirmed trip type indicates the whole weekend or a return.
+- Broad periods such as next week, next month, sometime in August, around September, or flexible dates do not identify an exact date. Do not choose an arbitrary day unless the current agent response confirms the exact date actually applied.
+- Do not independently convert unresolved phrases into exact dates. Preserve them as unresolved unless the current evidence supplies one deterministic result under the rules above.
+- If broad or tentative timing is not resolved in the agent response, preserve an existing confirmed exact date unless the user explicitly clears it; otherwise leave the date null.
+- An explicit return date wins. Otherwise derive return_date only when confirmed outbound_date and duration_days are available.
+- Changing between oneway and roundtrip may clear an incompatible return_date, but it does not clear duration_days unless the user or agent explicitly changes or removes the trip duration.
+- Do not silently roll old dates forward or repair them without current-turn evidence.
+
+## Budget Rules
+- Update only values stated or clearly confirmed: amount, currency, per_person, and total.
+- Do not store tentative budget proposals. If the user says maybe, around, or asks a budget question and the agent requests clarification, preserve the existing budget unchanged.
+- Flight-card notes such as "Prices shown are per person" describe displayed fares, not the user's trip budget. Never use them to populate budget fields.
+- Never assume currency or whether a budget is per person or total.
+- If per_person=true and amount plus passengerData.total are known, total=amount*passengerData.total.
+- If per_person=false and amount is known, total=amount.
+- Otherwise preserve a valid existing total or use null.
+
+## Extraction Boundaries
+Extract from the user when they state, confirm, correct, remove, or select a value.
+
+Extract from the agent when it confirms an applied change, confirms an actual flight search, or delivers the selected itinerary.
+
+Do not extract from an agent question, a missing-information request, a general answer, an example, or a list of options the user has not selected.
+
+Do not derive a city name from an IATA code or an IATA code from a city name using outside knowledge. Store each field only when that exact value appears in reliable evidence or already exists in Old Context.
+
+Before returning JSON, verify that the object is complete, supported old values were preserved, every change has current evidence, passengerData is internally consistent, and excluded fields are absent.`;
+
+export const summaryAgentConfig = {
+  model: 'gpt-5.4-mini',
+  modelSettings: {
+    reasoning: { effort: 'low' },
+    text: { verbosity: 'low' },
+  },
+};
+
+export function createSummaryAgentRunContext({ now = new Date(), timeZone } = {}) {
+  return {
+    summaryAgent: {
+      clock: createFlightTurnClock({ now, timeZone }),
+    },
+  };
+}
+
+export function buildSummaryAgentInstructions(runContext) {
+  const clock = runContext?.context?.summaryAgent?.clock;
+  const dynamicClock = clock?.localDate
+    ? `<current_date_reference>
+localDate: ${clock.localDate}
+localDateTime: ${clock.localDateTime}
+timeZone: ${clock.timeZone}
+Use this immutable clock as the only reference for current and relative dates in this turn.
+</current_date_reference>`
+    : `<current_date_reference>
+Clock unavailable. Do not resolve relative dates yourself; use only an exact date confirmed in the current evidence.
+</current_date_reference>`;
+
+  return `${SUMMARY_AGENT_PROMPT}\n\n${dynamicClock}`;
+}
+
+export const SummaryExtractorAgent = new Agent({
+  name: 'Summary Extractor Agent',
+  instructions: buildSummaryAgentInstructions,
+  model: summaryAgentConfig.model,
+  modelSettings: summaryAgentConfig.modelSettings,
+  outputType: summaryAgentOutputSchema,
+  tools: [],
 });
-```
-
-Use only one timeout owner. Remove `timeoutMs` from the shared Gateway/Flight
-Agent `modelSettings` when timeout is controlled by the request-scoped Runner;
-otherwise the Agent setting may override the increasing Runner value.
-
-Do not mutate a shared singleton like this in a production server:
-
-```js
-FlightAgent.modelSettings.timeoutMs += 4_000;
-```
-
-That can change the timeout of concurrent requests. Timeout counters and Runner
-instances must remain local to the current HTTP request.
-
-## Streaming Structure
-
-Use one `PassThrough` stream for all attempts:
-
-```text
-Initial text stream ─┐
-Recovery stream 1   ├─ PassThrough → HTTP response
-Recovery stream 2   ┘
-```
-
-Track the number of characters forwarded. Recovery is permitted only when that
-count is zero. Await both the attempt's text stream and `result.completed`
-before considering the attempt settled.
-
-The recovery limit is separate from SDK `maxRetries`:
-
-- SDK `maxRetries` retries one model request internally when replay is allowed.
-- RunState recovery handles a terminal timeout surfaced by the stream.
-
-## Scope
-
-- Handle only streaming `ModelTimeoutError` recovery.
-- Preserve the current context, session, handoffs, tools, and client format.
-- Do not change prompts, tool schemas, business logic, or existing SDK retry
-  policy.
-- Do not add retry state to durable conversation context.
-
-## Deliverable
-
-Implement the wrapper at the current `toTextStream()` integration point and
-report the files changed, timeout sequence, and how `result.state`, context,
-session, and the HTTP response are preserved.
