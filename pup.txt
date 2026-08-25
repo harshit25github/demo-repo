@@ -1,6 +1,5 @@
 import { tool } from '@openai/agents';
 import { z } from 'zod';
-import { createHash } from 'node:crypto';
 import {
   getFlightSearchState,
   initializeFlightToolContext,
@@ -17,12 +16,6 @@ const generatedContractsContextSchema = z.object({
     .nullable()
     .describe(
       'Optional 1-based contract/option indexes. Use null only with read to inspect every current option.',
-    ),
-  expectedResultSetVersion: z
-    .string()
-    .nullable()
-    .describe(
-      'Version returned by a preceding read call. Pass null for read or a direct explicit indexed selection.',
     ),
 });
 
@@ -66,30 +59,8 @@ function getCurrentResultSet(appContext) {
   };
 }
 
-function stableSerialize(value) {
-  if (Array.isArray(value)) {
-    return `[${value.map(stableSerialize).join(',')}]`;
-  }
-  if (value && typeof value === 'object') {
-    return `{${Object.keys(value)
-      .filter((key) => key !== 'show')
-      .sort()
-      .map((key) => `${JSON.stringify(key)}:${stableSerialize(value[key])}`)
-      .join(',')}}`;
-  }
-  return JSON.stringify(value);
-}
-
-export function buildFlightResultSetVersion(searchKey, contracts) {
-  const fingerprint = stableSerialize({
-    searchKey: searchKey || null,
-    contracts,
-  });
-  return createHash('sha256').update(fingerprint).digest('hex').slice(0, 24);
-}
-
 function visibleCount(contracts) {
-  return contracts.filter((contract) => contract.show !== false).length;
+  return contracts.filter((contract) => contract.display !== false).length;
 }
 
 function moneyLabel(price) {
@@ -198,7 +169,7 @@ function buildSearchParams(appContext) {
 export const GetGeneratedContractsContextTool = tool({
   name: 'getGeneratedContractsContext',
   description:
-    'Inspect or select current generated flight contracts. Use mode=read without changing card visibility. Use mode=select to atomically show only the supplied 1-based indexes and hide every other current option. For cheapest, best, recommendation, or generic comparison, read all first and then select 1-3 options using the returned resultSetVersion. For an explicit indexed comparison, select those indexes directly with expectedResultSetVersion=null.',
+    'Inspect or select current generated flight contracts. Use mode=read without changing card visibility. Use mode=select to atomically show only the supplied 1-based indexes and hide every other current option. For cheapest, best, recommendation, or generic comparison, read all first and then select 1-3 options. For an explicit indexed comparison, select those indexes directly.',
   parameters: generatedContractsContextSchema,
   strict: true,
   execute(input, context) {
@@ -207,10 +178,6 @@ export const GetGeneratedContractsContextTool = tool({
     const contracts = results.map(normalizeContract);
     const requestedIndexes = input.indexes || null;
     const searchParams = buildSearchParams(appContext);
-    const resultSetVersion = buildFlightResultSetVersion(
-      appContext.flight.searchKey,
-      results,
-    );
 
     if (contracts.length === 0) {
       const output = {
@@ -222,7 +189,6 @@ export const GetGeneratedContractsContextTool = tool({
         UID: appContext.flight.uid,
         searchKey: appContext.flight.searchKey || null,
         searchParams,
-        resultSetVersion,
         selectedIndexes: [],
         visibleCount: 0,
         contracts: [],
@@ -261,7 +227,6 @@ export const GetGeneratedContractsContextTool = tool({
         UID: appContext.flight.uid,
         searchKey: appContext.flight.searchKey || null,
         searchParams,
-        resultSetVersion,
         selectedIndexes: [],
         visibleCount: visibleCount(results),
         contracts: [],
@@ -283,7 +248,6 @@ export const GetGeneratedContractsContextTool = tool({
         UID: appContext.flight.uid,
         searchKey: appContext.flight.searchKey || null,
         searchParams,
-        resultSetVersion,
         selectedIndexes: [],
         visibleCount: visibleCount(results),
         contracts: [],
@@ -304,7 +268,6 @@ export const GetGeneratedContractsContextTool = tool({
           UID: appContext.flight.uid,
           searchKey: appContext.flight.searchKey || null,
           searchParams,
-          resultSetVersion,
           selectedIndexes: [],
           visibleCount: visibleCount(results),
           totalAvailable: contracts.length,
@@ -335,33 +298,12 @@ export const GetGeneratedContractsContextTool = tool({
       }
     }
 
-    if (
-      input.mode === 'select' &&
-      input.expectedResultSetVersion !== null &&
-      input.expectedResultSetVersion !== resultSetVersion
-    ) {
-      return {
-        ok: false,
-        code: 'STALE_RESULT_SET',
-        source: 'dummy',
-        message: 'The active flight options changed. Read the current options again.',
-        UID: appContext.flight.uid,
-        searchKey: appContext.flight.searchKey || null,
-        searchParams,
-        resultSetVersion,
-        selectedIndexes: [],
-        visibleCount: visibleCount(results),
-        contracts: [],
-        summary: buildRankingSummary(contracts),
-      };
-    }
-
     let activeResults = results;
     if (input.mode === 'select') {
       const selectedIndexSet = new Set(uniqueIndexes);
       activeResults = results.map((contract, index) => ({
         ...contract,
-        show: selectedIndexSet.has(index + 1),
+        display: selectedIndexSet.has(index + 1),
       }));
       replace(activeResults);
       updateFlightSearchRuntime(appContext.flight.searchKey, {
@@ -381,7 +323,6 @@ export const GetGeneratedContractsContextTool = tool({
       UID: appContext.flight.uid,
       searchKey: appContext.flight.searchKey || null,
       searchParams,
-      resultSetVersion,
       selectedIndexes: input.mode === 'select' ? uniqueIndexes : [],
       visibleCount: visibleCount(activeResults),
       requestedIndexes: uniqueIndexes,
