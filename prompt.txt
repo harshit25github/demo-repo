@@ -1,16 +1,18 @@
-# Fix Flight Search Priority
+Analyze this complete JavaScript repository and create a safe, step-by-step plan to migrate it to TypeScript.
 
-Review the Flight Agent prompt priority logic.
+Requirements:
 
-Issue: agent is over-prioritizing existing search parameters. Existing search criteria should be a fallback, not override new explicit user input.
+* Inspect the repository architecture and dependencies before deciding the migration order.
+* Decide the migration phases yourself based on dependency flow, risk, and testability.
+* This task is ONLY for JavaScript → TypeScript migration. Do not refactor, redesign, optimize, or remove unused code yet.
+* Preserve all existing runtime behavior and business logic.
+* Introduce proper TypeScript types/interfaces and use Zod only where runtime validation is actually required.
+* Keep types and schemas organized in a clean, scalable folder structure.
+* Avoid unnecessary `any`, `@ts-ignore`, or unsafe type assertions.
+* Ensure the application can be tested/validated after each migration phase.
+* Identify risky areas, third-party typing issues, configuration changes, and migration prerequisites.
+* Include exact files/folders that should be handled in each phase.
 
-Example:
+For now, PLAN ONLY. Do not modify any code.
 
-* Existing search: Gurgaon → Goa
-* User says: Delhi → Goa
-* Expected: use Delhi → Goa
-
-Plan the best fix and update prompt rules so priority becomes:
-**current explicit user input > existing search parameters > older history/defaults**
-
-Also mention if any context/routing change is needed beyond prompt updates. Do not implement until the plan is reviewed.
+Create a clear migration plan/checklist that we can execute one phase at a time.
