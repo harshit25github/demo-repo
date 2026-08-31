@@ -1,18 +1,7 @@
-Analyze this complete JavaScript repository and create a safe, step-by-step plan to migrate it to TypeScript.
+I have integrated Logicflow retry handling for OpenAI failures, so we can reduce real-time failures when any temporary issue occurs from the OpenAI side.
 
-Requirements:
+Currently, we send the selected filters in the API payload after generating the search key. If multiple filters are requested together, like morning flight + specific airline + one-stop, and the response comes empty, we are not able to identify which filter is not applicable.
 
-* Inspect the repository architecture and dependencies before deciding the migration order.
-* Decide the migration phases yourself based on dependency flow, risk, and testability.
-* This task is ONLY for JavaScript → TypeScript migration. Do not refactor, redesign, optimize, or remove unused code yet.
-* Preserve all existing runtime behavior and business logic.
-* Introduce proper TypeScript types/interfaces and use Zod only where runtime validation is actually required.
-* Keep types and schemas organized in a clean, scalable folder structure.
-* Avoid unnecessary `any`, `@ts-ignore`, or unsafe type assertions.
-* Ensure the application can be tested/validated after each migration phase.
-* Identify risky areas, third-party typing issues, configuration changes, and migration prerequisites.
-* Include exact files/folders that should be handled in each phase.
+Should we enhance this at the API/digital team level so that only applicable filters are applied, and any non-applicable filter is returned as feedback in the API response? This way, we can still show results with valid filters and inform the user which filter could not be applied.
 
-For now, PLAN ONLY. Do not modify any code.
-
-Create a clear migration plan/checklist that we can execute one phase at a time.
+Please suggest if this approach works or if we should follow a different product behavior for this case.
