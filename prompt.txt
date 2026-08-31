@@ -1,33 +1,24 @@
-## Step 1 — Opus Prompt: Root-Cause Analysis / Planning
+Perform a final verification of the JavaScript to TypeScript migration.
 
-You are working on a JavaScript to TypeScript migration in a large existing codebase.
+Goal: confirm the repository is fully converted, type-safe, and running correctly.
 
-Goal: analyze TypeScript errors at repo level and create a safe fix plan.
+Checklist:
 
-Instructions:
+1. Verify that all required `.js` files are converted to `.ts` / `.tsx`.
+2. Check if any unexpected `.js` files are still present in the source folders.
+3. Run full typecheck using `npm run typecheck` or `npx tsc --noEmit`.
+4. Run the build command and confirm there are no compilation errors.
+5. Start the server and verify there are no runtime/startup errors.
+6. Check imports/exports, file extensions, path aliases, and module resolution.
+7. Ensure there are no unsafe fixes like unnecessary `any`, `@ts-ignore`, or disabled TS rules.
+8. Do not refactor business logic. Only fix issues required for TypeScript correctness.
 
-1. Run the typecheck command:
+Output:
 
-   * `npm run typecheck`
-   * If not available, run `npx tsc --noEmit`
-2. Do not start fixing immediately.
-3. Group the errors by root cause, not by file.
-4. Identify shared type issues first:
-
-   * missing interfaces
-   * incorrect imports/exports
-   * schema mismatch
-   * wrong function return types
-   * nullable/undefined handling
-   * third-party package typings
-5. Highlight which errors can be fixed globally and which need file-level fixes.
-6. Avoid suggesting `any`, `@ts-ignore`, or disabling TypeScript rules unless absolutely necessary.
-7. Provide a short execution plan in phases.
-
-Output format:
-
-* Summary of major error categories
-* Root cause analysis
-* Suggested fix order
-* Files/modules to fix first
-* Risks or areas needing manual confirmation
+* Migration status: Pass/Fail
+* Remaining JS files, if any
+* Typecheck result
+* Build result
+* Server run result
+* Issues found and minimal fixes applied
+* Final summary
