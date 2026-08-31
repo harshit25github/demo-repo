@@ -1,1 +1,33 @@
-Add support to receive the user’s timezone from the app side and hydrate it into the agentic workflow. This will help the agent understand the user’s local timezone and use it correctly while interpreting travel dates, time-based queries, and flight search requests.
+## Step 1 — Opus Prompt: Root-Cause Analysis / Planning
+
+You are working on a JavaScript to TypeScript migration in a large existing codebase.
+
+Goal: analyze TypeScript errors at repo level and create a safe fix plan.
+
+Instructions:
+
+1. Run the typecheck command:
+
+   * `npm run typecheck`
+   * If not available, run `npx tsc --noEmit`
+2. Do not start fixing immediately.
+3. Group the errors by root cause, not by file.
+4. Identify shared type issues first:
+
+   * missing interfaces
+   * incorrect imports/exports
+   * schema mismatch
+   * wrong function return types
+   * nullable/undefined handling
+   * third-party package typings
+5. Highlight which errors can be fixed globally and which need file-level fixes.
+6. Avoid suggesting `any`, `@ts-ignore`, or disabling TypeScript rules unless absolutely necessary.
+7. Provide a short execution plan in phases.
+
+Output format:
+
+* Summary of major error categories
+* Root cause analysis
+* Suggested fix order
+* Files/modules to fix first
+* Risks or areas needing manual confirmation
