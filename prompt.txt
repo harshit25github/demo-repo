@@ -1,15 +1,16 @@
-# Enhance Flight Context Validation Script
+# Fix Flight Search Priority
 
-Update the existing test script to generate and run **50 single-turn flight journeys** covering `oneway`, `roundtrip`, and `multicity` (minimum 5 journeys per trip type).
+Review the Flight Agent prompt priority logic.
 
-Each journey should provide:
+Issue: agent is over-prioritizing existing search parameters. Existing search criteria should be a fallback, not override new explicit user input.
 
-* `tripType`
-* ONDs/segments
-* travel dates appropriate to the trip type
+Example:
 
-Goal: verify that when the response/context contains **alternate travel dates** or **nearby airport information**, the final `flightContext` also contains the same information correctly.
+* Existing search: Gurgaon → Goa
+* User says: Delhi → Goa
+* Expected: use Delhi → Goa
 
-For every journey capture: input, response context, final flight context, alternate-date check, nearby-airport check, pass/fail, and issue details.
+Plan the best fix and update prompt rules so priority becomes:
+**current explicit user input > existing search parameters > older history/defaults**
 
-Enhance the existing script only; do not create a separate testing framework.
+Also mention if any context/routing change is needed beyond prompt updates. Do not implement until the plan is reviewed.
