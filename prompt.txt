@@ -1,7 +1,1 @@
-I have integrated Logicflow retry handling for OpenAI failures, so we can reduce real-time failures when any temporary issue occurs from the OpenAI side.
-
-Currently, we send the selected filters in the API payload after generating the search key. If multiple filters are requested together, like morning flight + specific airline + one-stop, and the response comes empty, we are not able to identify which filter is not applicable.
-
-Should we enhance this at the API/digital team level so that only applicable filters are applied, and any non-applicable filter is returned as feedback in the API response? This way, we can still show results with valid filters and inform the user which filter could not be applied.
-
-Please suggest if this approach works or if we should follow a different product behavior for this case.
+Add support to receive the user’s timezone from the app side and hydrate it into the agentic workflow. This will help the agent understand the user’s local timezone and use it correctly while interpreting travel dates, time-based queries, and flight search requests.
