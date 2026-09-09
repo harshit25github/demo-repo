@@ -1,15 +1,12 @@
-Debug Flight Agent Conversation History Usage
+# Fix Policy Suggested Question Repetition
 
-Flight Agent is relying too heavily on dynamically hydrated context. When that context is empty, it sometimes ignores useful information already present in the OpenAI conversation/session history.
+Update Policy Helper Agent dynamic prompt to include the existing suggested questions already stored in context.
 
-Please inspect:
+Goal:
 
-whether conversationId / session history is actually being passed and restored correctly
-what history Flight Agent receives at runtime
-whether prompt rules are causing dynamic context to override/ignore conversation history
-whether earlier user-provided route, dates, passengers, cabin, etc. can be reused when current context is missing
+* Agent must know what questions were already generated.
+* Do not generate the same or very similar questions again.
+* Keep existing static prompt rules as-is unless a small clarification is needed.
+* Keep the injected context compact to avoid token increase.
 
-Expected priority:
-current user message > current hydrated context/searchCriteria > relevant conversation history > defaults
-
-Find the root cause and propose the minimal fix before implementing.
+Please inspect the current Policy Agent prompt/context flow and add the minimal dynamic context needed to prevent repeated suggested questions.
