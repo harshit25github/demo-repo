@@ -1,12 +1,8 @@
-# Fix Policy Suggested Question Repetition
+Hi IT Team,
 
-Update Policy Helper Agent dynamic prompt to include the existing suggested questions already stored in context.
+I’m able to access `platform.openai.com`, but the login flow through `auth.platform.openai.com` is being blocked as a non-compliant action.
 
-Goal:
+Please whitelist the required OpenAI authentication URL/domain and `@openai.com` emails so I can access the platform and receive verification/notification emails.
 
-* Agent must know what questions were already generated.
-* Do not generate the same or very similar questions again.
-* Keep existing static prompt rules as-is unless a small clarification is needed.
-* Keep the injected context compact to avoid token increase.
-
-Please inspect the current Policy Agent prompt/context flow and add the minimal dynamic context needed to prevent repeated suggested questions.
+Thanks,
+[Your Name]
