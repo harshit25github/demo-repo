@@ -1,8 +1,16 @@
-Hi IT Team,
+# Update Cheapo Agent MCP Tool Instructions
 
-I’m able to access `platform.openai.com`, but the login flow through `auth.platform.openai.com` is being blocked as a non-compliant action.
+I will provide the **old agent prompt** where this MCP tool is already being used correctly.
 
-Please whitelist the required OpenAI authentication URL/domain and `@openai.com` emails so I can access the platform and receive verification/notification emails.
+Review that prompt and update the **Cheapo Agent prompt** so it clearly understands **how to use this MCP tool**, including:
 
-Thanks,
-[Your Name]
+* required payload/parameters and how to build them
+* field mapping and required/optional values
+* tool-call sequence/conditions
+* how to handle the MCP response and continue the flow
+* any important examples or edge-case instructions from the old prompt
+
+The Cheapo Agent already knows **when** to call the MCP tool. Focus mainly on **how to call and use it correctly**.
+
+Do not copy unrelated instructions from the old agent. Keep the new prompt clean, concise, and avoid duplicate or conflicting rules.
+
