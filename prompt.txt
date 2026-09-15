@@ -1,23 +1,23 @@
-# Improve Flight Agent Reasoning & Recovery
+# Plan Flight Agent Context Intelligence Improvements
 
-Review the current Flight Agent system prompt, conversation/context handling, and all available tools. Improve the prompt so the agent uses **reasoning and existing context instead of repeatedly asking the user for information that can already be inferred**.
+Review the current Flight Agent prompt, dynamic context hydration, conversation history usage, tool instructions, and model configuration. Do **not implement yet** — first identify why the agent keeps asking for information that is already available.
 
-Example failure to generalize from:
+Use this priority strictly:
 
-* User says dates are flexible / “any dates”.
-* Later says round trip and “one month stay”.
-* Agent should infer a sensible future departure date, derive the return date from the stay duration, and search.
-* If `flight_search` responds with something like `departure date must be after today`, treat that as **actionable tool feedback**, correct the date, and retry instead of asking the user unnecessarily.
+1. **Current user message — highest priority**
+2. **Current dynamic context / search context**
+3. **Relevant conversation history**
+4. **Safe inference/defaults only when needed**
 
-General behavior required:
+Expected behavior:
 
-* Priority: **current user message → current flight/search context → relevant conversation history → sensible defaults/inference**.
-* Combine information collected across previous turns; do not treat every message independently.
-* If enough information exists to make a reasonable search, **act instead of asking another clarification**.
-* Use tool errors/validation responses as feedback. If the correction is deterministic and safe, fix the input and retry the appropriate tool.
-* Use `resolve_flight_date`/other tools intelligently where useful; do not call tools mechanically.
-* Ask the user only when information is genuinely ambiguous and cannot be safely inferred.
-* Do not hardcode this single scenario or add dozens of phrase-specific rules. Add **general reasoning principles** that work across flight-search scenarios.
-* Never invent critical information when multiple materially different interpretations are possible.
+* If the user explicitly provides or changes a value now, that always wins.
+* If the user does not provide a field, use the latest reliable value from dynamic context.
+* If dynamic context also does not contain it, recover it from relevant history.
+* Never ask again for information that is already reliably available.
+* Combine information across turns instead of treating each message independently.
+* Use tool validation/error feedback to correct recoverable inputs and retry when appropriate.
 
-Keep the change minimal and clean. Do not modify existing business rules/tool contracts unless required. After updating the prompt, test it against this scenario plus several similar multi-turn/flexible-date/tool-error scenarios and report what improved and any remaining gaps.
+Inspect whether prompt conflicts, context hydration, history restoration, tool rules, or model configuration are preventing this behavior.
+
+Deliver a concise plan with root causes, prompt/config changes, affected files, and test scenarios. Keep it general and intelligence-driven; do not add dozens of hardcoded cases.
