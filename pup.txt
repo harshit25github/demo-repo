@@ -1,16 +1,1 @@
-# Update Cheapo Agent MCP Tool Instructions
-
-I will provide the **old agent prompt** where this MCP tool is already being used correctly.
-
-Review that prompt and update the **Cheapo Agent prompt** so it clearly understands **how to use this MCP tool**, including:
-
-* required payload/parameters and how to build them
-* field mapping and required/optional values
-* tool-call sequence/conditions
-* how to handle the MCP response and continue the flow
-* any important examples or edge-case instructions from the old prompt
-
-The Cheapo Agent already knows **when** to call the MCP tool. Focus mainly on **how to call and use it correctly**.
-
-Do not copy unrelated instructions from the old agent. Keep the new prompt clean, concise, and avoid duplicate or conflicting rules.
-
+mkdir -p crawler-adapter/{crawl_service,config,migrations} && touch crawler-adapter/{app.py,requirements-adapter.txt,.env} crawler-adapter/crawl_service/{__init__.py,crawl_runner.py,failure_policy.py,job_api.py,models.py,repository.py,webhook.py,worker.py} crawler-adapter/config/{crawl-policies.json,crawl-policies.schema.json,site-overrides.json} crawler-adapter/migrations/{001_crawl_jobs.sql,002_result_pagination_index.sql,003_store_results_in_postgres.sql,004_result_cursor_indexes.sql}
