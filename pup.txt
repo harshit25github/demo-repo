@@ -1,52 +1,36 @@
-Update the **production Gateway Agent routing prompt**.
+Enhance the existing **post-booking intent detection** with this additional rule:
 
-Goal: make routing context-aware and **prioritize Flight Agent over Trip Planner** for normal travel/flight-related conversations.
+### New Trigger Rule
 
-Use this internal decision flow:
+Trigger **post-booking intent** when the user message contains only booking-identification information, such as:
 
-**Understand intent → Check conversation history/context → Classify request → Route to the correct agent**
-
-### Routing Priority
-
-Prefer **Flight Agent** when:
-
-* user provides origin/destination;
-* user provides only a destination during an ongoing flight conversation;
-* user asks about dates, fares, airlines, filters, stops, baggage, timings, cheapest options, etc.;
-* user gives short inputs like `"Dubai"`, `"Delhi to Dubai"`, `"next weekend"`, `"direct only"`;
-* conversation history already indicates an active flight-search flow.
-
-Do NOT route to Trip Planner simply because a destination/place is mentioned.
-
-### Trip Planner
-
-Route to Trip Planner only when the user clearly asks for:
-
-* travel inspiration;
-* destination recommendations;
-* itinerary/trip planning;
-* places to visit / things to do;
-* destination exploration.
+* booking number
+* PNR
+* confirmation/reference number
+* any numeric/alphanumeric identifier that is clearly linked to an existing booking
 
 Examples:
 
-`Delhi to Dubai` → Flight Agent
-`Dubai next weekend` → Flight Agent
-`make it direct` → Flight Agent
-`cheapest dates for Dubai` → Flight Agent
-
-`Where should I travel in December?` → Trip Planner
-`Suggest destinations for honeymoon` → Trip Planner
-`Plan 5 days in Dubai` → Trip Planner
+`ABCD12` → Post-booking
+`PNR 6E4XYZ` → Post-booking
+`Booking 12345678` → Post-booking
+`12345678` → Post-booking **only when context indicates this is a booking/reference number**
 
 ### Important
 
-* Use conversation history before routing short/ambiguous follow-ups.
-* If the user is already in a Flight Agent flow, preserve that intent unless they clearly switch topics.
-* Destination mention alone must NOT trigger Trip Planner.
-* Avoid keyword-only routing; infer the user's actual intent.
-* Keep existing guardrails and unrelated Gateway behavior unchanged.
+* Do not require an explicit action like `"cancel"`, `"change"`, or `"refund"`.
+* A booking identifier alone is enough when it clearly refers to an existing booking.
+* Use current message + conversation history/context to determine whether a bare number is booking-related.
+* Do not classify arbitrary numbers as post-booking without supporting context.
 
-Review the current routing prompt, identify rules causing Trip Planner over-routing, and make only the minimal changes required.
+Preserve all existing post-booking rules and add this as an additional detection path.
 
-Also add a few multi-turn tests for short/lazy user inputs and report PASS/FAIL routing results.
+Also add tests for:
+
+* PNR only
+* booking number only
+* confirmation code only
+* bare number after `"my booking is"`
+* unrelated number with no booking context
+
+Return only the prompt change and test results.
