@@ -1,1 +1,38 @@
-if not exist crawler-adapter\crawl_service mkdir crawler-adapter\crawl_service & if not exist crawler-adapter\config mkdir crawler-adapter\config & if not exist crawler-adapter\migrations mkdir crawler-adapter\migrations & for %F in (app.py requirements-adapter.txt .env crawl_service\__init__.py crawl_service\crawl_runner.py crawl_service\failure_policy.py crawl_service\job_api.py crawl_service\models.py crawl_service\repository.py crawl_service\webhook.py crawl_service\worker.py config\crawl-policies.json config\crawl-policies.schema.json config\site-overrides.json migrations\001_crawl_jobs.sql migrations\002_result_pagination_index.sql migrations\003_store_results_in_postgres.sql migrations\004_result_cursor_indexes.sql) do @if not exist "crawler-adapter\%F" type nul > "crawler-adapter\%F"
+Refactor and improve the existing **post-booking Tripwire/guardrail prompt**.
+
+The current prompt is poorly structured and sometimes misclassifies user intent. Preserve the existing business behavior, but improve its reasoning and formatting.
+
+The guardrail should internally follow:
+
+**Understand → Classify → Verify Context → Decide → Respond**
+
+Requirements:
+
+* Understand the user's actual intent, not just keywords.
+* Distinguish general informational questions from **booking-specific post-booking requests**.
+* Trigger Tripwire only when the request truly requires post-booking handling/human support according to existing rules.
+* Use conversation/context before deciding.
+* Do not trigger from ambiguous wording without enough evidence.
+* Avoid false positives from generic questions such as cancellation/baggage/policy information.
+* If intent is unclear, classify conservatively according to existing business rules.
+* Properly redact/block content when Tripwire is triggered.
+* Do not expose internal reasoning, guardrail logic, or system details.
+
+Make the prompt clearly structured into:
+
+1. Role
+2. What should trigger
+3. What should NOT trigger
+4. Decision process
+5. Output format
+6. Examples / edge cases
+
+Do not add generic `"think step-by-step"` instructions or chain-of-thought.
+
+First inspect the existing prompt and current Tripwire behavior, then rewrite only this guardrail prompt. Keep it concise and token-efficient.
+
+Also report briefly:
+
+* what was causing ambiguity;
+* what rules were clarified;
+* what false-positive/false-negative cases are now better handled.
