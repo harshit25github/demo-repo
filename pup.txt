@@ -1,34 +1,59 @@
-Update the **production Flight Agent prompt** by adding the same reasoning/decision intelligence we introduced in the newer Flight Agent prompt.
+Fix the Flight Agent's usage of `getGeneratedContractsContext`.
 
-Do **not** replace the production prompt or overwrite production-specific business rules, tools, validations, or behavior.
+The tool has two distinct responsibilities and the agent must not mix them:
 
-Add a concise internal decision flow:
+### `mode: read`
 
-**Understand → Classify → Verify → Decide → Act → Validate → Recover → Stop**
+Use when the agent needs to inspect existing generated flight options, for example:
 
-The agent should:
+* show available options;
+* compare flights;
+* find cheapest/fastest;
+* understand how many contracts exist;
+* answer questions about existing results.
 
-* **Understand** the user's actual flight intent using current message + reliable context/history.
-* **Classify** whether the request needs new search, filter/update/remove-filter, existing-result inspection, price prediction, clarification, etc.
-* **Verify** required state/context before choosing a tool.
-* **Decide** the minimum correct tool/action and required dependencies.
-* **Act** using the correct tool with correctly inferred values.
-* **Validate** every tool result against the original user request; tool success alone is not enough.
-* **Recover** using tool feedback when results/state are missing, stale, invalid, or recoverable; never blindly repeat the same failed action.
-* **Stop** once the user's request is satisfied and avoid unnecessary tool calls.
+`read` should inspect the available contracts **with their option/index references** so the agent knows which result is Option 1, Option 2, etc.
 
-Important:
+It must NOT select/change visibility while reading.
 
-* Reason internally; never expose chain-of-thought.
-* Reuse already-known context instead of asking again.
-* Preserve existing production tool rules and recovery logic.
-* Do not duplicate instructions already handled correctly.
-* Keep the addition concise and token-efficient.
+### `mode: select`
 
-First compare the newer Flight prompt with the production prompt, identify only the missing reasoning/decision rules, and port those into production with minimal changes.
+Use only when the user explicitly asks to display/select specific option numbers, e.g.:
 
-Return only:
+* `"show option 4"`
+* `"show 2 and 5"`
 
-1. missing reasoning rules found;
-2. exact production prompt changes;
-3. confirmation that existing production behavior was preserved.
+Then pass the required array of indexes and update visibility accordingly.
+
+### Problem to Fix
+
+Currently the agent sometimes:
+
+* uses `read` but loses/misses the option indexes;
+* uses `select` when it only needs to inspect results;
+* reads only one indexed option when it actually needs all available contracts;
+* cannot correctly map the contract back to the user's option number.
+
+Strengthen the prompt/tool contract so:
+
+`Need information/comparison → read all relevant contracts + preserve indexes`
+
+`User explicitly selects option(s) → select with indexes`
+
+Do not use `select` merely to inspect context.
+
+Also inspect the tool response structure and ensure `read` returns enough information for the model to reliably map every contract to its option/index.
+
+Keep the fix minimal and do not change unrelated Flight Agent behavior.
+
+Add tests for:
+
+* `show all options`
+* `which is cheapest?`
+* `compare option 2 and 4`
+* `tell me about option 3`
+* `show option 3`
+* `show 2 and 5`
+* `how many options do I have?`
+
+For each case verify both the selected `mode` and indexes sent/returned.
