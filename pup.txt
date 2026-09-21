@@ -1,60 +1,34 @@
-Improve the existing **human handoff / soft handoff guardrail**. Do not redesign the overall flow.
+Update the **production Flight Agent prompt** by adding the same reasoning/decision intelligence we introduced in the newer Flight Agent prompt.
 
-### Expected behavior
+Do **not** replace the production prompt or overwrite production-specific business rules, tools, validations, or behavior.
 
-We have two stages:
+Add a concise internal decision flow:
 
-1. **First explicit human-agent request → Soft Handoff**
+**Understand → Classify → Verify → Decide → Act → Validate → Recover → Stop**
 
-   * Acknowledge the request.
-   * Follow the existing soft-handoff script/process.
-   * Do not immediately perform the hard handoff.
+The agent should:
 
-2. **User asks for a human agent again → Hard Handoff**
-
-   * Detect that the user has already requested human help earlier.
-   * If they repeat/persist with the request, trigger the actual human handoff.
-
-### Main issue
-
-The second request is sometimes not detected correctly, especially when the user uses short, informal, or different wording.
-
-Strengthen detection using **current message + conversation context + existing handoff state**, not keyword matching alone.
-
-Treat messages like these as the same human-handoff intent when context supports it:
-
-* `agent`
-* `connect me`
-* `human`
-* `real person`
-* `talk to someone`
-* `still want agent`
-* `no, connect me`
-* `agent please`
-* `I need someone`
-* `can I talk to them`
-* `just transfer me`
+* **Understand** the user's actual flight intent using current message + reliable context/history.
+* **Classify** whether the request needs new search, filter/update/remove-filter, existing-result inspection, price prediction, clarification, etc.
+* **Verify** required state/context before choosing a tool.
+* **Decide** the minimum correct tool/action and required dependencies.
+* **Act** using the correct tool with correctly inferred values.
+* **Validate** every tool result against the original user request; tool success alone is not enough.
+* **Recover** using tool feedback when results/state are missing, stale, invalid, or recoverable; never blindly repeat the same failed action.
+* **Stop** once the user's request is satisfied and avoid unnecessary tool calls.
 
 Important:
 
-* Distinguish **human-agent requests** from requests referring to an AI/travel agent.
-* The second request does not need to use the same wording as the first.
-* If soft handoff has already happened and the user clearly persists, perform hard handoff.
-* Do not reset the decision just because the wording changed.
-* Do not trigger on vague mentions of the word `agent` when human intent is not clear.
+* Reason internally; never expose chain-of-thought.
+* Reuse already-known context instead of asking again.
+* Preserve existing production tool rules and recovery logic.
+* Do not duplicate instructions already handled correctly.
+* Keep the addition concise and token-efficient.
 
-Use an internal decision flow:
+First compare the newer Flight prompt with the production prompt, identify only the missing reasoning/decision rules, and port those into production with minimal changes.
 
-`Understand intent → Check prior handoff state → Detect persistence → Soft or Hard Handoff`
+Return only:
 
-Review the current prompt/state handling and fix only what is needed to make repeated human-handoff requests reliable.
-
-Also add tests covering short/lazy multi-turn inputs such as:
-
-`agent` → soft handoff → `yes agent` → hard handoff
-
-`talk to someone` → soft handoff → `no connect me` → hard handoff
-
-`chat with travel agent about flights` → should NOT automatically mean human handoff unless context clearly indicates a human.
-
-Keep the changes concise and preserve the existing handoff business rules.
+1. missing reasoning rules found;
+2. exact production prompt changes;
+3. confirmation that existing production behavior was preserved.
