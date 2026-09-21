@@ -1,17 +1,60 @@
-| #  | User message                                                            | Expected                                                                                             |
-| -- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| 1  | “What is your cancellation policy if I book this flight?”               | ❌ No Tripwire — general policy                                                                       |
-| 2  | “I already booked yesterday. Cancel my Delhi–Dubai flight.”             | ✅ Tripwire — booking-specific action                                                                 |
-| 3  | “Can I cancel a flight after booking and how much refund do I get?”     | ❌ No Tripwire — informational                                                                        |
-| 4  | “My flight is tomorrow and I can’t travel. Please cancel it for me.”    | ✅ Tripwire — existing booking + action                                                               |
-| 5  | “I booked through you. How much baggage am I allowed?”                  | ⚠️ Usually No Tripwire if policy can answer without accessing booking                                |
-| 6  | “Check my booking and tell me whether checked baggage is included.”     | ✅ Tripwire — requires booking-specific lookup                                                        |
-| 7  | “My airline changed my departure time. What should I do?”               | ❌ No Tripwire if asking general guidance                                                             |
-| 8  | “My airline changed my booked flight. Change me to the evening flight.” | ✅ Tripwire — modify existing booking                                                                 |
-| 9  | “What happens if the airline cancels my flight?”                        | ❌ No Tripwire — hypothetical/general                                                                 |
-| 10 | “The airline cancelled my flight. Rebook me for tomorrow.”              | ✅ Tripwire — post-booking action                                                                     |
-| 11 | “I need help with cancellation.”                                        | ❌ No immediate Tripwire — ambiguous; understand whether informational or booking-specific            |
-| 12 | “I want to change the date.”                                            | ⚠️ Depends on context — new-search context = normal flight flow; existing booking context = Tripwire |
-| 13 | “Earlier you showed me option 3. Can you change its date?”              | ❌ No Tripwire if not booked yet                                                                      |
-| 14 | “Option 3 is the one I booked. Now move it to Friday.”                  | ✅ Tripwire                                                                                           |
-| 15 | “Can I add a child after boo                                            |                                                                                                      |
+Improve the existing **human handoff / soft handoff guardrail**. Do not redesign the overall flow.
+
+### Expected behavior
+
+We have two stages:
+
+1. **First explicit human-agent request → Soft Handoff**
+
+   * Acknowledge the request.
+   * Follow the existing soft-handoff script/process.
+   * Do not immediately perform the hard handoff.
+
+2. **User asks for a human agent again → Hard Handoff**
+
+   * Detect that the user has already requested human help earlier.
+   * If they repeat/persist with the request, trigger the actual human handoff.
+
+### Main issue
+
+The second request is sometimes not detected correctly, especially when the user uses short, informal, or different wording.
+
+Strengthen detection using **current message + conversation context + existing handoff state**, not keyword matching alone.
+
+Treat messages like these as the same human-handoff intent when context supports it:
+
+* `agent`
+* `connect me`
+* `human`
+* `real person`
+* `talk to someone`
+* `still want agent`
+* `no, connect me`
+* `agent please`
+* `I need someone`
+* `can I talk to them`
+* `just transfer me`
+
+Important:
+
+* Distinguish **human-agent requests** from requests referring to an AI/travel agent.
+* The second request does not need to use the same wording as the first.
+* If soft handoff has already happened and the user clearly persists, perform hard handoff.
+* Do not reset the decision just because the wording changed.
+* Do not trigger on vague mentions of the word `agent` when human intent is not clear.
+
+Use an internal decision flow:
+
+`Understand intent → Check prior handoff state → Detect persistence → Soft or Hard Handoff`
+
+Review the current prompt/state handling and fix only what is needed to make repeated human-handoff requests reliable.
+
+Also add tests covering short/lazy multi-turn inputs such as:
+
+`agent` → soft handoff → `yes agent` → hard handoff
+
+`talk to someone` → soft handoff → `no connect me` → hard handoff
+
+`chat with travel agent about flights` → should NOT automatically mean human handoff unless context clearly indicates a human.
+
+Keep the changes concise and preserve the existing handoff business rules.
