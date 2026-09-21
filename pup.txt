@@ -1,59 +1,52 @@
-Fix the Flight Agent's usage of `getGeneratedContractsContext`.
+Update the **production Gateway Agent routing prompt**.
 
-The tool has two distinct responsibilities and the agent must not mix them:
+Goal: make routing context-aware and **prioritize Flight Agent over Trip Planner** for normal travel/flight-related conversations.
 
-### `mode: read`
+Use this internal decision flow:
 
-Use when the agent needs to inspect existing generated flight options, for example:
+**Understand intent → Check conversation history/context → Classify request → Route to the correct agent**
 
-* show available options;
-* compare flights;
-* find cheapest/fastest;
-* understand how many contracts exist;
-* answer questions about existing results.
+### Routing Priority
 
-`read` should inspect the available contracts **with their option/index references** so the agent knows which result is Option 1, Option 2, etc.
+Prefer **Flight Agent** when:
 
-It must NOT select/change visibility while reading.
+* user provides origin/destination;
+* user provides only a destination during an ongoing flight conversation;
+* user asks about dates, fares, airlines, filters, stops, baggage, timings, cheapest options, etc.;
+* user gives short inputs like `"Dubai"`, `"Delhi to Dubai"`, `"next weekend"`, `"direct only"`;
+* conversation history already indicates an active flight-search flow.
 
-### `mode: select`
+Do NOT route to Trip Planner simply because a destination/place is mentioned.
 
-Use only when the user explicitly asks to display/select specific option numbers, e.g.:
+### Trip Planner
 
-* `"show option 4"`
-* `"show 2 and 5"`
+Route to Trip Planner only when the user clearly asks for:
 
-Then pass the required array of indexes and update visibility accordingly.
+* travel inspiration;
+* destination recommendations;
+* itinerary/trip planning;
+* places to visit / things to do;
+* destination exploration.
 
-### Problem to Fix
+Examples:
 
-Currently the agent sometimes:
+`Delhi to Dubai` → Flight Agent
+`Dubai next weekend` → Flight Agent
+`make it direct` → Flight Agent
+`cheapest dates for Dubai` → Flight Agent
 
-* uses `read` but loses/misses the option indexes;
-* uses `select` when it only needs to inspect results;
-* reads only one indexed option when it actually needs all available contracts;
-* cannot correctly map the contract back to the user's option number.
+`Where should I travel in December?` → Trip Planner
+`Suggest destinations for honeymoon` → Trip Planner
+`Plan 5 days in Dubai` → Trip Planner
 
-Strengthen the prompt/tool contract so:
+### Important
 
-`Need information/comparison → read all relevant contracts + preserve indexes`
+* Use conversation history before routing short/ambiguous follow-ups.
+* If the user is already in a Flight Agent flow, preserve that intent unless they clearly switch topics.
+* Destination mention alone must NOT trigger Trip Planner.
+* Avoid keyword-only routing; infer the user's actual intent.
+* Keep existing guardrails and unrelated Gateway behavior unchanged.
 
-`User explicitly selects option(s) → select with indexes`
+Review the current routing prompt, identify rules causing Trip Planner over-routing, and make only the minimal changes required.
 
-Do not use `select` merely to inspect context.
-
-Also inspect the tool response structure and ensure `read` returns enough information for the model to reliably map every contract to its option/index.
-
-Keep the fix minimal and do not change unrelated Flight Agent behavior.
-
-Add tests for:
-
-* `show all options`
-* `which is cheapest?`
-* `compare option 2 and 4`
-* `tell me about option 3`
-* `show option 3`
-* `show 2 and 5`
-* `how many options do I have?`
-
-For each case verify both the selected `mode` and indexes sent/returned.
+Also add a few multi-turn tests for short/lazy user inputs and report PASS/FAIL routing results.
