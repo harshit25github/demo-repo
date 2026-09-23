@@ -1,34 +1,116 @@
-# Fix Origin/Destination Field Separation in Flight Agent
+````markdown
+Plan smarter pre-search CTAs / “You might ask” questions for Flight Agent.
 
-Review the Flight Agent prompt and `flight_search` tool schema/field descriptions. Fix the location mapping so **city/location name and airport/IATA information are never combined into the same field**.
+Do not implement yet. First inspect the current CTA/suggested-question flow and propose the best design.
 
-Example current wrong call:
+## Goal
+
+Currently CTAs are mainly generated after a flight search. We also want useful CTAs before a search is possible, based on whatever travel context is already known.
+
+Most important rule:
+
+**Once the user selects/uses a CTA, that CTA or the same intent must not be suggested again in the conversation.**
+
+Avoid exact and semantic repetition.
+
+## Required scenarios
+
+### 1. Departure + Arrival known, travel date missing
+
+Example:
+`DEL → DXB`, no date.
+
+Possible CTAs:
+- Cheapest this week
+- Cheapest next month
+- Cheapest in the next 3 months
+
+Do NOT use:
+- “Earliest flight from origin to destination”
+
+### 2. Only Departure location known
+
+Example:
+`From Delhi`, but no arrival location/date.
+
+Possible discovery CTAs:
+- Cheapest beach destination from Delhi
+- Cheapest international destination from Delhi
+- Weekend getaway from Delhi
+
+These should help the user discover what they can do next.
+
+## Also explore other useful states
+
+Plan intelligent CTAs for cases such as:
+
+- only arrival location known
+- departure + date known, arrival missing
+- arrival + date known, departure missing
+- departure + arrival + flexible/month-level date known
+- departure + arrival + exact date known but search not yet initiated
+- complete search context available
+- price prediction completed and user can proceed to flight search
+- completely empty flight context
+
+Do not force CTAs where they do not add value.
+
+## CTA generation rules
+
+CTAs should be:
+- short and mobile-friendly
+- from the user’s perspective
+- actionable
+- based only on currently available context
+- relevant to the next logical step
+- non-repetitive
+- natural, not robotic
+
+Track previously selected/generated CTA intent so already-used actions are not suggested again.
+
+Example:
+If user already selected:
+`Cheapest next month`
+
+Do not later generate:
+- “Find cheapest flights next month”
+- “Show lowest fares next month”
+
+Treat these as the same CTA intent.
+
+## What to plan
+
+Inspect:
+- current suggested-question tool
+- where CTA context is stored
+- when the tool is called
+- how previous suggested questions are preserved
+- how to track CTA selection/use
+- how to generate CTAs before and after flight search
+
+Propose whether we should track something like:
 
 ```ts
-destination: "London LHR"
-destination_iata: "LHR"
-destination_airport_name: "London Heathrow Airport"
+usedCTAIntents: []
+````
+
+Prefer intent-level tracking rather than only exact text matching.
+
+## Deliverable
+
+Provide a concise plan covering:
+
+1. Current CTA flow
+2. Recommended context states/scenarios
+3. CTA examples for each state
+4. Non-repeat strategy
+5. How selected CTA intent should be tracked
+6. Prompt/tool/context changes required
+7. Edge cases
+8. Tests to add
+9. Recommended implementation approach
+
+Do not implement until approved.
+
 ```
-
-Expected:
-
-```ts
-destination: "London"
-destination_iata: "LHR"
-destination_airport_name: "London Heathrow Airport"
 ```
-
-Apply the same rule to **origin** as well:
-
-* `origin` / `destination` → city or location name only
-* `origin_iata` / `destination_iata` → IATA code only
-* `origin_airport_name` / `destination_airport_name` → airport name only
-
-If user says `"Delhi to London LHR"`, interpret `"London"` as the destination and `"LHR"` as the airport constraint/code. Never generate values such as `"London LHR"`, `"Delhi DEL"`, or multiple locations inside a single location field.
-
-Update both:
-
-1. Flight Agent prompt/instructions
-2. Tool payload schema descriptions/examples
-
-Keep the fix general, minimal, and consistent across origin and destination. Add tests for city-only, city + IATA, airport-name + IATA, and both origin/destination combinations to ensure this does not regress.
