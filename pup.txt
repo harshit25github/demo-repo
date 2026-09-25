@@ -1,98 +1,82 @@
-Debug and fix Flight Agent suggested-question/CTA flow using the provided conversation as the reference case.
+Plan Post-Booking Guardrail improvements to avoid false tripwires on pre-booking/page-assistance queries.
 
-Do not redesign the entire CTA system. Fix the current behavior cleanly.
+Do not implement yet. First inspect the current Gateway, CheapOair Pages Agent, and Post-Booking Guardrail behavior.
 
-## Issue 1: No CTAs after Price Prediction failure
+## Problem
 
-Current flow:
-- User selects something like `Cheapest next month`.
-- `price_prediction_tool` returns `NO_PREDICTIONS`.
-- Agent calls `update_flight_suggested_questions` with `suggestedQuestions: []`.
-
-This should not happen.
-
-Even if prediction fails, generate useful next-step CTAs based on the remaining flight context.
+The Post-Booking Guardrail is incorrectly tripwiring some valid pre-booking queries.
 
 Example:
-If route is already known but travel date is still needed, possible CTAs could be:
-- Search flights next week
-- Search flights next weekend
-- Choose another travel date
+“How do I view seat selection options for my flight?”
 
-Requirements:
-- Do not expose prediction failure details.
-- Do not leave suggested questions empty when useful next actions exist.
-- Do not regenerate the same consumed price-prediction intent.
-- Keep suggestions flight-related and context-aware.
+This can be a pre-booking/page-assistance query and should be handled by the CheapOair Pages Agent, not treated as post-booking.
 
-## Issue 2: CTA selected by user appears again
+## What to inspect
 
-Conversation flow:
-1. CTA: `Show non-stop flights`
-2. User selects it.
-3. Non-stop becomes active.
-4. CTA: `Remove non-stop filter`
-5. User selects it.
-6. Filter is successfully removed.
-7. `Remove non-stop filter` must never remain/reappear as the current CTA after that action.
+1. Gateway routing
+- How Gateway decides between:
+  - CheapOair Pages Agent
+  - Post-Booking Guardrail
+  - other agents
+- What routing rules currently exist for seat selection, review page, payment page, booking flow, etc.
 
-After a user action is completed, its intent should be considered consumed for the current search phase.
+2. CheapOair Pages Agent
+- Review its prompt and responsibilities.
+- List the pre-booking/page-related intents it should handle.
+- Identify examples that may currently overlap with post-booking detection.
 
-## Issue 3: CTA update failure causes tool loop
+3. Post-Booking Guardrail
+- Review current prompt/rules.
+- Identify why generic booking-related words like:
+  - seat
+  - booking
+  - ticket
+  - flight
+  - review
+  - confirmation
+may incorrectly trigger post-booking.
 
-After removing non-stop, CTA generation tries to reuse previously generated intents such as:
-- `results:cheapest`
-- `results:compare_top`
+## Required behavior
 
-`update_flight_suggested_questions` rejects the payload with `REPEATED_CTA_INTENT`.
+Post-booking should tripwire only when there is clear evidence of an existing completed booking or a request to manage an existing booking.
 
-After that, the agent starts calling `apply_filter` repeatedly.
+Examples of true post-booking:
+- booking/PNR/confirmation/order already exists
+- cancel my booking
+- change my booked flight
+- refund my ticket
+- manage existing reservation
+- baggage/change/cancellation question tied to an existing booking
 
-Fix this behavior.
+Examples that should NOT tripwire:
+- how do I select a seat?
+- where can I choose seats?
+- what happens on the review page?
+- how do I continue to payment?
+- can I add baggage before booking?
+- how do I pick a fare?
+- seat-selection/page-navigation questions before booking completion
 
-If suggested-question update fails because some CTA intents were already generated/used:
-- do not repeat the previous business tool call
-- generate a fresh CTA set
-- retry the suggested-question update at most once
-- if fresh useful CTAs cannot be generated, continue normally without looping
+## Important principle
 
-## Prompt/intelligence rules
+Do not classify based only on keywords like “seat”, “booking”, “ticket”, or “flight”.
 
-Strengthen Flight Agent instructions:
+Use intent and booking state:
+- pre-booking/page assistance → CheapOair Pages Agent
+- existing-booking management → Post-Booking Guardrail
 
-- Always generate fresh CTAs from current flight context.
-- Never regenerate an intent already marked generated/used in the current search phase.
-- If user just executed a CTA, treat that CTA intent as consumed.
-- Use conversation history plus CTA context to understand what the user already acted on.
-- Do not solve CTA duplication by hardcoding phrases.
-- Let the LLM generate alternatives intelligently.
-- A new flight search/searchKey may reset CTA history and start fresh.
+If booking state is ambiguous, prefer normal pre-booking routing unless there is clear evidence of an existing booking.
 
-## Validate with the exact flow
+## Deliverable
 
-Test:
+Provide a short plan with:
+1. Current overlap/root cause
+2. CheapOair Pages Agent responsibilities
+3. Clear pre-booking vs post-booking boundary
+4. Recommended Post-Booking Guardrail prompt changes
+5. Gateway routing changes, if needed
+6. Example queries for both sides
+7. Tests to add
+8. Files/functions likely to change
 
-`DEL → NYC`
-→ `Cheapest next month`
-→ prediction returns NO_PREDICTIONS
-→ verify non-empty useful CTAs
-
-Then:
-
-`next week`
-→ flight search
-→ `Show non-stop flights`
-→ `Remove non-stop filter`
-→ verify:
-- non-stop is removed
-- `Remove non-stop filter` does not appear again
-- previously generated CTAs are not reused
-- fresh suggestions are generated
-- no repeated `apply_filter` calls
-- no tool loop occurs
-
-Deliverable:
-- identify root cause
-- fix prompt/context/tool recovery behavior
-- share before/after CTA flow
-- share tests and files changed
+Do not implement until approved.
