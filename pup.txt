@@ -1,82 +1,32 @@
-Plan Post-Booking Guardrail improvements to avoid false tripwires on pre-booking/page-assistance queries.
-
-Do not implement yet. First inspect the current Gateway, CheapOair Pages Agent, and Post-Booking Guardrail behavior.
-
-## Problem
-
-The Post-Booking Guardrail is incorrectly tripwiring some valid pre-booking queries.
-
-Example:
-“How do I view seat selection options for my flight?”
-
-This can be a pre-booking/page-assistance query and should be handled by the CheapOair Pages Agent, not treated as post-booking.
-
-## What to inspect
-
-1. Gateway routing
-- How Gateway decides between:
-  - CheapOair Pages Agent
-  - Post-Booking Guardrail
-  - other agents
-- What routing rules currently exist for seat selection, review page, payment page, booking flow, etc.
-
-2. CheapOair Pages Agent
-- Review its prompt and responsibilities.
-- List the pre-booking/page-related intents it should handle.
-- Identify examples that may currently overlap with post-booking detection.
-
-3. Post-Booking Guardrail
-- Review current prompt/rules.
-- Identify why generic booking-related words like:
-  - seat
-  - booking
-  - ticket
-  - flight
-  - review
-  - confirmation
-may incorrectly trigger post-booking.
-
-## Required behavior
-
-Post-booking should tripwire only when there is clear evidence of an existing completed booking or a request to manage an existing booking.
-
-Examples of true post-booking:
-- booking/PNR/confirmation/order already exists
-- cancel my booking
-- change my booked flight
-- refund my ticket
-- manage existing reservation
-- baggage/change/cancellation question tied to an existing booking
-
-Examples that should NOT tripwire:
-- how do I select a seat?
-- where can I choose seats?
-- what happens on the review page?
-- how do I continue to payment?
-- can I add baggage before booking?
-- how do I pick a fare?
-- seat-selection/page-navigation questions before booking completion
-
-## Important principle
-
-Do not classify based only on keywords like “seat”, “booking”, “ticket”, or “flight”.
-
-Use intent and booking state:
-- pre-booking/page assistance → CheapOair Pages Agent
-- existing-booking management → Post-Booking Guardrail
-
-If booking state is ambiguous, prefer normal pre-booking routing unless there is clear evidence of an existing booking.
-
-## Deliverable
-
-Provide a short plan with:
-1. Current overlap/root cause
-2. CheapOair Pages Agent responsibilities
-3. Clear pre-booking vs post-booking boundary
-4. Recommended Post-Booking Guardrail prompt changes
-5. Gateway routing changes, if needed
-6. Example queries for both sides
-7. Tests to add
-8. Files/functions likely to change
-
-Do not implement until approved.
+| # | User Query | Expected Tripwire | Expected Handling |
+|---|---|---:|---|
+| 1 | How do I view seat selection options for my flight? | ❌ False | CheapOair Pages Agent |
+| 2 | Where can I select my seat? | ❌ False | Pages Agent |
+| 3 | Can I choose a window seat before booking? | ❌ False | Pages Agent |
+| 4 | How do I add baggage before checkout? | ❌ False | Pages Agent |
+| 5 | What happens on the review page? | ❌ False | Pages Agent |
+| 6 | How do I continue from review to payment? | ❌ False | Pages Agent |
+| 7 | Where can I enter passenger details? | ❌ False | Pages Agent |
+| 8 | How do I change the selected fare before paying? | ❌ False | Pages Agent |
+| 9 | Can I select seats for both passengers? | ❌ False | Pages Agent |
+| 10 | Where can I see baggage options while booking? | ❌ False | Pages Agent |
+| 11 | Can I go back and change my flight before payment? | ❌ False | Pre-booking / Pages Agent |
+| 12 | I haven't booked yet. How can I add a seat? | ❌ False | Pages Agent |
+| 13 | I already booked my flight. How do I change my seat? | ✅ True | Post-booking |
+| 14 | Change the seat on my existing reservation | ✅ True | Post-booking |
+| 15 | I want to cancel my booking | ✅ True | Post-booking |
+| 16 | How can I change my booked flight date? | ✅ True | Post-booking |
+| 17 | I need a refund for my ticket | ✅ True | Post-booking |
+| 18 | How do I manage my existing reservation? | ✅ True | Post-booking |
+| 19 | My confirmation number is ABC123. I want to change seats. | ✅ True | Post-booking |
+| 20 | Booking ID 12345678 | ✅ True | Post-booking |
+| 21 | Where can I find my booking confirmation? | ✅ True | Post-booking |
+| 22 | Can I add baggage to the flight I already booked? | ✅ True | Post-booking |
+| 23 | How much does seat selection cost? | ❌ False | Normal pre-booking/policy flow |
+| 24 | Can I select seats on CheapOair? | ❌ False | Pages Agent |
+| 25 | I want to change my seat | ⚠️ Ambiguous | Do **not** tripwire unless existing booking is established |
+| 26 | How do I change my flight? | ⚠️ Ambiguous | Ask/route normally unless booking context proves existing booking |
+| 27 | Can I add baggage? | ⚠️ Ambiguous | Do not assume post-booking |
+| 28 | Where is the seat selection page? | ❌ False | Pages Agent |
+| 29 | I am on the review page and can't find seat selection | ❌ False | Pages Agent |
+| 30 | I completed payment and now want to select another seat | ✅ True | Post-booking |
