@@ -1,32 +1,7 @@
-| # | User Query | Expected Tripwire | Expected Handling |
-|---|---|---:|---|
-| 1 | How do I view seat selection options for my flight? | ❌ False | CheapOair Pages Agent |
-| 2 | Where can I select my seat? | ❌ False | Pages Agent |
-| 3 | Can I choose a window seat before booking? | ❌ False | Pages Agent |
-| 4 | How do I add baggage before checkout? | ❌ False | Pages Agent |
-| 5 | What happens on the review page? | ❌ False | Pages Agent |
-| 6 | How do I continue from review to payment? | ❌ False | Pages Agent |
-| 7 | Where can I enter passenger details? | ❌ False | Pages Agent |
-| 8 | How do I change the selected fare before paying? | ❌ False | Pages Agent |
-| 9 | Can I select seats for both passengers? | ❌ False | Pages Agent |
-| 10 | Where can I see baggage options while booking? | ❌ False | Pages Agent |
-| 11 | Can I go back and change my flight before payment? | ❌ False | Pre-booking / Pages Agent |
-| 12 | I haven't booked yet. How can I add a seat? | ❌ False | Pages Agent |
-| 13 | I already booked my flight. How do I change my seat? | ✅ True | Post-booking |
-| 14 | Change the seat on my existing reservation | ✅ True | Post-booking |
-| 15 | I want to cancel my booking | ✅ True | Post-booking |
-| 16 | How can I change my booked flight date? | ✅ True | Post-booking |
-| 17 | I need a refund for my ticket | ✅ True | Post-booking |
-| 18 | How do I manage my existing reservation? | ✅ True | Post-booking |
-| 19 | My confirmation number is ABC123. I want to change seats. | ✅ True | Post-booking |
-| 20 | Booking ID 12345678 | ✅ True | Post-booking |
-| 21 | Where can I find my booking confirmation? | ✅ True | Post-booking |
-| 22 | Can I add baggage to the flight I already booked? | ✅ True | Post-booking |
-| 23 | How much does seat selection cost? | ❌ False | Normal pre-booking/policy flow |
-| 24 | Can I select seats on CheapOair? | ❌ False | Pages Agent |
-| 25 | I want to change my seat | ⚠️ Ambiguous | Do **not** tripwire unless existing booking is established |
-| 26 | How do I change my flight? | ⚠️ Ambiguous | Ask/route normally unless booking context proves existing booking |
-| 27 | Can I add baggage? | ⚠️ Ambiguous | Do not assume post-booking |
-| 28 | Where is the seat selection page? | ❌ False | Pages Agent |
-| 29 | I am on the review page and can't find seat selection | ❌ False | Pages Agent |
-| 30 | I completed payment and now want to select another seat | ✅ True | Post-booking |
+{
+  "isPostBooking": false,
+  "intent": "NEW_BOOKING",
+  "evidence": "none",
+  "confidence": 0.98,
+  "reason": "User asks a general how-to question about checking in; no existing booking or ticket identifier/purchase evidence is provided."
+}
