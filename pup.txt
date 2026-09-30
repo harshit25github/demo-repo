@@ -1,1 +1,12 @@
-Departure city can be persisted because it is user-driven flight context and can be updated whenever the user changes it. Timezone is system-derived, so it should come fresh from the client/service on every request instead of being persisted.
+Please review and fix these 3 production issues step by step:
+
+1. **Suggested questions are not generating**  
+   Trace the current flow, identify exactly why they are missing, and fix the root cause without adding unnecessary wrappers or fallback layers.
+
+2. **Clean up Flight Agent prompt**  
+   The Flight Agent now talks to the Manager, not directly to the user. Remove prompt instructions/examples related to user-facing tone, acknowledgements, conversational wording, emojis, etc. Keep only instructions needed for domain reasoning, tool usage, recovery, and rich feedback to the Manager.
+
+3. **Improve Manager response tone**  
+   Manager responses are currently too direct/robotic. Make them more natural, friendly, and engaging with proper acknowledgement, softer phrasing, and light emoji usage where appropriate—without exposing internal agent/tool details.
+
+Handle one issue at a time: first explain the root cause and proposed change, then implement only that change before moving to the next issue. Keep the solution simple and agent-intelligence driven.
