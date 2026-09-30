@@ -1,7 +1,89 @@
-{
-  "isPostBooking": false,
-  "intent": "NEW_BOOKING",
-  "evidence": "none",
-  "confidence": 0.98,
-  "reason": "User asks a general how-to question about checking in; no existing booking or ticket identifier/purchase evidence is provided."
-}
+Review our current **Gateway/handoff orchestration** and plan how to migrate it to the **OpenAI Agents SDK Manager pattern using agents-as-tools**.
+
+I’ll provide the relevant OpenAI SDK documentation links. Use those as the primary reference and compare them with our actual codebase.
+
+## Goal
+
+Move from:
+
+`User → Gateway → handoff to specialist`
+
+to:
+
+`User → Manager → specialist agent(s) as tools → Manager → User`
+
+Do not implement yet.
+
+## Important migration constraints
+
+### 1. Plan this as a multi-step migration
+Do not propose one large refactor.
+
+Break the migration into small phases, for example:
+- Manager baseline
+- specialist agents as tools
+- context flow
+- guardrails
+- streaming
+- retries/timeouts
+- cleanup after validation
+
+Each step should be independently testable before moving to the next.
+
+### 2. Do not modify the existing Gateway implementation
+
+Keep the current Gateway flow untouched.
+
+Create the new Manager architecture in a **separate folder/module structure** so both approaches can exist independently during migration.
+
+Do not:
+- remove Gateway files
+- rewrite Gateway code
+- move existing Gateway files
+- reuse them in a way that risks breaking the current production flow
+
+Use the Gateway only as a reference to understand current behavior.
+
+## Analyze
+
+- current Gateway routing/handoffs
+- specialist agents
+- guardrails
+- context/state
+- streaming
+- retries/timeouts
+- final response flow
+
+Identify:
+- what maps directly to SDK Manager / agents-as-tools
+- what custom code is unnecessary
+- what business behavior must be preserved
+- what should be postponed until later phases
+
+## Target baseline
+
+Start simple:
+
+- separate Manager folder
+- one Manager Agent
+- specialists exposed as tools
+- specialists respond to Manager
+- Manager owns final user response
+- minimal wrappers
+- final-only response initially
+- no custom retry/resume logic initially
+
+## Deliverable
+
+Provide:
+
+1. Current Gateway flow
+2. Target Manager flow
+3. Proposed new folder structure
+4. Multi-step migration phases
+5. Files/modules to create
+6. What existing Gateway code remains untouched
+7. SDK-native vs custom responsibilities
+8. Risks and tests for each phase
+
+Do not implement until the plan is reviewed.
