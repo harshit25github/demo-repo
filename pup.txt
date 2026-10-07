@@ -1,5 +1,3 @@
-Recipient’s full name
-Team/Department name
-Complete office address
-City, State, PIN code
-Recipient’s contact number
+Earlier, the flight agent was passing the user’s raw location input directly to the `flight_search` tool. So when the user entered `Parag`, the tool only returned a generic “no result found” response, and the agent inferred it as `Prague`, causing the response to deviate from the actual user input.
+
+We have fixed this by first resolving/normalizing the user’s location input through the location logic before calling flight search. Now the tool gets proper location context and returns feedback against the exact resolved location/code, so the agent does not incorrectly infer or switch the destination.
