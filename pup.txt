@@ -1,3 +1,7 @@
-Earlier, the flight agent was passing the user’s raw location input directly to the `flight_search` tool. So when the user entered `Parag`, the tool only returned a generic “no result found” response, and the agent inferred it as `Prague`, causing the response to deviate from the actual user input.
+As discussed, the cron timings were suggested by Pawan sir.
 
-We have fixed this by first resolving/normalizing the user’s location input through the location logic before calling flight search. Now the tool gets proper location context and returns feedback against the exact resolved location/code, so the agent does not incorrectly infer or switch the destination.
+The expectation was that the first batch would have the highest volume, but today the second batch itself had 45+ Compass. Since the third batch started while the earlier processing was still heavy, there was a sudden spike in CPU and memory usage.
+
+As this is a UI automation flow using Puppeteer, the increased load can hang the system or crash the browser/process.
+
+I will let the third batch execution complete first. Once it is completed, I will restart the process for the remaining groups/bookings.
