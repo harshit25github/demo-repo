@@ -1,7 +1,1 @@
-As discussed, the cron timings were suggested by Pawan sir.
-
-The expectation was that the first batch would have the highest volume, but today the second batch itself had 45+ Compass. Since the third batch started while the earlier processing was still heavy, there was a sudden spike in CPU and memory usage.
-
-As this is a UI automation flow using Puppeteer, the increased load can hang the system or crash the browser/process.
-
-I will let the third batch execution complete first. Once it is completed, I will restart the process for the remaining groups/bookings.
+The first batch had 25 Compass records (around 50+ bookings, since each Compass has at least 2 bookings). The second batch had 45 Compass records, around 90+ bookings, nearly double. At roughly [X] minutes per booking, 90+ bookings can’t finish within the 2-hour window. So the second batch was still running when the third batch started, the system got overloaded, and it crashed. I’ll rerun the failed records once the third batch finishes, or when no other batch is running. For reference, the batch timings shared by John sir are [time 1], [time 2] and [time 3].
