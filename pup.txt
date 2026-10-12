@@ -1,1 +1,48 @@
-The first batch had 25 Compass records (around 50+ bookings, since each Compass has at least 2 bookings). The second batch had 45 Compass records, around 90+ bookings, nearly double. At roughly [X] minutes per booking, 90+ bookings can’t finish within the 2-hour window. So the second batch was still running when the third batch started, the system got overloaded, and it crashed. I’ll rerun the failed records once the third batch finishes, or when no other batch is running. For reference, the batch timings shared by John sir are [time 1], [time 2] and [time 3].
+Review the current **Post-Booking classification flow** once, then thoroughly study the official OpenAI **Decisions API** documentation and plan how to migrate the existing classifier to it.
+
+Our current `gpt-5.4-nano` agent-based classification is too non-deterministic. We want to replace that classification step with a more concrete Decisions API flow.
+
+### Official OpenAI documentation
+
+Please read these thoroughly before planning:
+
+- Decisions API guide:  
+  https://developers.openai.com/api/docs/guides/decisions
+
+- Decisions API reference:  
+  https://developers.openai.com/api/reference/resources/decisions/methods/create
+
+- TypeScript Decisions API reference:  
+  https://developers.openai.com/api/reference/typescript/resources/decisions
+
+- GPT-6 Luna model documentation:  
+  https://developers.openai.com/api/docs/models/gpt-6-luna
+
+OpenAI currently documents the Decisions API as a dedicated `POST /v1/decisions` endpoint using `gpt-6-luna`, intended for classification, routing, scoring, and similar typed decisions.
+
+### Migration direction
+
+Current flow:
+
+**Input Guardrail → Post-Booking classifier agent (`gpt-5.4-nano`) → classification output**
+
+Target direction:
+
+**Input Guardrail → direct Decisions API call → classification result**
+
+Important:
+- Replace the current agent-based Post-Booking classifier with the Decisions API.
+- Do not keep using an Agent/Responses API call for this classification if the Decisions API covers the requirement.
+- Prefer calling the Decisions API directly using the existing OpenAI API key/configuration already available in the codebase.
+- Use the model/configuration recommended by the latest Decisions API documentation.
+- Preserve the existing Post-Booking business intent and output contract as much as possible.
+- Do not redesign unrelated guardrails or architecture.
+- Keep the integration minimal and avoid unnecessary wrappers or abstractions.
+
+For now, **do not implement anything**.
+
+First provide only the migration plan:
+
+**Current classifier flow → Decisions API equivalent → request/question design → input/context → result mapping into existing guardrail output → files/code areas to change → fallback/error handling → testing strategy**
+
+Base the plan on the latest official documentation, not assumptions from the existing Agents SDK.
