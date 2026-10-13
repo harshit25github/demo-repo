@@ -1,48 +1,103 @@
-Review the current **Post-Booking classification flow** once, then thoroughly study the official OpenAI **Decisions API** documentation and plan how to migrate the existing classifier to it.
+flight_search({
+  "origin": "Sydney",
+  "origin_iata": null,
+  "origin_airport_name": null,
+  "origin_distance_km": null,
+  "destination": "Mumbai",
+  "destination_iata": null,
+  "destination_airport_name": null,
+  "destination_distance_km": null,
+  "outbound_date": "2026-11-01",
+  "return_date": null,
+  "pax": null,
+  "adults": 1,
+  "seniors": 0,
+  "children": 0,
+  "children_ages": null,
+  "seat_infants": 0,
+  "lap_infants": 0,
+  "cabin_class": "economy",
+  "trip_type": "oneway",
+  "segments": null,
+  "direct_flight_only": false,
+  "preferred_airlines": null
+})
 
-Our current `gpt-5.4-nano` agent-based classification is too non-deterministic. We want to replace that classification step with a more concrete Decisions API flow.
+flight_search({
+  "origin": "Sydney",
+  "origin_iata": null,
+  "origin_airport_name": null,
+  "origin_distance_km": null,
+  "destination": "Mumbai",
+  "destination_iata": null,
+  "destination_airport_name": null,
+  "destination_distance_km": null,
+  "outbound_date": "2026-11-01",
+  "return_date": null,
+  "pax": null,
+  "adults": 1,
+  "seniors": 0,
+  "children": 0,
+  "children_ages": null,
+  "seat_infants": 0,
+  "lap_infants": 0,
+  "cabin_class": "economy",
+  "trip_type": "oneway",
+  "segments": null,
+  "direct_flight_only": false,
+  "preferred_airlines": null
+})
 
-### Official OpenAI documentation
 
-Please read these thoroughly before planning:
+Investigate and improve **end-to-end logging and debugging across the entire Flight Agent workflow**.
 
-- Decisions API guide:  
-  https://developers.openai.com/api/docs/guides/decisions
+**1. Root Cause Investigation**
+- Investigate why identical `flight_search` payloads sometimes succeed and sometimes fail.
+- Trace all possible failure points, including payload transformation, API responses, timeouts, retries, asynchronous execution, missing fields, and search context.
+- Identify potential issues before making changes. Do not assume the problem is with the LLM or API.
 
-- Decisions API reference:  
-  https://developers.openai.com/api/reference/resources/decisions/methods/create
+**2. Comprehensive Logging**
+- Trace the complete execution flow, starting from **Prime Search**, through every internal function, tool invocation, and external API call.
+- Pay special attention to **Digital API, Flight Search, and Apply Filter API**, including their complete request/response lifecycles.
+- Log every important checkpoint:
+  - Tool invocation, input arguments, and execution context.
+  - Payload construction and transformations at each stage.
+  - API endpoint, method, request payload, and relevant headers.
+  - API response status, response body, errors, and validation results.
+  - SearchKey, UID, search criteria, filter parameters, and context changes.
+  - Retry attempts, timeouts, exceptions, and fallback behavior.
+  - Execution time for each tool, API call, and important operation.
+  - Final output returned from each tool to the Flight Agent.
+- Capture logs for **both successful and failed executions**, including cases where an API returns an unexpected or empty response without throwing an error.
+- Ensure errors are logged with their original cause, stack trace, and exact failure stage.
+- Add a consistent **correlation ID** to trace one user request across tools, internal methods, and downstream APIs.
+- Ensure logs reveal the exact payload sent to each API, not just the initial tool arguments.
 
-- TypeScript Decisions API reference:  
-  https://developers.openai.com/api/reference/typescript/resources/decisions
+**3. Implementation Requirements**
+- First inspect the existing architecture, tools, API integrations, and logging mechanisms.
+- Cover all Flight Agent tools and their downstream dependencies, not just `flight_search`.
+- Use structured, readable logs with consistent naming and execution stages.
+- Redact authentication tokens, credentials, personal information, and other sensitive values. Keep full debugging details safely available where appropriate.
+- Avoid unnecessary wrappers, duplicate logging, excessive helper methods, and complicated abstractions.
+- Reuse existing logging utilities wherever possible.
+- Preserve existing business logic, API contracts, and tool behavior.
 
-- GPT-6 Luna model documentation:  
-  https://developers.openai.com/api/docs/models/gpt-6-luna
+**4. Verification**
+- Test successful, failed, timeout, empty-response, malformed-response, and retry scenarios.
+- Repeatedly execute identical flight-search payloads to investigate intermittent failures.
+- Verify that logs capture the complete execution path and clearly identify where failures occur.
+- Include `apply_filter` scenarios involving existing search keys and multiple filters.
 
-OpenAI currently documents the Decisions API as a dedicated `POST /v1/decisions` endpoint using `gpt-6-luna`, intended for classification, routing, scoring, and similar typed decisions.
+**Expected Outcome**
 
-### Migration direction
+I should be able to trace a request from **Prime Search → Flight Agent Tool → Payload Formation → Digital API / Apply Filter API → API Response → Tool Result**, including every relevant intermediate stage.
 
-Current flow:
+For any successful or failed request, the logs must make it easy to determine **what was sent, what was received, which stage executed, how long it took, and exactly where and why a failure occurred**.
 
-**Input Guardrail → Post-Booking classifier agent (`gpt-5.4-nano`) → classification output**
+Finally, provide a concise summary of:
+- Root causes identified, separating confirmed issues from suspected ones.
+- Logging changes implemented.
+- Tests performed and their results.
+- Any unresolved issues requiring further investigation.
 
-Target direction:
-
-**Input Guardrail → direct Decisions API call → classification result**
-
-Important:
-- Replace the current agent-based Post-Booking classifier with the Decisions API.
-- Do not keep using an Agent/Responses API call for this classification if the Decisions API covers the requirement.
-- Prefer calling the Decisions API directly using the existing OpenAI API key/configuration already available in the codebase.
-- Use the model/configuration recommended by the latest Decisions API documentation.
-- Preserve the existing Post-Booking business intent and output contract as much as possible.
-- Do not redesign unrelated guardrails or architecture.
-- Keep the integration minimal and avoid unnecessary wrappers or abstractions.
-
-For now, **do not implement anything**.
-
-First provide only the migration plan:
-
-**Current classifier flow → Decisions API equivalent → request/question design → input/context → result mapping into existing guardrail output → files/code areas to change → fallback/error handling → testing strategy**
-
-Base the plan on the latest official documentation, not assumptions from the existing Agents SDK.
+**Priority: Complete debugging visibility, minimal code complexity, and zero unintended changes to existing functionality.**
