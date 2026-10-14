@@ -1,7 +1,33 @@
-Update the existing Flight Agent prompt with one additional rule:
+Focus specifically on improving the **`flight_search` tool feedback contract**. Do **not implement yet**—first inspect the complete search flow and prepare a minimal design.
 
-When the user asks for the **"earliest possible flight"**, treat **today's date as the earliest possible departure date**, using the current date already dynamically available in the agent's context.
+The current problem is that too much information is hidden inside the tool. The Flight Agent may submit one location, our internal APIs may resolve/infer it into something different, and if the search later fails the Agent only sees a generic failure. It therefore cannot understand what actually happened or give the Manager a useful next step.
 
-Reuse the existing date-handling logic and dynamic date context. Do not introduce new date calculations, variables, or tools.
+Please trace the entire `flight_search` flow and design richer feedback so the Agent can clearly know:
 
-Make only this minimal prompt change without modifying any existing rules or functionality.
+- what origin/destination the Agent originally requested
+- what location/IATA our internal resolution actually produced
+- whether any location was changed, normalized, or resolved unexpectedly
+- which important stage succeeded or failed
+- whether the search ultimately succeeded, partially succeeded, or failed
+- the actual reason for failure when we know it
+- whether the problem is recoverable
+- what information should be requested next, if anything
+- enough context for the Flight Agent to give sophisticated feedback to the Manager without exposing unnecessary backend details
+
+For both **success and failure**, define a clean, consistent structured contract.
+
+Important:
+- Do not dump raw internal errors/API payloads into the Agent.
+- Translate backend failures into useful domain-level information.
+- Do not add unnecessary wrappers or orchestration.
+- Preserve existing working search behavior.
+- If we return structured feedback/object data, it must be part of the **tool’s own structured output contract**, not an extra object generated outside the tool.
+- Keep the design extensible enough for the existing flight-search stages, but do not over-engineer it.
+
+For now provide:
+
+**Current information flow → where information is getting lost → proposed `flight_search` feedback shape → success example → failure/location-resolution example → minimal code areas that need changes.**
+
+The goal is:
+
+**Flight Search knows exactly what happened → Flight Agent receives that truth → Flight Agent can reason and provide the Manager with the correct next action.**
