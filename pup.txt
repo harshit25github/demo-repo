@@ -1,1 +1,63 @@
-  "error": "InputGuardrailTripwireTriggered: Input guardrail triggered: {\"isExitCondition\":true,\"exitCondition\":\"isHumanHandoffRequested\",\"reason\":\"User requests to speak (context of pending soft handoff implies continuing request for a human agent).\",\"message\":\"I understand you'd like to speak with a human agent. Let me connect you with our customer support team who can assist you directly.\",\"confidence\":0.9,\"metadata\":{\"detectedIntent\":\"HUMAN_HANDOFF\"},\"triggeredAt\":\"2026-10-14T12:27:18.489Z\"}"
+Create **5 realistic multi-turn conversations** to thoroughly test our recently enhanced Flight Agent.
+
+The conversations should stress the major tools, especially:
+
+- `flight_search`
+- `apply_filter`
+- `price_prediction`
+- `get_generated_context` / generated contracts read-select flow
+- any other currently registered Flight Agent tools
+
+First inspect the current Flight Agent implementation and tool contracts so the scenarios match the real behavior.
+
+### Conversation style
+
+Our real users usually type **very short, incomplete messages**. They often give only keywords rather than clearly explaining their intent.
+
+Use messages like:
+
+- `del nyc`
+- `next friday`
+- `nonstop`
+- `cheaper`
+- `option 2`
+- `evening only`
+- `same but business`
+- `remove airline`
+- `what about 3rd`
+- `next week flexible`
+
+Do not make every user message detailed or perfectly written.
+
+### Test difficulty
+
+Mix:
+- **2 relatively simple conversations**
+- **3 difficult/tricky conversations**
+
+The complex cases should test whether the Agent can correctly understand history and decide between:
+- new `flight_search`
+- `apply_filter`
+- removing/changing filters
+- `price_prediction`
+- reading/selecting previously generated contracts
+- asking for genuinely missing information
+- reusing existing context instead of unnecessarily searching again
+
+Include tricky situations such as:
+- changing origin/destination after a previous search
+- flexible date ranges
+- multiple filters added/removed across turns
+- references like `option 2`, `same one`, `cheaper one`, `third`
+- changing core search criteria after filters are already applied
+- selecting a generated contract and then asking follow-up questions about it
+- ambiguous/low-context user messages
+- cases where **no tool call** should happen
+
+For every turn provide:
+
+**User message → Expected intent → Expected tool(s) → Why → Expected state/context change**
+
+Do not overfit the conversations to the prompt. Make them realistic enough to expose weaknesses in reasoning, context retention, tool selection, search-vs-filter decisions, and generated-contract handling.
+
+For now, **create the 5 conversations only. Do not run them yet.**
