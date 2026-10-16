@@ -1,19 +1,14 @@
-Integrate **Trip Planner V2 into our existing production pipeline**, focusing on two critical dependencies.
+Review the **Gateway Flight Agent prompt** and the **Manager Mode Flight Agent prompt**, focusing specifically on our recent improvements to **tool feedback handling**.
 
-**1. Image Source Integration**
-- Inspect the existing production image-fetching implementation (`get_place_images_batch` or its current equivalent).
-- Reuse our existing **custom batch image API** instead of the temporary/test image source used in V2.
-- Verify whether the image integration is currently a tool or a direct method, and use the simplest existing approach.
-- Preserve image-fetching behavior and rendering compatibility. Avoid unnecessary wrappers.
+Both agents use the same underlying Flight tools, but we recently enhanced the Gateway Flight Agent's instructions to better understand tool responses, failures, recovery options, and next actions.
 
-**2. Context Schema Compatibility — Critical**
-- Compare the complete Trip Planner V2 context with the existing production Trip Planner context.
-- **Production context must remain the source of truth.**
-- Preserve the exact schema, property names, types, nesting, structure, and property ordering wherever required by existing contracts.
-- Do not introduce custom fields, rename properties, or restructure the context.
-- Ensure existing context hydration, updates, and client-side consumption continue working without modification.
-- Adapt V2 to the existing production contract, not the other way around.
+- Compare both prompts and identify any missing or outdated tool-feedback intelligence in the Manager Mode Flight Agent.
+- Bring over relevant improvements while preserving existing Manager Mode intelligence and behavior.
+- Ensure the Flight Agent correctly interprets detailed tool feedback and provides accurate, meaningful feedback to the Manager.
+- Keep domain-specific tool handling and recovery intelligence inside the Flight Agent, not the Manager.
+- Update the Manager prompt only if necessary for correctly consuming specialist feedback.
+- Avoid duplicate instructions, unnecessary wrappers, or unrelated changes.
 
-**Implementation:** First trace both implementations, identify differences, then make only the necessary integration changes. Verify image fetching and context compatibility with targeted tests.
+**Goal:** Keep both Flight Agents aligned with the latest tool-feedback intelligence without replacing or weakening their existing behavior.
 
-**Goal:** Trip Planner V2 should use our existing production image API and context contract seamlessly, without breaking current behavior or adding unnecessary complexity.
+Make targeted prompt changes and verify them using existing tests.
