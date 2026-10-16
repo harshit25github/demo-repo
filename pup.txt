@@ -1,79 +1,203 @@
-Thoroughly review and evaluate our **Production Manager Agent**, focusing primarily on its **intelligence, reasoning, and conversational quality**, not just whether the code executes successfully.
+# Goal: Production Manager Agent Intelligence & Response Stabilization
 
-Our local implementation has already been tested. Now we need to verify how effectively the production Manager understands users, coordinates specialists, and guides conversations toward meaningful outcomes.
+Thoroughly review, improve, and test our existing **Manager + Flight Agent + Trip Planner V2 architecture**.
 
-### 1. Manager Intelligence — Highest Priority
+Our primary problem is not tool execution. The specialists are often returning useful feedback, but the **Manager is not using that intelligence effectively**. Its responses are too short, robotic, and lack acknowledgement, engagement, and meaningful guidance.
 
-Evaluate whether the Manager can:
+We need to fix this properly, not through unnecessary wrappers or hardcoded response handling.
 
-- Understand short, vague, incomplete, misspelled, and keyword-only user queries.
-- Correctly interpret user intent using conversation history and available context.
-- Understand indirect references like "second one", "same trip", "cheaper", or "change that".
-- Infer reasonable details without making unsupported assumptions.
-- Ask only relevant questions when genuinely important information is missing.
-- Avoid repeatedly asking for information the user has already shared.
-- Proactively guide users toward their travel goals rather than simply reacting to commands.
+## 1. Model Configuration
 
-### 2. Conversational Quality & Engagement
+Start with the following configuration:
 
-Evaluate whether responses feel **natural, welcoming, helpful, and personalized**, rather than robotic.
+- **Manager Agent → GPT-5.5**
+- **Flight Agent → GPT-5.2**
+- **Trip Planner V2 → Keep the current configured model initially**
+
+First evaluate this configuration thoroughly.
+
+If Flight Agent intelligence or feedback quality remains insufficient, we can consider upgrading it to GPT-5.5 later, but only with clear evidence.
+
+Avoid repeatedly switching models during testing. Keep the configuration fixed so we can measure whether improvements come from the model or prompt changes.
+
+## 2. Manager Intelligence — Highest Priority
+
+Our Manager should behave like a **sophisticated AI travel advisor**, not a simple input-output chatbot.
+
+Evaluate and improve its ability to:
+
+- Understand short, incomplete, misspelled, ambiguous, and keyword-only queries.
+- Leverage conversation history and existing application context.
+- Understand implicit references such as "second one", "cheaper", "same trip", or "change that".
+- Infer reasonable information without making unsupported assumptions.
+- Ask only necessary clarification questions.
+- Understand user preferences, intentions, and changing requirements.
+- Proactively guide users toward useful travel decisions.
+- Generate intelligent, contextual follow-up questions and CTAs.
+
+The objective is to help users progress naturally through their travel experience, even when they provide very little information.
+
+## 3. Fix Robotic Manager Responses
+
+Our Flight Agent already produces rich and meaningful feedback, but the Manager often reduces it to a single-line response.
+
+This is unacceptable for our intended user experience.
+
+Improve the Manager prompt so it produces:
+
+- Natural, meaningful acknowledgements.
+- Friendly, welcoming, conversational responses.
+- Strong contextual personalization.
+- Appropriate emoji-rich and visually engaging content.
+- Useful explanations of available options and results.
+- Relevant suggestions and next actions.
+- Intelligent CTAs that move the conversation forward.
+
+**Important:** Do not force long responses for every message. The response should be proportional to the user's intent and the information available.
+
+A short confirmation can remain short, but meaningful flight results, recommendations, and travel-planning responses should not lose useful specialist information.
+
+Avoid repetitive acknowledgements, fixed templates, unnatural enthusiasm, and generic questions.
+
+## 4. Improve Trip Planner Presentation
+
+Current itinerary responses sometimes follow a rigid structure like:
+
+`Day 1 → Morning → Afternoon → Evening`
+
+This can feel unnecessarily mechanical.
+
+Give the Manager more flexibility to present travel plans naturally and attractively.
+
+- Use engaging descriptions and useful recommendations.
+- Adapt presentation to the user's request.
+- Highlight experiences rather than mechanically listing activities.
+- Use icons, relevant visual elements, and clear Markdown.
+- Preserve important itinerary details, dates, activities, and context.
+- Follow required client-rendering contracts without forcing unnecessary textual templates.
+
+The Manager should be intelligent enough to decide how best to present the information.
+
+## 5. Review Gateway Prompt & Routing Intelligence
+
+Thoroughly compare our existing **Gateway Agent prompt** against the current **Manager Agent prompt**.
+
+The Gateway previously prioritized Flight Agent routing because the handoff architecture generally transferred control to one specialist at a time.
+
+Our Manager architecture is different.
+
+It can coordinate **Flight Agent and Trip Planner V2 together** when the user's request requires both.
+
+Therefore:
+
+- Do not blindly carry over Gateway routing priorities.
+- Identify useful intent-understanding intelligence from the Gateway prompt.
+- Remove obsolete single-handoff assumptions.
+- Ensure Flight and Trip Planner receive appropriate requests.
+- Use both specialists when they provide complementary value.
+- Combine specialist findings into one coherent, useful response.
+- Avoid unnecessary specialist calls when existing context already answers the question.
+
+Routing should depend on **actual user intent and conversation context**, not outdated Gateway priorities.
+
+## 6. Optimize the Manager Prompt
+
+Review the entire Manager system prompt thoroughly.
+
+We should have a **well-defined, structured, compact Markdown prompt** aligned with current OpenAI prompting guidance for the configured model.
 
 Focus on:
-- Meaningful acknowledgement of user preferences and requests.
-- Natural references to previously shared context.
-- Friendly and engaging tone without repetitive templates.
-- Relevant, intelligent follow-up questions.
-- Strong, contextual **CTAs (calls to action)** that help move the conversation forward.
-- Useful recommendations and next steps instead of generic questions.
-- Clean Markdown formatting and meaningful icon usage.
 
-The Manager should behave like an **intelligent travel advisor**, not an input-output chatbot.
+- Removing duplicated instructions.
+- Identifying and resolving contradictory rules.
+- Removing obsolete Gateway assumptions.
+- Removing unnecessary restrictions on response flexibility.
+- Keeping responsibilities and priorities clearly organized.
+- Separating routing, specialist coordination, and response presentation rules.
+- Preserving useful existing intelligence.
 
-### 3. Routing & Specialist Coordination
+Do not blindly expand the prompt. Improve its quality, clarity, and consistency.
 
-Verify that the Manager intelligently decides when to call:
+Use targeted few-shot examples only where they solve actual observed problems.
 
-- Flight Agent
-- Trip Planner V2
-- Both specialists
-- Neither, when existing context is sufficient
+## 7. Comprehensive Multi-Turn Testing
 
-Evaluate how well it understands specialist feedback, combines results, preserves context, and generates accurate user-facing responses without exposing unnecessary internal details.
+First inspect the existing testing infrastructure and reuse available scripts/test cases.
 
-### 4. Realistic Multi-Turn Testing
+Test three major categories:
 
-Create realistic conversations using **minimal and imperfect user inputs**, not perfectly structured prompts.
+**A. Flight-focused conversations**
+- Flight searches and modifications.
+- Short and ambiguous flight requests.
+- Filtering, pricing, and existing flight context.
+- Rich Flight Agent feedback being correctly communicated by the Manager.
 
-Include ambiguous requests, changing preferences, context references, mixed flight/trip-planning intents, and users who need guidance.
+**B. Trip-planning conversations**
+- Destination discovery.
+- Itinerary generation and editing.
+- User preferences and history understanding.
+- Natural, attractive itinerary presentation.
+- Relevant follow-up questions and recommendations.
 
-Run **one conversation at a time**, inspect every turn, and evaluate:
+**C. Mixed Flight + Trip Planner conversations**
+- Requests requiring both specialists.
+- Switching between flights and itinerary planning.
+- Combined travel recommendations.
+- Understanding previous selections and conversation context.
+- Correct sequencing and coordination of specialist calls.
 
-**User intent → Manager understanding → Routing → Specialist feedback → Final response → CTA**
+Make the queries realistic. Users often provide only keywords, incorrect city names, incomplete details, or vague instructions.
 
-Identify weak behavior, investigate the root cause, and make targeted improvements before proceeding.
+### Execution Strategy — Mandatory
 
-### 5. Evaluation & Reporting
+Run **one multi-turn conversation at a time**.
 
-Provide measurable results for:
+For each conversation:
 
-- Intent-understanding accuracy.
+1. Inspect Manager reasoning outcomes and routing decisions through available traces.
+2. Review specialist tool calls and actual feedback.
+3. Compare specialist feedback with the Manager's final response.
+4. Check for missing information, robotic responses, weak acknowledgements, incorrect routing, or poor CTAs.
+5. Investigate actual failures and identify their root causes.
+6. Make targeted improvements.
+7. Re-run the affected test to validate the fix.
+8. Continue only when the current conversation is stable.
+
+Do not run everything together or waste OpenAI API tokens on repeated tests without a clear debugging purpose.
+
+## 8. Evaluation & Success Metrics
+
+Evaluate:
+
+- Intent understanding accuracy.
+- Routing and multi-specialist coordination accuracy.
 - Context/history utilization.
-- Routing correctness.
-- Relevant clarification-question quality.
+- Specialist feedback preservation.
+- Response completeness and correctness.
 - Conversational naturalness and personalization.
-- CTA relevance and usefulness.
-- Specialist-feedback handling.
-- Overall conversation success rate.
+- Acknowledgement and tone quality.
+- CTA relevance.
+- Itinerary presentation quality.
+- Token usage and latency.
 
-Use explicit evaluation criteria and actual test evidence. Do not invent accuracy percentages.
+Provide measurable pass rates where possible, with clear evaluation criteria and actual evidence. Distinguish subjective quality scores from objectively verified behavior.
 
-### Important Constraints
+## Engineering Constraints
 
-- Focus primarily on **Manager intelligence and prompt improvements**.
-- Preserve existing production architecture, context schemas, specialist tools, and working functionality.
-- Keep the configured **GPT-5.2 model fixed** throughout testing.
-- Avoid unnecessary wrappers, hardcoded conversational rules, or unrelated refactoring.
-- Use API tokens efficiently and reuse existing test infrastructure.
-- Run and stabilize **one conversation before moving to the next**.
+- Keep the existing production architecture and context schemas intact.
+- Preserve working Flight Agent and Trip Planner intelligence.
+- Keep domain-specific recovery and tool behavior inside specialists.
+- Prefer prompt improvements over hardcoded conversational handling.
+- Avoid unnecessary wrappers, adapters, factories, and tracking mechanisms.
+- Keep code and prompt changes minimal and maintainable.
+- Do not change model configurations during an evaluation run.
 
-**Goal:** Determine whether our production Manager genuinely understands users, helps them make decisions, asks intelligent questions, and moves conversations naturally toward successful travel planning—not merely whether it produces technically correct responses.
+## Final Objective
+
+We want a Manager that **understands users, intelligently coordinates specialists, preserves valuable findings, communicates naturally, and proactively guides users toward their travel goals**.
+
+The objective is not simply to pass tests or generate longer answers.
+
+We need a **reliable, intelligent, engaging travel assistant**.
+
+Start by auditing the current Manager prompt, Gateway routing rules, and existing test results. Apply targeted improvements, then test the initial GPT-5.5 Manager + GPT-5.2 Flight Agent configuration with one realistic multi-turn conversation before expanding testing.
