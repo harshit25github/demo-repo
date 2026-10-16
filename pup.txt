@@ -1,14 +1,79 @@
-Review the **Gateway Flight Agent prompt** and the **Manager Mode Flight Agent prompt**, focusing specifically on our recent improvements to **tool feedback handling**.
+Thoroughly review and evaluate our **Production Manager Agent**, focusing primarily on its **intelligence, reasoning, and conversational quality**, not just whether the code executes successfully.
 
-Both agents use the same underlying Flight tools, but we recently enhanced the Gateway Flight Agent's instructions to better understand tool responses, failures, recovery options, and next actions.
+Our local implementation has already been tested. Now we need to verify how effectively the production Manager understands users, coordinates specialists, and guides conversations toward meaningful outcomes.
 
-- Compare both prompts and identify any missing or outdated tool-feedback intelligence in the Manager Mode Flight Agent.
-- Bring over relevant improvements while preserving existing Manager Mode intelligence and behavior.
-- Ensure the Flight Agent correctly interprets detailed tool feedback and provides accurate, meaningful feedback to the Manager.
-- Keep domain-specific tool handling and recovery intelligence inside the Flight Agent, not the Manager.
-- Update the Manager prompt only if necessary for correctly consuming specialist feedback.
-- Avoid duplicate instructions, unnecessary wrappers, or unrelated changes.
+### 1. Manager Intelligence — Highest Priority
 
-**Goal:** Keep both Flight Agents aligned with the latest tool-feedback intelligence without replacing or weakening their existing behavior.
+Evaluate whether the Manager can:
 
-Make targeted prompt changes and verify them using existing tests.
+- Understand short, vague, incomplete, misspelled, and keyword-only user queries.
+- Correctly interpret user intent using conversation history and available context.
+- Understand indirect references like "second one", "same trip", "cheaper", or "change that".
+- Infer reasonable details without making unsupported assumptions.
+- Ask only relevant questions when genuinely important information is missing.
+- Avoid repeatedly asking for information the user has already shared.
+- Proactively guide users toward their travel goals rather than simply reacting to commands.
+
+### 2. Conversational Quality & Engagement
+
+Evaluate whether responses feel **natural, welcoming, helpful, and personalized**, rather than robotic.
+
+Focus on:
+- Meaningful acknowledgement of user preferences and requests.
+- Natural references to previously shared context.
+- Friendly and engaging tone without repetitive templates.
+- Relevant, intelligent follow-up questions.
+- Strong, contextual **CTAs (calls to action)** that help move the conversation forward.
+- Useful recommendations and next steps instead of generic questions.
+- Clean Markdown formatting and meaningful icon usage.
+
+The Manager should behave like an **intelligent travel advisor**, not an input-output chatbot.
+
+### 3. Routing & Specialist Coordination
+
+Verify that the Manager intelligently decides when to call:
+
+- Flight Agent
+- Trip Planner V2
+- Both specialists
+- Neither, when existing context is sufficient
+
+Evaluate how well it understands specialist feedback, combines results, preserves context, and generates accurate user-facing responses without exposing unnecessary internal details.
+
+### 4. Realistic Multi-Turn Testing
+
+Create realistic conversations using **minimal and imperfect user inputs**, not perfectly structured prompts.
+
+Include ambiguous requests, changing preferences, context references, mixed flight/trip-planning intents, and users who need guidance.
+
+Run **one conversation at a time**, inspect every turn, and evaluate:
+
+**User intent → Manager understanding → Routing → Specialist feedback → Final response → CTA**
+
+Identify weak behavior, investigate the root cause, and make targeted improvements before proceeding.
+
+### 5. Evaluation & Reporting
+
+Provide measurable results for:
+
+- Intent-understanding accuracy.
+- Context/history utilization.
+- Routing correctness.
+- Relevant clarification-question quality.
+- Conversational naturalness and personalization.
+- CTA relevance and usefulness.
+- Specialist-feedback handling.
+- Overall conversation success rate.
+
+Use explicit evaluation criteria and actual test evidence. Do not invent accuracy percentages.
+
+### Important Constraints
+
+- Focus primarily on **Manager intelligence and prompt improvements**.
+- Preserve existing production architecture, context schemas, specialist tools, and working functionality.
+- Keep the configured **GPT-5.2 model fixed** throughout testing.
+- Avoid unnecessary wrappers, hardcoded conversational rules, or unrelated refactoring.
+- Use API tokens efficiently and reuse existing test infrastructure.
+- Run and stabilize **one conversation before moving to the next**.
+
+**Goal:** Determine whether our production Manager genuinely understands users, helps them make decisions, asks intelligent questions, and moves conversations naturally toward successful travel planning—not merely whether it produces technically correct responses.
