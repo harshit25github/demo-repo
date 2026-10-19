@@ -1,15 +1,22 @@
-Prepare a **production API smoke-test suite**, but **do not execute any requests yet**.
+Enhance the **Manager Agent's streaming events** with these two requirements:
 
-First, thoroughly inspect the existing API implementation, authentication flow, request bodies, headers, and required environment variables.
+**1. Acknowledgement (`ACK`) Event**
 
-Cover these three steps:
+- Both Flight Agent and Trip Planner tool-call arguments now support an `acknowledgement` field alongside `input`.
+- When the Manager generates a tool call, inspect its arguments. If `acknowledgement` is a non-empty string, emit a new streaming chunk with **`status: "ack"`** containing that message.
+- Keep acknowledgement events separate from existing `emitStatus` messages. They serve different purposes.
+- Reuse the existing streaming infrastructure where possible. Add a small helper only if genuinely necessary.
+- Ensure acknowledgements are emitted once, without duplication, including parallel specialist calls.
 
-1. **App Registration:** Identify the registration API and its required payload. The admin token is already available in our `.env` file.
-2. **OAuth Authentication:** Inspect the OAuth API flow to understand how we obtain the JWT/access token.
-3. **`/chat` API:** Identify the exact endpoint, request payload, authentication headers, and expected response.
+**2. Gateway vs Manager Status Events**
 
-Build a simple, reusable test suite that executes these steps sequentially against production once I provide the integration details and approve execution.
+- Inspect all status chunks previously emitted by the Gateway Agent.
+- Compare them with the current Manager streaming flow.
+- Identify any missing status events and restore equivalent behavior where appropriate.
+- Preserve existing event contracts and streaming behavior.
 
-**Important:** No direct database access, no production requests yet, no hardcoded credentials, and no unnecessary wrappers or test infrastructure.
+**Important:** Inspect the SDK streaming/tool-call events to identify the correct point to capture complete acknowledgement arguments, ideally before specialist execution. Implement the simplest solution without unnecessary wrappers.
 
-First explain the complete API flow, prepare the suite, and show me how we will execute and verify it. Wait for my approval before running anything.
+Finally, run targeted tests for Flight-only, Trip-only, both specialists, empty acknowledgements, and existing status events.
+
+**Goal:** Preserve Gateway status-event behavior while introducing a distinct, reliable `ACK` chunk for Manager acknowledgements.
