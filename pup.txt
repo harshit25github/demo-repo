@@ -1,22 +1,39 @@
-Enhance the **Manager Agent's streaming events** with these two requirements:
+We need to enhance our `/chat` API to support both **Gateway Agent** and **Manager Agent** approaches, along with reliable streaming retry handling.
 
-**1. Acknowledgement (`ACK`) Event**
+### Phase 1 — Explore Retry Mechanism (First Priority)
 
-- Both Flight Agent and Trip Planner tool-call arguments now support an `acknowledgement` field alongside `input`.
-- When the Manager generates a tool call, inspect its arguments. If `acknowledgement` is a non-empty string, emit a new streaming chunk with **`status: "ack"`** containing that message.
-- Keep acknowledgement events separate from existing `emitStatus` messages. They serve different purposes.
-- Reuse the existing streaming infrastructure where possible. Add a small helper only if genuinely necessary.
-- Ensure acknowledgements are emitted once, without duplication, including parallel specialist calls.
+1. Inspect the existing Gateway Agent streaming retry, timeout, and recovery implementation.
+2. Verify whether the same retry mechanism works with the Manager Agent approach.
+3. Temporarily reduce the model timeout to **2 seconds in a controlled local test** to trigger timeout/retry scenarios.
+4. Test both Gateway and Manager approaches and inspect actual SDK events, retries, streaming behavior, and errors.
+5. If the existing mechanism works for Manager, **reuse it**. Otherwise, separate the runtime handling where necessary and implement Manager-specific retry/recovery logic.
 
-**2. Gateway vs Manager Status Events**
+Ensure retries do not cause duplicate tool executions, duplicate streaming chunks, or inconsistent conversation state. Restore the original timeout after testing.
 
-- Inspect all status chunks previously emitted by the Gateway Agent.
-- Compare them with the current Manager streaming flow.
-- Identify any missing status events and restore equivalent behavior where appropriate.
-- Preserve existing event contracts and streaming behavior.
+### Phase 2 — Add Platform-Based Routing
 
-**Important:** Inspect the SDK streaming/tool-call events to identify the correct point to capture complete acknowledgement arguments, ideally before specialist execution. Implement the simplest solution without unnecessary wrappers.
+Add an optional `platform` field to the `/chat` API request payload.
 
-Finally, run targeted tests for Flight-only, Trip-only, both specialists, empty acknowledgements, and existing status events.
+```json
+{
+  "platform": "manager"
+}
+```
 
-**Goal:** Preserve Gateway status-event behavior while introducing a distinct, reliable `ACK` chunk for Manager acknowledgements.
+Routing rules:
+- `platform: "manager"` → Manager Agent approach.
+- `platform: "gateway"` → Gateway Agent approach.
+- Missing `platform` → Default to `gateway` for backward compatibility.
+
+Preserve existing request contracts, authentication, streaming events, and response structure.
+
+### Phase 3 — Implementation & Testing
+
+- Implement the routing and necessary retry changes.
+- Test both approaches with normal responses, forced timeouts, successful retries, exhausted retries, and interrupted streams.
+- Verify existing Gateway functionality remains unchanged.
+- Prefer shared retry logic when technically possible. Avoid unnecessary wrappers, duplicate code, and overengineering.
+
+**Important:** Start with R&D and report whether Gateway's existing retry mechanism is compatible with Manager. Then implement the simplest reliable approach based on your findings.
+
+**Expected output:** Briefly explain the findings, implementation changes, test results, and any remaining limitations.
