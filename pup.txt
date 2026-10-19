@@ -1,42 +1,29 @@
-Enhance our **Nexus Service chat UI** to support switching between **Gateway Agent** and **Manager Agent** approaches.
+Enhance our Next.js chat client to handle acknowledgement messages with a natural streaming animation.
 
-The backend already supports architecture selection through the `/user/chatting` POST API. We now need to integrate this into Nexus.
+Requirements
 
-### Requirements
+1. Handle status: "ack" events
 
-**1. Architecture Selection Dropdown**
-- Add a clean, modern dropdown directly in the chat interface.
-- Options: **Gateway** and **Manager**.
-- Default selection: **Gateway**.
-- Place it near the chat header or input area, wherever it fits naturally without cluttering the UI.
-- Clearly display the currently selected approach.
+Acknowledgement chunks are sent only by the Manager approach, not Gateway.
 
-**2. API Payload Integration**
+When the client receives a chunk with status: "ack" and a non-empty message, display that acknowledgement.
 
-When sending a chat request, include the selected architecture in the existing orchestration payload.
+Gateway should continue working exactly as before, without requiring acknowledgement handling.
 
-- Gateway selected → `platform: "gateway"`
-- Manager selected → `platform: "manager"`
+2. Simulate streaming on the client
 
-Inspect the actual `/user/chatting` API contract and use its existing payload structure. Do not assume the location of the `platform` field.
+The backend sends the complete acknowledgement in a single chunk.
 
-**3. Chat Experience**
-- Users should be able to switch approaches easily to compare their behavior.
-- Ensure the selected approach is consistently passed in subsequent chat requests.
-- Preserve existing streaming, acknowledgements, chat history, and error handling.
-- Avoid mixing Gateway and Manager conversation context when switching approaches. Inspect the existing session behavior and handle this appropriately.
+Instead of displaying it instantly, progressively reveal the text character-by-character or in small chunks with a slight delay.
 
-**4. UI/UX**
-- Keep the design minimal, polished, and consistent with Nexus's existing styling.
-- Prefer reusing existing dropdown components.
-- Make the selection intuitive and responsive across screen sizes.
+Make the animation smooth, natural, and responsive, without introducing unnecessary latency.
 
-### Implementation
+3. Message lifecycle
 
-First inspect the current Nexus chat UI, API integration, and session management. Then implement the simplest reliable solution.
+Display the acknowledgement as a temporary assistant message.
 
-Avoid unnecessary components, wrappers, or architectural changes.
+Once the actual assistant response starts streaming, smoothly replace the acknowledgement with the real response.
 
-**Goal:** Allow users to switch between Gateway and Manager directly from Nexus chat and test both approaches using the correct backend payload.
+Prevent duplicate messages, overlapping animations, or mixed content.
 
-Finally, summarize the files changed, API payload mapping, and testing results.
+Handle cancellation, errors, and interrupted streams properly.
