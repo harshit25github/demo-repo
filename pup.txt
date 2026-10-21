@@ -1,29 +1,44 @@
-Enhance our Next.js chat client to handle acknowledgement messages with a natural streaming animation.
-
-Requirements
-
-1. Handle status: "ack" events
-
-Acknowledgement chunks are sent only by the Manager approach, not Gateway.
-
-When the client receives a chunk with status: "ack" and a non-empty message, display that acknowledgement.
-
-Gateway should continue working exactly as before, without requiring acknowledgement handling.
-
-2. Simulate streaming on the client
-
-The backend sends the complete acknowledgement in a single chunk.
-
-Instead of displaying it instantly, progressively reveal the text character-by-character or in small chunks with a slight delay.
-
-Make the animation smooth, natural, and responsive, without introducing unnecessary latency.
-
-3. Message lifecycle
-
-Display the acknowledgement as a temporary assistant message.
-
-Once the actual assistant response starts streaming, smoothly replace the acknowledgement with the real response.
-
-Prevent duplicate messages, overlapping animations, or mixed content.
-
-Handle cancellation, errors, and interrupted streams properly.
+ok: false
+status: NEEDS_USER_INPUT
+reason: PASSENGER_RULE_VIOLATION
+nextAction: ASK_USER
+askFor[1]: passengers
+recoverable: true
+message: "Child passengers require at least one adult or senior to accompany them (Children: 1, Adults: 0, Seniors: 0). Ask the user to add an adult or senior."
+stages:
+  input: ok
+  locations: ok
+  dates: ok
+  passengers: failed
+search:
+  tripType: oneway
+  cabin: economy
+  passengers:
+    adults: 0
+    seniors: 0
+    children: 1
+    seatInfants: 0
+    lapInfants: 0
+    total: 1
+  outboundDate:
+    requested: 2026-10-28
+    used: 2026-10-28
+  returnDate: null
+  origin:
+    requested: Delhi
+    requestedIata: DEL
+    source: message
+    used:
+      iata: DEL
+      name: "DEL - New Delhi IGI, India"
+    changed: false
+  destination:
+    requested: New York
+    requestedIata: NYC
+    source: message
+    used:
+      iata: NYC
+      name: "NYC - New York All Airports, New York, United States"
+    changed: false
+results: null
+warnings[0]:
