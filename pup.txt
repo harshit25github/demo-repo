@@ -1,44 +1,72 @@
-ok: false
-status: NEEDS_USER_INPUT
-reason: PASSENGER_RULE_VIOLATION
-nextAction: ASK_USER
-askFor[1]: passengers
-recoverable: true
-message: "Child passengers require at least one adult or senior to accompany them (Children: 1, Adults: 0, Seniors: 0). Ask the user to add an adult or senior."
-stages:
-  input: ok
-  locations: ok
-  dates: ok
-  passengers: failed
-search:
-  tripType: oneway
-  cabin: economy
-  passengers:
-    adults: 0
-    seniors: 0
-    children: 1
-    seatInfants: 0
-    lapInfants: 0
-    total: 1
-  outboundDate:
-    requested: 2026-10-28
-    used: 2026-10-28
-  returnDate: null
-  origin:
-    requested: Delhi
-    requestedIata: DEL
-    source: message
-    used:
-      iata: DEL
-      name: "DEL - New Delhi IGI, India"
-    changed: false
-  destination:
-    requested: New York
-    requestedIata: NYC
-    source: message
-    used:
-      iata: NYC
-      name: "NYC - New York All Airports, New York, United States"
-    changed: false
-results: null
-warnings[0]:
+We need to **refactor our production `/chat` API architecture** to completely separate Gateway Agent and Manager Agent execution.
+
+Currently, `/v1/chat` supports both approaches using the `orchestrator` property. We now want independent APIs and service structures so both architectures can evolve separately.
+
+### 1. API Segregation
+
+- **`/v1/chat` → Gateway Agent only**
+- **`/v2/chat` → Manager Agent only**
+- Remove the need for orchestration-based selection between these approaches.
+- Preserve existing Gateway API behavior and backward compatibility wherever possible.
+- Ensure Manager-specific changes never impact Gateway execution.
+
+### 2. Explore Existing Architecture
+
+Thoroughly inspect the production codebase and identify:
+
+- API routes, controllers, and middleware.
+- Gateway and Manager execution flows.
+- Agent initialization and configurations.
+- Streaming and SSE handling.
+- Retry, timeout, and error recovery mechanisms.
+- Authentication, session management, conversation history, and context hydration.
+- Status, acknowledgement (`status: "ack"`), and other streaming events.
+- Shared services, utilities, and dependencies.
+
+Identify which components are currently coupled and what needs to change.
+
+### 3. Separate Manager V2 Architecture
+
+Design a clean, independent structure for Manager V2, including dedicated folders and files for its:
+
+- Route and controller.
+- Agent execution/runtime.
+- Streaming and event handling.
+- Retry and timeout recovery.
+- Manager-specific services, configuration, and future enhancements.
+
+Gateway V1 should retain its existing execution behavior.
+
+**Important:** Separate architecture-specific business logic, but reuse genuinely common, stateless utilities where safe. Do not duplicate everything unnecessarily or introduce complex abstraction layers.
+
+### 4. Refactoring Strategy
+
+Plan the migration carefully:
+
+1. Identify existing Gateway and Manager dependencies.
+2. Propose a clean folder and service structure.
+3. Identify which existing files should remain unchanged, move, or be refactored.
+4. Define the new `/v2/chat` execution flow.
+5. Explain how V1 compatibility will be preserved, especially for existing requests containing `orchestrator`.
+6. Prepare a step-by-step implementation and regression-testing strategy.
+
+### 5. Verification
+
+The final implementation must guarantee:
+
+- V1 executes Gateway only.
+- V2 executes Manager only.
+- Both APIs preserve their required authentication, streaming, and response contracts.
+- Manager-specific development cannot unexpectedly break Gateway.
+- Both architectures can be tested and maintained independently.
+
+### Important Instructions
+
+- **First perform a thorough codebase analysis and prepare the refactoring plan. Do not modify production code yet.**
+- Prefer minimal, readable code with clear separation of responsibilities.
+- Avoid unnecessary wrappers, factories, duplicated services, and overengineering.
+- Preserve existing functionality unless a change is explicitly required.
+
+**Expected output:** Current architecture analysis, proposed folder structure, dependency separation, affected files, migration plan, and regression risks.
+
+**Goal:** Establish a scalable V2 Manager architecture while keeping V1 Gateway stable and isolated, so we can independently enhance Manager V2 in future development.
