@@ -1,72 +1,585 @@
-We need to **refactor our production `/chat` API architecture** to completely separate Gateway Agent and Manager Agent execution.
+# Task: place marks with icons and Inventory API photos in Manager replies
 
-Currently, `/v1/chat` supports both approaches using the `orchestrator` property. We now want independent APIs and service structures so both architectures can evolve separately.
+You are working in our production backend, where the Manager Agent, Trip Planner V2 and Flight Agent already run. Your task is to add **place-mark hydration**:
 
-### 1. API Segregation
+- After the Manager has written its final reply, the backend marks the places the reply names.
+- The client then draws an icon for each place's kind, and shows a photo where we have one.
+- Photos come only from our **existing Inventory API**.
 
-- **`/v1/chat` → Gateway Agent only**
-- **`/v2/chat` → Manager Agent only**
-- Remove the need for orchestration-based selection between these approaches.
-- Preserve existing Gateway API behavior and backward compatibility wherever possible.
-- Ensure Manager-specific changes never impact Gateway execution.
+This was built and tested in a separate reference codebase that you can't see. Everything you need from it is in this document. Where the reference code names a variable that our production code may name differently, this document says what the value **means**, so you can find our equivalent. Don't guess names; inspect our code.
 
-### 2. Explore Existing Architecture
+---
 
-Thoroughly inspect the production codebase and identify:
+## 1. Rules
 
-- API routes, controllers, and middleware.
-- Gateway and Manager execution flows.
-- Agent initialization and configurations.
-- Streaming and SSE handling.
-- Retry, timeout, and error recovery mechanisms.
-- Authentication, session management, conversation history, and context hydration.
-- Status, acknowledgement (`status: "ack"`), and other streaming events.
-- Shared services, utilities, and dependencies.
+1. **Keep the architecture.** The Manager calls the Trip Planner and Flight specialists as tools, exactly as now. Add no agents and no LLM calls. Hydration is plain code that runs after the Manager's final output exists.
+2. **Keep streaming.** Hydrate only the final text. Never inject marks into partial deltas, and never into the Manager's own conversation history; the model keeps seeing its plain reply.
+3. **Photos only from the existing Inventory API client.** Don't add an image provider, don't fetch images from the web, and never build, guess or placeholder a URL. A place without an Inventory photo gets `photo: null`.
+4. **Settings stay in code.** Values such as the 1-second photo timeout are constants, not new environment variables. Reuse the Inventory client's existing auth and config.
+5. **No speculative abstractions.** Add only the functions below.
+6. **Commit only the files you change.** Run the type check and the existing tests before finishing.
 
-Identify which components are currently coupled and what needs to change.
+---
 
-### 3. Separate Manager V2 Architecture
+## 2. What the client receives
 
-Design a clean, independent structure for Manager V2, including dedicated folders and files for its:
+The final reply text marks the **first** mention of each place as a Markdown link with a `place:` reference:
 
-- Route and controller.
-- Agent execution/runtime.
-- Streaming and event handling.
-- Retry and timeout recovery.
-- Manager-specific services, configuration, and future enhancements.
+```markdown
+Here's your 5-day solo [Tokyo](place:1) plan, one area at a time.
+**Day 1 · Old Tokyo:** [Sensō-ji](place:2) early, snacks on [Nakamise-dōri](place:3), then [Tokyo Skytree](place:4).
+```
 
-Gateway V1 should retain its existing execution behavior.
+The final `done` payload carries the marks in reply order:
 
-**Important:** Separate architecture-specific business logic, but reuse genuinely common, stateless utilities where safe. Do not duplicate everything unnecessarily or introduce complex abstraction layers.
+```json
+"places": [
+  { "ref": "1", "kind": "city",     "photo": "https://<inventory image url>" },
+  { "ref": "2", "kind": "temple",   "photo": null },
+  { "ref": "3", "kind": "market",   "photo": null },
+  { "ref": "4", "kind": "landmark", "photo": null }
+]
+```
 
-### 4. Refactoring Strategy
+- `ref` is the `N` in `place:N`, counted from 1 in the order the marks appear.
+- The place's name is the link text. The list doesn't repeat it.
+- `kind` is one of twelve names:
+  - The eleven place kinds: `city`, `area`, `landmark`, `temple`, `museum`, `park`, `nature`, `market`, `food`, `nightlife`, `daytrip`.
+  - `flight`, which marks the first "flight" or "flights" on a turn that has a flight search.
+- `photo` is a URL from the Inventory API, or `null`. Today only cities get a photo.
+- The stored assistant message keeps the same list (`message.places`), and loading a chat returns it unchanged.
+- **The backend sends no icons.** The client maps `kind` to its icon and loads a photo only when the traveler opens it.
 
-Plan the migration carefully:
+---
 
-1. Identify existing Gateway and Manager dependencies.
-2. Propose a clean folder and service structure.
-3. Identify which existing files should remain unchanged, move, or be refactored.
-4. Define the new `/v2/chat` execution flow.
-5. Explain how V1 compatibility will be preserved, especially for existing requests containing `orchestrator`.
-6. Prepare a step-by-step implementation and regression-testing strategy.
+## 3. Find these in our code first
 
-### 5. Verification
+Before writing anything, find and note our equivalent of each item below.
 
-The final implementation must guarantee:
+| What it is | What to look for |
+|---|---|
+| **A. The Manager runner's post-processing** | Where the Manager's final output (`result.finalOutput`) is turned into the text sent to the client. We usually call it `sanitizeNoLinks(...)`, then `assertNoLinks(...)`. Hydration goes right after that. |
+| **B. The link sanitizer** | The module with `sanitizeNoLinks`, `assertNoLinks` and a `MARKDOWN_LINK_PATTERN`. |
+| **C. The Trip Planner V2 schema** | The Zod schema of Trip's structured result. Check its day `places` field: is it `string[]` or `{ name, kind }[]`? Then check the report day schema the Manager receives: does it have `places: string[]`? |
+| **D. Trip state helpers and apply** | Where Trip's result is saved into the trip state (days, places), where the report for the Manager is built, and where `placesOfInterest` is filled. |
+| **E. The two prompts** | The Trip Planner V2 instructions, at the line describing `places`, and the Manager prompt, at the section on Trip replies. |
+| **F. The request state** | The trip state (saved plan with days and places, options suggested, destination with city and IATA) and the flight state (whether Flight ran this turn, whether a search exists, the route's first segment with origin, destination and IATA codes). |
+| **G. The chat API** | Where the final `done` SSE payload is built, and where the assistant message is stored and loaded. |
+| **H. The Inventory API client** | Its lookup inputs (IATA code, city name, country?), whether it batches, which response field is the image URL and which size variants exist, plus its timeout and error behaviour. |
 
-- V1 executes Gateway only.
-- V2 executes Manager only.
-- Both APIs preserve their required authentication, streaming, and response contracts.
-- Manager-specific development cannot unexpectedly break Gateway.
-- Both architectures can be tested and maintained independently.
+If any of these is missing or very different, stop and report what you found before changing code.
 
-### Important Instructions
+---
 
-- **First perform a thorough codebase analysis and prepare the refactoring plan. Do not modify production code yet.**
-- Prefer minimal, readable code with clear separation of responsibilities.
-- Avoid unnecessary wrappers, factories, duplicated services, and overengineering.
-- Preserve existing functionality unless a change is explicitly required.
+## 4. Trip Planner V2: tag each place with a kind
 
-**Expected output:** Current architecture analysis, proposed folder structure, dependency separation, affected files, migration plan, and regression risks.
+**Skip this section** if C already shows `places: { name, kind }[]` with a kinds enum, and the report days already carry `places: string[]`.
 
-**Goal:** Establish a scalable V2 Manager architecture while keeping V1 Gateway stable and isolated, so we can independently enhance Manager V2 in future development.
+### 4.1 Schema
+
+```ts
+/** The eleven kinds of place Trip tags; the client draws one icon per kind. */
+export const PLACE_KINDS = ['city', 'area', 'landmark', 'temple', 'museum', 'park', 'nature', 'market', 'food', 'nightlife', 'daytrip'] as const;
+export type PlaceKind = (typeof PLACE_KINDS)[number];
+
+// In the day schema of Trip's structured result: replace `places: z.array(text).max(8).nullable()` with
+places: z.array(z.object({ name: text, kind: z.enum(PLACE_KINDS) }).strict()).max(8).nullable(),
+
+// In the day schema of the report the Manager receives, add the day's place names
+// so the Manager can copy them exactly:
+places: z.array(text),
+
+/** A named place in a saved day, with the kind that picks its icon. */
+export interface SavedTripPlace {
+  name: string;
+  kind: PlaceKind;
+}
+// In the saved day type: plans saved before kinds existed hold plain strings.
+places: Array<SavedTripPlace | string>;
+```
+
+`text` stands for our existing trimmed, non-empty string schema (`z.string().trim().min(1)`).
+
+### 4.2 Reading saved places (older plans keep working, no data migration)
+
+```ts
+/** A saved day's places, with a null kind for the plain names of plans saved before kinds existed. */
+export function dayPlaces(day: { places?: Array<SavedTripPlace | string> } | undefined): Array<{ name: string; kind: PlaceKind | null }> {
+  return (day?.places ?? []).map((place) => (typeof place === 'string' ? { name: place, kind: null } : place));
+}
+```
+
+Use `dayPlaces(day).map((place) => place.name)` everywhere our code currently reads `day.places` as strings:
+- the line that describes the saved plan in Trip's own input;
+- the loop that fills `placesOfInterest`;
+- the report day.
+
+### 4.3 Saving a day, and the report day
+
+```ts
+/** Each named place once, by name. */
+function uniquePlaces(places: SavedTripPlace[]): SavedTripPlace[] {
+  const seen = new Set<string>();
+  return places.filter((place) => {
+    const key = place.name.toLowerCase();
+    if (!place.name || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+// Where a day from Trip's result is saved (null still means "keep the saved list"):
+places: day.places === null
+  ? [...(kept?.places ?? [])]
+  : uniquePlaces(day.places.map((place) => ({ name: plainText(place.name), kind: place.kind }))),
+
+// Where a report day is built for the Manager:
+places: dayPlaces(day).map((place) => place.name),
+```
+
+`plainText` is our existing helper that strips links and markup from model text into one plain line. Use whatever ours is called.
+
+### 4.4 The Trip prompt
+
+Replace the line describing `places` with:
+
+```text
+- places: every named place in the day, written exactly as in the day's text, each with its kind: city; area, a neighborhood or town; landmark, a sight, tower or viewpoint; temple, also a shrine, church or mosque; museum, or another culture venue; park, or a garden; nature, such as a beach, lake, waterfall or mountain; market, or a shopping street; food, such as a food street, hall or restaurant; nightlife; or daytrip, a place visited for the day. Whenever you change a time block, return the day's full list.
+```
+
+### 4.5 The Manager prompt (two rules)
+
+In the part describing Trip feedback, mention that each report day has its places:
+
+```text
+A day's morning, afternoon and evening are how it is stored, not a layout; its notes are extra details for that day, and its places are the places it names.
+```
+
+In the Trip replies section, add the exact-name rule. Marks only match exact names, so this is what makes them work:
+
+```text
+- Write each place's name exactly as the day's places give it, the first time it appears: never shorten, translate or respell it.
+```
+
+Make sure the Manager prompt also forbids links and icons in its text, for example:
+
+```text
+- Never use emojis or other icons, in any reply: the app adds icons to place names and flights itself.
+```
+
+---
+
+## 5. The marker (new module, copy as-is)
+
+Create a small text module, for example `shared/text/place-marks.ts`:
+
+```ts
+/**
+ * Place marks: after the Manager's reply is finished, the backend marks the first mention of each place a specialist
+ * named as [name](place:N), and the turn carries a places list the client reads to draw an icon for each mark's kind
+ * and, where there is one, a photo. The model never writes a mark, so it can't invent a place.
+ */
+
+/** Something the reply may name: a place under any of its names, or the word "flight" or "flights". */
+export interface PlaceCandidate {
+  /** The names a mention can use, such as "Bali" and "Denpasar". The reply keeps the one it wrote. */
+  names: string[];
+  /** One of the eleven place kinds, or "flight". */
+  kind: string;
+  photo: string | null;
+}
+
+/** One mark in the turn's places list, in reply order. The name is the reply's own text, so the list doesn't repeat it. */
+export interface PlaceMark {
+  ref: string;
+  kind: string;
+  photo: string | null;
+}
+
+const escapeForPattern = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** Text marks never touch: headings, struck text, fenced and inline code, and anything already a link. */
+const PROTECTED = [/^[ \t]{0,3}#{1,6}[ \t].*$/gm, /~~[^~\n]+~~/g, /```[\s\S]*?```/g, /`[^`\n]*`/g, /\[[^\]\n]*\]\([^)\n]*\)/g];
+
+/** A capitalized word other than "I" right after a name, on the same line: the name starts a longer one, such as "Tokyo Skytree". */
+const LONGER_NAME = /[ \t ]+(?!I\b)\p{Lu}/uy;
+const startsLongerName = (text: string, at: number) => { LONGER_NAME.lastIndex = at; return LONGER_NAME.test(text); };
+
+/**
+ * Marks the first mention of each candidate, keeping the words exactly as the reply wrote them and any bold around
+ * them. Longer names win where names overlap, so "Tokyo Skytree" is the landmark, not Tokyo. A place name followed by
+ * another capitalized word is part of a longer name the specialists didn't give, such as "Tokyo Station", and stays plain.
+ */
+export function markPlaces(markdown: string, candidates: readonly PlaceCandidate[]): { text: string; places: PlaceMark[] } {
+  const byName = new Map<string, PlaceCandidate>();
+  for (const candidate of candidates) {
+    for (const name of candidate.names) {
+      const key = name.trim().toLowerCase();
+      if (key && !byName.has(key)) byName.set(key, candidate);
+    }
+  }
+  if (!byName.size) return { text: markdown, places: [] };
+
+  // Letters and digits on either side mean another word.
+  const names = [...byName.keys()].sort((left, right) => right.length - left.length).map(escapeForPattern);
+  const pattern = new RegExp(`(?<![\\p{L}\\p{N}])(?:${names.join('|')})(?![\\p{L}\\p{N}])`, 'giu');
+  const spans = PROTECTED.flatMap((rule) => [...markdown.matchAll(rule)].map((match) => [match.index, match.index + match[0].length]));
+
+  const marked = new Set<PlaceCandidate>();
+  const places: PlaceMark[] = [];
+  let text = '';
+  let copied = 0;
+  for (const match of markdown.matchAll(pattern)) {
+    const start = match.index;
+    const end = start + match[0].length;
+    const candidate = byName.get(match[0].toLowerCase());
+    if (!candidate || marked.has(candidate) || spans.some(([from, to]) => start < to && end > from)) continue;
+    if (candidate.kind !== 'flight' && startsLongerName(markdown, end)) continue;
+    marked.add(candidate);
+    const ref = String(places.length + 1);
+    places.push({ ref, kind: candidate.kind, photo: candidate.photo });
+    text += `${markdown.slice(copied, start)}[${match[0]}](place:${ref})`;
+    copied = end;
+  }
+  return { text: text + markdown.slice(copied), places };
+}
+```
+
+Worked example:
+
+```ts
+markPlaces('Your **Bali** plan starts at Tirta Empul, then Bali again.', [
+  { names: ['Tirta Empul'], kind: 'temple', photo: null },
+  { names: ['Bali', 'Denpasar'], kind: 'city', photo: 'https://<inventory url>' },
+]);
+// text:   'Your **[Bali](place:1)** plan starts at [Tirta Empul](place:2), then Bali again.'
+// places: [{ ref: '1', kind: 'city', photo: 'https://<inventory url>' }, { ref: '2', kind: 'temple', photo: null }]
+```
+
+---
+
+## 6. The link sanitizer (two changes)
+
+A `place:` link the model writes itself must be stripped like any other link. The final check must then let through only the marks the backend issued.
+
+```ts
+// 1. Add `place:` to the Markdown link pattern, so model-written place links are removed by sanitizeNoLinks:
+const MARKDOWN_LINK_PATTERN = /\[([^\]\n]+)\]\(((?:https?:\/\/|www\.|place:|[a-z0-9.-]+\.[a-z]{2,})[^)\s]*)[^)]*\)/gi;
+
+// 2. New export next to assertNoLinks:
+/** assertNoLinks for a reply the backend added place marks to: those exact references pass, anything else still fails. */
+export function assertOnlyIssuedLinks(text = '', issued: readonly string[] = []): void {
+  const allowed = new Set(issued);
+  assertNoLinks(String(text || '').replace(/\[([^\]\n]+)\]\(([^)\s]+)\)/g, (link, label, url) => (allowed.has(url) ? label : link)));
+}
+```
+
+---
+
+## 7. The photo lookup on our Inventory API (the only image integration point)
+
+Implement exactly one function with this shape, backed by our existing Inventory API client:
+
+```ts
+/** A destination to look up: the IATA code Trip or Flight saved, if any, and its city name. */
+export interface DestinationRef {
+  iata: string | null;
+  city: string | null;
+}
+
+/** One city's photo, as the hydration step matches it to the names in the reply. */
+export interface CityPhoto {
+  /** The city's IATA codes, used to match a destination by code (from the request and/or the Inventory response). */
+  codes: string[];
+  /** The city's name as the Inventory API gives it. */
+  name: string;
+  /** Other names a reply may use for the city (e.g. "Denpasar" for "Bali"), or []. */
+  aliases: string[];
+  /** The image URL exactly as the Inventory API returned it. Never constructed or invented. */
+  photo: string;
+}
+
+/**
+ * The photos the Inventory API has for these destinations: one batched call per turn where the API allows it.
+ * A destination with no image is left out, so its name is still marked, with photo: null.
+ * No catch or retry here: the runner's photosOrNone guard turns any failure or slowness into "no photos".
+ */
+export async function cityPhotosFor(destinations: readonly DestinationRef[]): Promise<CityPhoto[]> {
+  // 1. De-duplicate: by IATA code (upper case) when present, else by lower-cased city name.
+  // 2. Call our existing Inventory API client once (batch) or in parallel, with its existing auth and config.
+  // 3. For each destination with an image, return { codes, name, aliases, photo }:
+  //    - photo: the URL of a medium/thumbnail variant (about 330–960 px wide), not the original;
+  //    - codes: include the requested IATA code so the runner can match by code;
+  //    - aliases: any alternate names the API returns; otherwise [].
+  // 4. Ignore credit or licence fields for now; the contract has no credit field.
+}
+```
+
+The reference codebase used a small local JSON list here only for testing. Don't add one; this function is the Inventory API.
+
+---
+
+## 8. Hydration in the Manager runner
+
+### 8.1 What the reference code's names mean
+
+Map each name to ours before you paste anything:
+
+| Reference name | Meaning |
+|---|---|
+| `appContext` | The request state object the Manager and specialists share for this turn. |
+| `appContext.tripPlanner.suggestions` | Trip's chip list. Trip saves a new array each time its result is saved, so "different from before the run" means Trip ran this turn. |
+| `appContext.tripPlanner.options` | The destinations Trip suggested. They're replaced only when Trip suggests new ones. Each has `code` (an IATA code or null) and `city`. |
+| `appContext.tripPlanner.plan` | The saved plan. `plan.destination` is `{ city, iata }`, and `plan.days[]` holds the saved days with their `places`. |
+| `flightTurn.flightRan` | True when the Flight agent ran in this turn. |
+| `appContext.flight.searchKey` | Set when a flight search exists in state. |
+| `appContext.flight.segments[0]` | The current search's first leg: `{ origin, destination, origin_iata, destination_iata }`. |
+| `log(level, event, data)` | Our structured logger. |
+
+### 8.2 Helpers (put them next to the runner)
+
+```ts
+/** The cities a reply may name: the options Trip suggested this turn, if it ran and suggested any, and the plan's city. */
+function tripDestinations(trip: TripState | undefined, optionsBefore: unknown): DestinationRef[] {
+  const options = trip?.options && trip.options !== optionsBefore ? trip.options : [];
+  const planCity = trip?.plan?.destination;
+  return [
+    ...options.map((option) => ({ iata: option.code, city: option.city })),
+    ...(planCity ? [{ iata: planCity.iata, city: planCity.city }] : []),
+  ];
+}
+
+/** A flight search's route cities. */
+function routeCities(flight: FlightState): DestinationRef[] {
+  const segment = flight.segments?.[0];
+  return segment
+    ? [{ iata: segment.origin_iata ?? null, city: segment.origin || null }, { iata: segment.destination_iata ?? null, city: segment.destination || null }]
+    : [];
+}
+
+/** A city as a mark candidate under its own name and the Inventory's names for it, with its photo when there is one. */
+function cityCandidate(city: DestinationRef, photos: readonly CityPhoto[]): PlaceCandidate | null {
+  const lower = (value: string | null | undefined) => String(value ?? '').trim().toLowerCase();
+  const photo = photos.find((entry) => (city.iata && entry.codes.includes(city.iata.toUpperCase()))
+    || [entry.name, ...entry.aliases].some((name) => lower(name) === lower(city.city)));
+  const names = [...new Set([city.city, photo?.name, ...(photo?.aliases ?? [])].filter((name): name is string => !!name?.trim()))];
+  return names.length ? { names, kind: 'city', photo: photo?.photo ?? null } : null;
+}
+
+/** The named places of the saved plan, by kind. Plain names saved before kinds existed stay unmarked. */
+function planPlaces(trip: TripState | undefined): PlaceCandidate[] {
+  return (trip?.plan?.days ?? []).flatMap((day) => dayPlaces(day).flatMap((place) => (place.kind ? [{ names: [place.name], kind: place.kind, photo: null }] : [])));
+}
+
+/** The word "flight" or "flights", marked with the flight icon on a turn with a flight search. */
+const FLIGHTS: PlaceCandidate = { names: ['flights', 'flight'], kind: 'flight', photo: null };
+
+/** How long a finished reply waits for its photos before it goes out with marks but no photos. */
+const PHOTO_LOOKUP_TIMEOUT_MS = 1000;
+
+/** The photos a lookup found, or none when it fails or runs past timeoutMs: photos never fail a reply or hold it up. */
+async function photosOrNone(lookup: () => Promise<CityPhoto[]>, timeoutMs: number, requestId: string): Promise<CityPhoto[]> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timedOut = new Promise<null>((resolve) => { timer = setTimeout(resolve, timeoutMs, null); });
+  try {
+    const photos = await Promise.race([Promise.resolve().then(lookup), timedOut]);
+    if (!photos) log('warn', 'manager.photo_lookup_timed_out', { requestId, timeoutMs });
+    return photos ?? [];
+  } catch (error) {
+    log('warn', 'manager.photo_lookup_failed', {
+      requestId,
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
+    return [];
+  } finally {
+    clearTimeout(timer);
+  }
+}
+```
+
+`TripState` and `FlightState` are our own trip and flight state types.
+
+### 8.3 Run options (so tests can inject a fake lookup)
+
+```ts
+export interface ManagerRunOptions {
+  // ...existing fields...
+  /** Substitute city photo lookup and wait, for tests. Production uses cityPhotosFor and PHOTO_LOOKUP_TIMEOUT_MS. */
+  photoLookup?: typeof cityPhotosFor;
+  photoTimeoutMs?: number;
+}
+// in the runner's option destructuring:
+const { /* ...existing... */ photoLookup = cityPhotosFor, photoTimeoutMs = PHOTO_LOOKUP_TIMEOUT_MS } = options;
+```
+
+### 8.4 Before the Manager run
+
+Capture what the hydration step compares against. Skip any line that already exists.
+
+```ts
+// Trip stores a new chip list each time its result is saved, so a different list means Trip ran.
+const tripChipsBefore = appContext.tripPlanner?.suggestions;
+// Likewise its options, which are replaced only when Trip suggests destinations.
+const tripOptionsBefore = appContext.tripPlanner?.options;
+```
+
+### 8.5 After the final output is sanitized
+
+This replaces "return the sanitized text":
+
+```ts
+const reply = String(result.finalOutput ?? '');
+const sanitized = sanitizeNoLinks(reply);
+assertNoLinks(sanitized.text);
+
+const tripChips = appContext.tripPlanner?.suggestions;
+const tripRan = tripChips !== tripChipsBefore && Array.isArray(tripChips);
+const flightSearched = flightTurn.flightRan && Boolean(appContext.flight.searchKey);
+const cities = [
+  // A saved plan is marked on any turn, so a day zoom answered without calling Trip is marked too.
+  ...(tripRan || appContext.tripPlanner?.plan
+    ? tripDestinations(appContext.tripPlanner, tripRan ? tripOptionsBefore : appContext.tripPlanner?.options)
+    : []),
+  ...(flightSearched ? routeCities(appContext.flight) : []),
+];
+const photos = cities.length ? await photosOrNone(() => photoLookup(cities), photoTimeoutMs, requestId) : [];
+const marked = markPlaces(sanitized.text, [
+  ...cities.flatMap((city) => cityCandidate(city, photos) ?? []),
+  ...planPlaces(appContext.tripPlanner),
+  ...(flightSearched ? [FLIGHTS] : []),
+]);
+assertOnlyIssuedLinks(marked.text, marked.places.map((place) => `place:${place.ref}`));
+
+// Anything else that reads the reply (for example chip de-duplication) keeps using sanitized.text.
+return {
+  ...existingResultFields,
+  output: marked.text,     // the text the client gets and the chat stores
+  places: marked.places,   // done.places, saved with the message
+};
+```
+
+The Manager's conversation history (SDK session) is not touched: the model keeps its plain reply.
+
+---
+
+## 9. The chat API and storage
+
+```ts
+// The gateway/runner result type:
+places?: PlaceMark[];
+
+// The final `done` payload, next to finalText:
+places: gatewayResult.places ?? [],
+
+// The stored assistant message (type and the write):
+places?: PlaceMark[];
+places: gatewayResult.places ?? [],
+```
+
+Loading a chat must return `message.places` unchanged.
+
+If partial text deltas are streamed to the client, they stay plain names. The marks arrive with `done`, whose `finalText` is the marked text, and the client re-renders the message there.
+
+---
+
+## 10. Tests
+
+Adapt these to our test framework; they're written for `node:test` with `assert`.
+
+### 10.1 Unit tests: the marker and the sanitizer
+
+```ts
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { markPlaces, type PlaceCandidate } from '<our path>/place-marks';
+import { assertOnlyIssuedLinks, sanitizeNoLinks } from '<our path>/link-sanitizer';
+
+const PHOTO = 'https://inventory.example/bali.jpg'; // test fixture only; production URLs come from the Inventory API
+const place = (name: string, kind = 'landmark', photo: string | null = null): PlaceCandidate => ({ names: [name], kind, photo });
+const FLIGHTS: PlaceCandidate = { names: ['flights', 'flight'], kind: 'flight', photo: null };
+
+test('first mention becomes a place: reference, keeping bold and spelling, listed in reply order', () => {
+  const { text, places } = markPlaces('Your **Bali** plan starts at Tirta Empul, then Bali again and tirta empul.', [
+    place('Tirta Empul', 'temple'), { names: ['Bali', 'Denpasar'], kind: 'city', photo: PHOTO },
+  ]);
+  assert.equal(text, 'Your **[Bali](place:1)** plan starts at [Tirta Empul](place:2), then Bali again and tirta empul.');
+  assert.deepEqual(places, [{ ref: '1', kind: 'city', photo: PHOTO }, { ref: '2', kind: 'temple', photo: null }]);
+  assert.equal(markPlaces('Land in Denpasar, then Bali.', [{ names: ['Bali', 'Denpasar'], kind: 'city', photo: PHOTO }]).text,
+    'Land in [Denpasar](place:1), then Bali.');
+});
+
+test('headings, struck text, code, existing links and parts of other words are left alone', () => {
+  const reply = '## Your Ubud plan\n\nNot ~~Ubud~~, try `Ubud` mode, a [Ubud guide](https://x.test), Ubudian food and Ubud-style coffee.';
+  assert.equal(markPlaces(reply, [place('Ubud', 'area')]).text,
+    '## Your Ubud plan\n\nNot ~~Ubud~~, try `Ubud` mode, a [Ubud guide](https://x.test), Ubudian food and [Ubud](place:1)-style coffee.');
+});
+
+test('a name that starts a longer name is not that place; the longest name wins', () => {
+  const tokyo = place('Tokyo', 'city');
+  assert.equal(markPlaces('**Day 2 — Tokyo Skytree + Asakusa (old Tokyo)**', [tokyo, place('Tokyo Skytree')]).text,
+    '**Day 2 — [Tokyo Skytree](place:1) + Asakusa (old [Tokyo](place:2))**');
+  assert.equal(markPlaces('Tokyo Tower at dusk, Tokyo Station at dawn.', [tokyo]).places.length, 0);
+  assert.equal(markPlaces('Tokyo station at dawn.', [tokyo]).text, '[Tokyo](place:1) station at dawn.');
+  assert.equal(markPlaces('In Tokyo I would stay in Shinjuku.', [tokyo]).text, 'In [Tokyo](place:1) I would stay in Shinjuku.');
+  assert.equal(markPlaces('Fly into New York City on Friday.', [place('New York', 'city'), place('New York City', 'city')]).text,
+    'Fly into [New York City](place:1) on Friday.');
+});
+
+test('the first "flight" or "flights" gets the flight mark, in any case', () => {
+  const { text, places } = markPlaces('Flights From Delhi to Dubai: three one-way flights.', [FLIGHTS, place('Dubai', 'city')]);
+  assert.equal(text, '[Flights](place:1) From Delhi to [Dubai](place:2): three one-way flights.');
+  assert.deepEqual(places.map((entry) => entry.kind), ['flight', 'city']);
+});
+
+test('only issued references pass; one the model wrote is removed first', () => {
+  assert.doesNotThrow(() => assertOnlyIssuedLinks('See [Bali](place:1).', ['place:1']));
+  assert.throws(() => assertOnlyIssuedLinks('See [Bali](place:2).', ['place:1']));
+  assert.throws(() => assertOnlyIssuedLinks('See [Bali](place:1) and https://evil.test.', ['place:1']));
+  assert.equal(sanitizeNoLinks('Stay in [Ubud](place:3) for the rice terraces.').text, 'Stay in Ubud for the rice terraces.');
+});
+```
+
+### 10.2 Unit tests: the Inventory-backed `cityPhotosFor`
+
+Use a stubbed Inventory client and check that:
+- it finds a destination by IATA code, else by city name;
+- it leaves out destinations with no image;
+- it collapses duplicate destinations into one call entry;
+- `photo` is exactly the URL the stub returned;
+- it makes one call per turn, if the API batches.
+
+### 10.3 Integration tests (scripted models, no network)
+
+- **A Trip turn that suggests options** (one city with an Inventory photo, one without) marks both city names at their first mention outside headings, and `result.places` is `[{ref:'1',kind:'city',photo:<url>},{ref:'2',kind:'city',photo:null}]`. The Manager's own `finalOutput` stays unmarked.
+- **A Trip turn that creates a plan** marks plan places with their kinds (temple, nature, area…).
+- **A plan saved with plain-string places** (an older plan) leaves those places unmarked, and the turn still works.
+- **A turn with no plan and no flight search** gets no marks: `places` is `[]`.
+- **A turn with a saved plan where the Manager answers without calling Trip** (e.g. "day 1 in detail") still marks the plan's city and places.
+- **A flight search turn** marks the first "flights" (kind `flight`) and the route cities.
+- **An Inventory lookup that throws, and one that never resolves** (run with `photoTimeoutMs: 20`): the reply keeps its marks with `photo: null`, a warning is logged, and the turn succeeds.
+- **The chat API's `done` event** carries `places` in reply order, and reloading the chat returns the same `message.places`.
+
+---
+
+## 11. Live check
+
+Run one real turn, "solo trip to tokyo 5 days", through the chat endpoint, and confirm:
+
+1. `done.finalText` contains `[Name](place:N)` links, and `done.places` has one entry per link, in order, with refs 1..N.
+2. The kinds look right, for example Sensō-ji `temple`, Nakamise-dōri `market`, Tokyo Skytree `landmark`, and Tokyo `city`.
+3. The Tokyo entry's `photo` is an Inventory API URL that loads in a browser. Every non-city entry has `photo: null`.
+4. The Manager's own stored conversation history has no `place:` links.
+5. With the Inventory API made unreachable, the same turn still answers within about one extra second, with marks and every `photo: null`.
+
+---
+
+## 12. Report back
+
+When done, report:
+
+- the files you changed and what changed in each;
+- whether Section 4 was needed, or production Trip already had kinds;
+- how `cityPhotosFor` maps to the Inventory API: which endpoint, the batching, and which image variant;
+- the tests you added and their results;
+- the live turn's `done.places`, and one sample `finalText` line.
