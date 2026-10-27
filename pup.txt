@@ -1,18 +1,12 @@
-Improve **Manager V2's response styling** by selectively adding lightweight icons/emojis directly through LLM-generated text.
+Investigate why **Manager V2's retry mechanism** is failing. Multiple conversations terminate around 30 seconds without retrying or recovering.
 
-### Requirements
+- Thoroughly review the retry documentation I've shared.
+- Inspect the current Manager streaming, timeout, error handling, and retry implementation.
+- Identify the exact root cause of the 30-second failures.
+- Compare the existing implementation against the documented retry strategy.
+- Propose a reliable solution that preserves streaming, conversation state, and tool execution without duplication.
+- Identify affected files and provide a minimal implementation and testing plan.
 
-- Inspect our existing client-side SVG icon hydration to understand which elements already have icons.
-- Identify a few meaningful places where the LLM can add icons directly, such as:
-  - ☀️ Morning
-  - 🌤️ Afternoon
-  - 🌙 Evening
-  - Other relevant itinerary sections, only when they improve readability.
-- **Avoid duplicate icons:** Never generate an icon for a location or element already handled by client-side hydration.
-- Keep icon usage minimal, contextual, and visually consistent. Don't add emojis to every heading or sentence.
-- Prefer simple Unicode emojis in the response rather than generating raw SVG markup.
-- Do not introduce extra LLM calls or unnecessary backend logic.
+**Manager V2 only. Do not modify Gateway V1.**
 
-First identify suitable places, then make minimal prompt improvements and test the output.
-
-**Goal:** Enhance readability with subtle, well-placed icons while preserving existing client-side SVG icon handling.
+**R&D and planning only — do not implement yet.** First provide evidence-based findings and the recommended approach.
