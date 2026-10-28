@@ -1,11 +1,24 @@
-Thoroughly review **`Migration-Docs.txt`** and compare it with our current production codebase.
+Explore our existing **Python Crawler Adapter** and **JavaScript Indexing Service** and plan the following architecture.
 
-- Identify what is **already implemented, partially implemented, and pending**.
-- Verify the integration between the Python Crawler Adapter and JavaScript RAG indexing service.
-- Identify missing functionality, dependencies, and potential integration gaps.
-- Prepare a clear, step-by-step implementation plan for the remaining work, with relevant file references.
-- Preserve existing working functionality and avoid unnecessary refactoring.
+### Expected Architecture
 
-**Scope:** Crawling-to-indexing integration and indexing only. Do not touch retrieval.
+1. **Crawler Adapter (Python):** Owns all crawling logic, configurations, rules, and worker execution. The JS service should not manage crawling configurations.
+2. **Indexing Service (JavaScript):** Calls the Crawler Adapter API to initiate crawling.
+3. **Webhook:** Once crawling completes, the Crawler Adapter notifies the JS service through a webhook.
+4. **Database:** Crawled content should be persisted so the JS service can retrieve it reliably.
+5. **Indexing:** The JS service reads the crawled content, performs chunking and embedding generation, and indexes it into the vector database.
 
-**Important:** Planning only. Do not modify any code yet. First present the implementation status and proposed development plan for my review.
+### Your Task
+
+- Thoroughly inspect both codebases and understand their existing implementations.
+- Identify what is already implemented, partially implemented, and missing.
+- Determine the necessary changes in both services to achieve this architecture.
+- Design reliable API communication, webhook handling, database integration, and indexing execution.
+- Prepare a clear, file-specific implementation plan.
+
+**Important:**
+- Focus only on crawling and indexing. Do not modify retrieval.
+- Reuse existing functionality and avoid unnecessary abstractions.
+- **Planning only. Do not implement yet.**
+
+**Goal:** Establish a clean, reliable architecture where Python handles crawling and JavaScript handles indexing, with clearly separated responsibilities.
