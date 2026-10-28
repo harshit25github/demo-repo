@@ -1,22 +1,22 @@
-**Task: Build an Airline Data Coverage & Fetch Failure Analysis Suite**
+Enhance our **Manager Agent prompt** with the following improvements:
 
-We currently extract airline documents from the CheapOair airline directory, process them into chunks, and index them in Qdrant for retrieval.
+**1. Flight Agent Prioritization**
+- When users mention only a destination (e.g., "Dubai", "Flights to Tokyo", "Paris next month"), prioritize the **Flight Agent**.
+- Do not invoke Trip Planner unless the user explicitly requests trip planning or the conversation context clearly indicates itinerary-related intent.
+- Avoid unnecessary parallel specialist calls.
 
-I want you to thoroughly analyze the existing ingestion and retrieval workflow and build a diagnostic suite that identifies:
+**2. Intelligent Intent Understanding**
+- Improve the Manager's ability to understand short, ambiguous, incomplete, and multi-turn queries.
+- Use conversation history and current context to infer the user's actual intent.
+- Route intelligently without unnecessary clarification or tool calls.
+- Avoid rigid keyword-based routing; use contextual reasoning.
 
-1. **Missing Baggage Information:** Airlines whose indexed documents lack meaningful baggage details, such as checked baggage allowance, weight limits, or baggage policies.
-2. **Content Unavailable:** Airlines whose source pages are accessible but genuinely lack the required baggage information.
-3. **Fetch Failures:** Airlines whose data cannot be retrieved due to broken pages, redirect loops, HTTP errors, timeouts, or similar issues.
-4. **Processing Failures:** Airlines whose source content exists but is lost during extraction, chunking, or indexing.
+**3. Contextual Icon Usage**
+- Add a few meaningful Unicode icons/emojis directly in the Manager's text responses to improve readability and visual appeal.
+- **Never duplicate client-side SVG icons**, especially for locations already handled by icon hydration.
+- Use icons selectively for relevant headings or sections, not every sentence.
+- Keep responses clean, concise, and professionally formatted.
 
-**Expected Outcome:**
-- Generate a categorized report listing affected airlines, source URLs, missing information, and failure reasons.
-- Verify suspected page failures before classifying an airline as unavailable.
-- Include diagnostic evidence to distinguish genuine source issues from failures in our pipeline.
-- Identify possible solutions for each failure category.
+**Important:** Focus on minimal prompt-level improvements. Preserve existing tools, agent architecture, and functionality. Avoid unnecessary code changes.
 
-**Instructions:**
-
-First, inspect the existing codebase and understand the complete workflow. Then design and implement a reusable diagnostic suite using the current architecture.
-
-Avoid unnecessary abstractions or changes to the existing production pipeline. Focus on accurate classification, actionable reporting, and reliable verification.
+Test representative scenarios and verify routing accuracy, response quality, and duplicate-icon prevention.
