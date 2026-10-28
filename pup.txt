@@ -1,34 +1,28 @@
-Update the **Flight Agent in both Gateway V1 and Manager V2** to handle missing trip types and ambiguous destinations correctly.
+Enhance **location ambiguity handling in the Flight Agent** for both **Gateway V1 and Manager V2**.
 
-### 1. Location Ambiguity
-- Ask for clarification whenever a destination has multiple plausible matches.
-- Examples:
-  - "Delhi to Kochi" → Kochi, India or Kōchi, Japan.
-  - "Pragway" → Could mean Prague, Czech Republic, or Paraguay, South America.
-- Use conversation context when reliable. Never assume a destination when genuine ambiguity remains.
+### Requirements
 
-### 2. Trip Type — Three-Level Validation
+1. **Destination API Validation**
+   - When a user provides a location, use our existing Destination API within the Flight Search tool to resolve valid destinations and airports.
+   - Use the tool's actual feedback instead of relying solely on LLM assumptions.
 
-**A. Agent Prompt**
-- Remove the default `one-way` assumption.
-- If trip type is missing, ask the user whether they want one-way, round-trip, or multi-city.
-- Do not call `flight_search` until the trip type is confirmed.
+2. **Intelligent Location Clarification**
+   - If multiple plausible locations or airports are returned, present relevant options and ask the user to select.
+   - Example: "Paraguay" → Retrieve available airports/cities in Paraguay and offer valid choices instead of simply asking "Where in Paraguay?"
+   - Handle misspellings, ambiguous city names, and country-level destinations intelligently.
+   - Avoid unnecessary clarification when the location is already clear and supported.
 
-**B. Flight Search Tool**
-- Add server-side validation for missing or invalid trip types.
-- If the Agent accidentally calls `flight_search` without a valid trip type, return clear, actionable feedback instructing it to ask the user.
-- Reject the request before executing the search. Never silently default to one-way.
+3. **Preserve Flight Search Rules**
+   - Destination lookup must not initiate a flight search prematurely.
+   - Continue requiring a confirmed trip type before executing `flight_search`.
+   - Preserve confirmed locations and search criteria across turns.
 
-**C. Initial Context / Skeleton**
-- Inspect context initialization, search criteria, schemas, and default-value assignments.
-- Remove any hardcoded `one-way` defaults.
-- Keep trip type unset until explicitly provided or reliably established from conversation context.
+4. **Implementation & Testing**
+   - Inspect the existing Destination API and its response structure.
+   - Apply consistent behavior across Gateway and Manager.
+   - Test ambiguous locations, multiple airports, country-level queries, misspellings, and follow-up selections.
+   - Ensure tool feedback is properly communicated to users.
 
-### 3. Verification
-- Apply consistently across both Gateway and Manager flows.
-- Test missing trip types, ambiguous locations, spelling mistakes, tool validation feedback, and multi-turn clarifications.
-- Ensure previously confirmed trip types remain preserved.
+**Goal:** Use real destination data to provide accurate, selectable location options rather than making assumptions or asking vague clarification questions.
 
-**Goal:** Enforce these rules at both the **prompt and tool levels**, while removing conflicting defaults from context initialization.
-
-Keep changes minimal and preserve existing functionality.
+Keep changes minimal and reuse existing tools and logic.
