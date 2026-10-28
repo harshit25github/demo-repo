@@ -1,9 +1,22 @@
-Analyze this codebase and create a docs/architecture/ folder with
-Markdown files containing Mermaid diagrams:
-1. overview.md – system-level components and how they connect
-2. modules.md – main folders/modules and their responsibilities
-3. flows.md – sequence diagrams for the 3-5 most important user flows
-4. data-model.md – main entities and relationships
-Keep each diagram under ~15 boxes; split into multiple diagrams if needed.
-Below each diagram, explain it in plain language for someone new to the code.
-List anything you were unsure about at the end of each file.
+**Task: Build an Airline Data Coverage & Fetch Failure Analysis Suite**
+
+We currently extract airline documents from the CheapOair airline directory, process them into chunks, and index them in Qdrant for retrieval.
+
+I want you to thoroughly analyze the existing ingestion and retrieval workflow and build a diagnostic suite that identifies:
+
+1. **Missing Baggage Information:** Airlines whose indexed documents lack meaningful baggage details, such as checked baggage allowance, weight limits, or baggage policies.
+2. **Content Unavailable:** Airlines whose source pages are accessible but genuinely lack the required baggage information.
+3. **Fetch Failures:** Airlines whose data cannot be retrieved due to broken pages, redirect loops, HTTP errors, timeouts, or similar issues.
+4. **Processing Failures:** Airlines whose source content exists but is lost during extraction, chunking, or indexing.
+
+**Expected Outcome:**
+- Generate a categorized report listing affected airlines, source URLs, missing information, and failure reasons.
+- Verify suspected page failures before classifying an airline as unavailable.
+- Include diagnostic evidence to distinguish genuine source issues from failures in our pipeline.
+- Identify possible solutions for each failure category.
+
+**Instructions:**
+
+First, inspect the existing codebase and understand the complete workflow. Then design and implement a reusable diagnostic suite using the current architecture.
+
+Avoid unnecessary abstractions or changes to the existing production pipeline. Focus on accurate classification, actionable reporting, and reliable verification.
