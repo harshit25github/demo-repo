@@ -1,57 +1,16 @@
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://local.crawler/schemas/crawl-policies.schema.json",
-  "title": "Crawler policy registry",
-  "type": "object",
-  "additionalProperties": false,
-  "required": ["schemaVersion", "topicUrlPatterns", "airlines"],
-  "properties": {
-    "schemaVersion": { "const": 1 },
-    "topicUrlPatterns": {
-      "type": "array",
-      "minItems": 1,
-      "uniqueItems": true,
-      "items": { "type": "string", "minLength": 1 }
-    },
-    "airlines": {
-      "type": "object",
-      "minProperties": 1,
-      "additionalProperties": { "$ref": "#/$defs/airlinePolicy" }
-    }
-  },
-  "$defs": {
-    "airlinePolicy": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["airlineCode", "airlineName", "extraDepth", "maxAdditionalPages", "allowedHostnames", "allowedUrlPatterns", "seedUrls", "skipIngestion"],
-      "properties": {
-        "airlineCode": { "type": "string", "pattern": "^[A-Z0-9]{2}$" },
-        "airlineName": { "type": "string", "minLength": 1 },
-        "extraDepth": { "type": "integer", "enum": [0, 1] },
-        "maxAdditionalPages": { "type": "integer", "minimum": 1, "maximum": 100 },
-        "allowedHostnames": {
-          "type": "array", "minItems": 1, "uniqueItems": true,
-          "items": { "type": "string", "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*(?:\\.[a-z]{2,})?$" }
-        },
-        "allowedUrlPatterns": {
-          "type": "array", "minItems": 1, "uniqueItems": true,
-          "items": { "type": "string", "pattern": "^\\*/" }
-        },
-        "seedUrls": {
-          "type": "array", "minItems": 1, "uniqueItems": true,
-          "items": { "type": "string", "format": "uri", "pattern": "^https?://" }
-        },
-        "skipIngestion": { "type": "boolean" }
-      }
-    }
-  }
-}
-{
-  "schemaVersion": 1,
-  "dynamicHosts": [
-    "ajet.com",
-    "www.elal.com",
-    "www.tigerairtw.com",
-    "www.suncountry.com"
-  ]
-}
+The crawling and indexing implementation is already completed. I now want to **understand the actual code and end-to-end execution flow**.
+
+Please inspect both the **JavaScript Indexing Service** and **Python Crawler Adapter** and explain:
+
+1. **Service Responsibilities:** What exactly does each service handle?
+2. **API Communication:** Which APIs are called, what payload does the Indexing Service send, and what does the Crawler Adapter return?
+3. **Crawler Execution:** How are URLs discovered, crawling configurations applied, and workers executed?
+4. **Webhooks:** How does the Crawler Adapter notify the Indexing Service, and what happens after completion?
+5. **Indexing Flow:** How is crawled data transferred, processed, chunked, and indexed into the database and vector DB?
+6. **Code References:** Show exact file paths, important functions, and actual request/response examples.
+
+Explain the complete flow **step by step in simple English**, with a sequence diagram if useful.
+
+**Important:** This is a code walkthrough only. Do not modify, refactor, or execute anything. Focus on crawling and indexing, not retrieval.
+
+**Goal:** Help me clearly understand how both services communicate and how the entire implementation works.
