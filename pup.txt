@@ -1,34 +1,37 @@
-Thoroughly review and enhance our **Python Crawler Adapter and JavaScript Indexing Service**, focusing exclusively on the **Airline Baggage Directory**.
+Thoroughly investigate and improve our Airline Baggage Directory crawling and indexing quality.
 
-### Objectives
+I've identified two major issues:
 
-1. **Code Review:** Identify performance, reliability, configuration, and architectural improvements in both services.
-2. **Advanced Crawl4AI:** Explore and implement suitable advanced configurations to maximize crawling success, including dynamic content handling, extraction accuracy, concurrency, and retry strategies.
-3. **End-to-End Execution:** Run the complete Baggage Directory crawling and indexing pipeline.
-4. **Airline-Level Verification:** Inspect every airline's crawling result. Identify failed URLs, missing content, incomplete baggage information, and extraction issues.
-5. **Iterative Improvements:** Investigate failures, implement fixes, rerun affected airlines, and continue improving until we achieve the highest practical crawling coverage.
-6. **Indexing Validation:** Verify successful content extraction, chunk generation, database storage, and vector DB indexing.
+1. Crawling Depth: Some airlines provide baggage details on secondary pages, but our current depth-1 crawling misses them.
+2. Image-Based Content: Some airlines display baggage allowances, weights, or policies inside images, which our text-only extraction cannot capture.
 
-### Important Instructions
+Your Task
 
-- **Baggage Directory only.** Do not crawl or index unrelated websites.
-- Prioritize both **crawling success rate and actual baggage-content quality**, not just successful HTTP responses.
-- Respect website access restrictions and rate limits.
-- Preserve existing working functionality and avoid unnecessary abstractions.
-- Ensure retries and reruns do not create duplicate indexing records.
-- Make technical decisions independently; I will be away from the system.
-- Do not stop at the first failure. Diagnose, fix, and retest wherever feasible.
+- Audit every indexed airline and verify whether the actual baggage information is present in our indexed content.
+- Identify missing or incomplete information and investigate its root cause for each airline.
+- Explore and implement intelligent multi-level crawling using Crawl4AI, following relevant baggage links without crawling unnecessary pages.
+- Investigate reliable extraction of baggage information from images, tables, PDFs, and dynamic content wherever applicable.
+- Improve crawling configurations, extraction, chunking, and indexing based on the findings.
+- Independently diagnose issues, implement fixes, and rerun affected airlines until the highest practical content coverage is achieved.
+- Validate that extracted baggage details are accurate, relevant, and correctly indexed in the vector DB.
 
-### Final Report
+Important
 
-Provide:
-- Total airlines/URLs processed.
-- Crawling and indexing success percentages.
-- Airlines successfully indexed with relevant baggage information.
-- Failed or partially indexed airlines, with reasons.
-- Improvements implemented and files modified.
-- Remaining limitations and recommended next steps.
+- Focus exclusively on the Baggage Directory.
+- Measure actual baggage-information coverage, not just successful crawling or HTTP responses.
+- Avoid duplicate records, unnecessary crawling, and excessive complexity.
+- Respect website restrictions and rate limits.
+- Make technical decisions independently. Don't wait for my approval for routine fixes.
 
-**Goal:** Build a highly reliable, production-ready baggage crawling and indexing pipeline with maximum practical coverage.
+Final Report
 
-**You have approval to inspect, implement, execute, debug, and retest within this scope.** Avoid destructive operations or unrelated production changes.
+Provide an airline-wise audit showing:
+
+- Missing baggage information and root causes.
+- Fixes implemented and retest results.
+- Successfully indexed versus partially indexed airlines.
+- Remaining limitations and overall content-coverage percentage.
+
+Goal: Achieve the highest practical accuracy and completeness of baggage information across all airlines, including content hidden behind secondary links or embedded in images.
+
+You have approval to investigate, implement, test, and iteratively improve the existing pipeline within this scope.
