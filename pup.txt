@@ -1,22 +1,34 @@
-Enhance our **Manager Agent prompt** with the following improvements:
+Update the **Flight Agent in both Gateway V1 and Manager V2** to handle missing trip types and ambiguous destinations correctly.
 
-**1. Flight Agent Prioritization**
-- When users mention only a destination (e.g., "Dubai", "Flights to Tokyo", "Paris next month"), prioritize the **Flight Agent**.
-- Do not invoke Trip Planner unless the user explicitly requests trip planning or the conversation context clearly indicates itinerary-related intent.
-- Avoid unnecessary parallel specialist calls.
+### 1. Location Ambiguity
+- Ask for clarification whenever a destination has multiple plausible matches.
+- Examples:
+  - "Delhi to Kochi" → Kochi, India or Kōchi, Japan.
+  - "Pragway" → Could mean Prague, Czech Republic, or Paraguay, South America.
+- Use conversation context when reliable. Never assume a destination when genuine ambiguity remains.
 
-**2. Intelligent Intent Understanding**
-- Improve the Manager's ability to understand short, ambiguous, incomplete, and multi-turn queries.
-- Use conversation history and current context to infer the user's actual intent.
-- Route intelligently without unnecessary clarification or tool calls.
-- Avoid rigid keyword-based routing; use contextual reasoning.
+### 2. Trip Type — Three-Level Validation
 
-**3. Contextual Icon Usage**
-- Add a few meaningful Unicode icons/emojis directly in the Manager's text responses to improve readability and visual appeal.
-- **Never duplicate client-side SVG icons**, especially for locations already handled by icon hydration.
-- Use icons selectively for relevant headings or sections, not every sentence.
-- Keep responses clean, concise, and professionally formatted.
+**A. Agent Prompt**
+- Remove the default `one-way` assumption.
+- If trip type is missing, ask the user whether they want one-way, round-trip, or multi-city.
+- Do not call `flight_search` until the trip type is confirmed.
 
-**Important:** Focus on minimal prompt-level improvements. Preserve existing tools, agent architecture, and functionality. Avoid unnecessary code changes.
+**B. Flight Search Tool**
+- Add server-side validation for missing or invalid trip types.
+- If the Agent accidentally calls `flight_search` without a valid trip type, return clear, actionable feedback instructing it to ask the user.
+- Reject the request before executing the search. Never silently default to one-way.
 
-Test representative scenarios and verify routing accuracy, response quality, and duplicate-icon prevention.
+**C. Initial Context / Skeleton**
+- Inspect context initialization, search criteria, schemas, and default-value assignments.
+- Remove any hardcoded `one-way` defaults.
+- Keep trip type unset until explicitly provided or reliably established from conversation context.
+
+### 3. Verification
+- Apply consistently across both Gateway and Manager flows.
+- Test missing trip types, ambiguous locations, spelling mistakes, tool validation feedback, and multi-turn clarifications.
+- Ensure previously confirmed trip types remain preserved.
+
+**Goal:** Enforce these rules at both the **prompt and tool levels**, while removing conflicting defaults from context initialization.
+
+Keep changes minimal and preserve existing functionality.
