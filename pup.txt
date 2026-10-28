@@ -1,24 +1,158 @@
-Explore our existing **Python Crawler Adapter** and **JavaScript Indexing Service** and plan the following architecture.
-
-### Expected Architecture
-
-1. **Crawler Adapter (Python):** Owns all crawling logic, configurations, rules, and worker execution. The JS service should not manage crawling configurations.
-2. **Indexing Service (JavaScript):** Calls the Crawler Adapter API to initiate crawling.
-3. **Webhook:** Once crawling completes, the Crawler Adapter notifies the JS service through a webhook.
-4. **Database:** Crawled content should be persisted so the JS service can retrieve it reliably.
-5. **Indexing:** The JS service reads the crawled content, performs chunking and embedding generation, and indexes it into the vector database.
-
-### Your Task
-
-- Thoroughly inspect both codebases and understand their existing implementations.
-- Identify what is already implemented, partially implemented, and missing.
-- Determine the necessary changes in both services to achieve this architecture.
-- Design reliable API communication, webhook handling, database integration, and indexing execution.
-- Prepare a clear, file-specific implementation plan.
-
-**Important:**
-- Focus only on crawling and indexing. Do not modify retrieval.
-- Reuse existing functionality and avoid unnecessary abstractions.
-- **Planning only. Do not implement yet.**
-
-**Goal:** Establish a clean, reliable architecture where Python handles crawling and JavaScript handles indexing, with clearly separated responsibilities.
+{
+  "schemaVersion": 1,
+  "topicUrlPatterns": [
+    "*bag*", "*luggage*", "*carry-on*", "*carryon*", "*restriction*",
+    "*restricted*", "*prohibited*", "*special-assistance*", "*special-needs*",
+    "*accessib*", "*disabilit*", "*special-item*", "*specialty*", "*sport*",
+    "*mobility*", "*medical-device*", "*pet*", "*animal*", "*fare*", "*refund*",
+    "*cancel*", "*change*", "*ticket*", "*fee*", "*condition*carriage*",
+    "*contract*carriage*"
+  ],
+  "airlines": {
+    "american": {
+      "airlineCode": "AA", "airlineName": "American Airlines", "extraDepth": 1,
+      "maxAdditionalPages": 20, "allowedHostnames": ["aa.com", "www.aa.com"],
+      "allowedUrlPatterns": ["*/i18n/travel-info/*", "*/i18n/customer-service/*"],
+      "seedUrls": ["https://www.aa.com/web/i18n/travel-info/baggage/checked-baggage-policy.html"],
+      "skipIngestion": false
+    },
+    "united": {
+      "airlineCode": "UA", "airlineName": "United Airlines", "extraDepth": 1,
+      "maxAdditionalPages": 20, "allowedHostnames": ["united.com", "www.united.com"],
+      "allowedUrlPatterns": ["*/en/*/fly/*", "*/ual/en/*", "*/web/en-*", "*/web/en/*"],
+      "seedUrls": ["https://www.united.com/en/us/fly/baggage.html"], "skipIngestion": false
+    },
+    "frontier": {
+      "airlineCode": "F9", "airlineName": "Frontier Airlines", "extraDepth": 1,
+      "maxAdditionalPages": 20,
+      "allowedHostnames": ["flyfrontier.com", "www.flyfrontier.com", "faq.flyfrontier.com"],
+      "allowedUrlPatterns": ["*/travel/*", "*/travel-information/*", "*/help/*", "*/articles/*"],
+      "seedUrls": ["https://www.flyfrontier.com/travel-information/baggage"], "skipIngestion": false
+    },
+    "volaris": {
+      "airlineCode": "Y4", "airlineName": "Volaris", "extraDepth": 1,
+      "maxAdditionalPages": 20,
+      "allowedHostnames": ["volaris.com", "www.volaris.com", "cms.volaris.com"],
+      "allowedUrlPatterns": ["*/en/travel-info/*", "*/en/useful-tips/*", "*/en/traveling-with-volaris/*"],
+      "seedUrls": ["https://cms.volaris.com/en/travel-info/baggage-policy/"], "skipIngestion": false
+    },
+    "jetblue": {
+      "airlineCode": "B6", "airlineName": "JetBlue Airways", "extraDepth": 1,
+      "maxAdditionalPages": 20,
+      "allowedHostnames": ["jetblue.com", "www.jetblue.com", "help.jetblue.com"],
+      "allowedUrlPatterns": ["*/at-the-airport/*", "*/help/*", "*/traveling-together/*", "*/flying-with-us/*", "*/s/article/*"],
+      "seedUrls": ["https://www.jetblue.com/at-the-airport/baggage-information"], "skipIngestion": false
+    },
+    "air-canada": {
+      "airlineCode": "AC", "airlineName": "Air Canada", "extraDepth": 1,
+      "maxAdditionalPages": 20, "allowedHostnames": ["aircanada.com", "www.aircanada.com"],
+      "allowedUrlPatterns": ["*/ca/en/aco/home/plan/*", "*/ca/en/aco/home/fly/*", "*/ca/en/aco/home/customer-support/*", "*/us/en/aco/home/plan/*", "*/us/en/aco/home/fly/*", "*/us/en/aco/home/customer-support/*"],
+      "seedUrls": ["https://www.aircanada.com/us/en/aco/home/plan/baggage/checked.html"], "skipIngestion": false
+    },
+    "westjet": {
+      "airlineCode": "WS", "airlineName": "WestJet Airlines", "extraDepth": 1,
+      "maxAdditionalPages": 20, "allowedHostnames": ["westjet.com", "www.westjet.com"],
+      "allowedUrlPatterns": ["*/en-ca/baggage*", "*/en-ca/pets*", "*/en-ca/help*", "*/en-ca/special-needs*", "*/en-ca/legal*", "*/en-ca/flights/fees*"],
+      "seedUrls": ["https://www.westjet.com/en-ca/baggage"], "skipIngestion": false
+    },
+    "alaska": {
+      "airlineCode": "AS", "airlineName": "Alaska Airlines", "extraDepth": 1,
+      "maxAdditionalPages": 20, "allowedHostnames": ["alaskaair.com", "www.alaskaair.com"],
+      "allowedUrlPatterns": ["*/content/travel-info/*", "*/content/fly/*", "*/content/legal/*", "*/content/about-us/customer-commitment/*"],
+      "seedUrls": ["https://www.alaskaair.com/content/travel-info/baggage/checked-bags", "https://www.alaskaair.com/content/travel-info/baggage/carry-on-luggage"],
+      "skipIngestion": false
+    },
+    "copa": {
+      "airlineCode": "CM", "airlineName": "Copa Airlines", "extraDepth": 1,
+      "maxAdditionalPages": 20,
+      "allowedHostnames": ["copaair.com", "www.copaair.com", "help.copaair.com"],
+      "allowedUrlPatterns": ["*/en-*/travel-information/*", "*/en-*/customer-service/*", "*/en/travel-information/*", "*/en/customer-service/*", "*/hc/en-us/articles/*", "*/hc/en-us/sections/*"],
+      "seedUrls": ["https://www.copaair.com/en-gs/travel-information/baggage-information/", "https://help.copaair.com/hc/en-us/articles/31677431132695-What-is-Copa-Airlines-baggage-policy", "https://help.copaair.com/hc/en-us/articles/360051189074-What-are-the-fare-classes-Copa-Airlines-offers"],
+      "skipIngestion": false
+    },
+    "aeromexico": {
+      "airlineCode": "AM", "airlineName": "Aeromexico", "extraDepth": 1,
+      "maxAdditionalPages": 20, "allowedHostnames": ["aeromexico.com", "www.aeromexico.com"],
+      "allowedUrlPatterns": ["*/en-us/travel-information/*", "*/en-us/informacion-de-vuelos/*"],
+      "seedUrls": ["https://www.aeromexico.com/en-us/travel-information/baggage"], "skipIngestion": false
+    },
+    "flair": {
+      "airlineCode": "F8", "airlineName": "Flair Airlines", "extraDepth": 1,
+      "maxAdditionalPages": 20, "allowedHostnames": ["flyflair.com", "www.flyflair.com"],
+      "allowedUrlPatterns": ["*/travel-info/*", "*/fly-flair/*", "*/customer-service/*", "*/policies/*", "*/optional-services/*"],
+      "seedUrls": ["https://www.flyflair.com/travel-info/baggage"], "skipIngestion": false
+    },
+    "avianca": {
+      "airlineCode": "AV", "airlineName": "Avianca", "extraDepth": 1,
+      "maxAdditionalPages": 20,
+      "allowedHostnames": ["avianca.com", "www.avianca.com", "ayuda.avianca.com"],
+      "allowedUrlPatterns": ["*/en/my-booking/prepare-your-trip/*", "*/en/information-and-help/*", "*/en/your-booking/changes-and-refunds/*", "*/hc/en-us/articles/*", "*/hc/en-us/sections/*"],
+      "seedUrls": ["https://www.avianca.com/en/my-booking/prepare-your-trip/baggage"], "skipIngestion": false
+    },
+    "delta": {
+      "airlineCode": "DL", "airlineName": "Delta Air Lines", "extraDepth": 1,
+      "maxAdditionalPages": 20, "allowedHostnames": ["delta.com", "www.delta.com"],
+      "allowedUrlPatterns": ["*/us/en/baggage/*", "*/us/en/pet-travel/*", "*/us/en/change-cancel/*", "*/us/en/special-circumstances/*", "*/us/en/children-infant-travel/*", "*/us/en/legal/*", "*/apac/en/baggage/*", "*/apac/en/pet-travel/*"],
+      "seedUrls": ["https://www.delta.com/us/en/baggage/overview"], "skipIngestion": false
+    },
+    "turkish": {
+      "airlineCode": "TK", "airlineName": "Turkish Airlines", "extraDepth": 1,
+      "maxAdditionalPages": 20,
+      "allowedHostnames": ["turkishairlines.com", "www.turkishairlines.com"],
+      "allowedUrlPatterns": ["*/en-in/any-questions/*", "*/en-us/any-questions/*", "*/en-int/any-questions/*", "*/en-in/additional-services/*", "*/en-us/additional-services/*", "*/en-int/additional-services/*"],
+      "seedUrls": ["https://www.turkishairlines.com/en-in/any-questions/baggage-information/", "https://www.turkishairlines.com/en-int/any-questions/carry-on-baggage/"],
+      "skipIngestion": false
+    },
+    "latam": {
+      "airlineCode": "LA", "airlineName": "LATAM Airlines", "extraDepth": 1,
+      "maxAdditionalPages": 20,
+      "allowedHostnames": ["latam.com", "www.latam.com", "latamairlines.com", "www.latamairlines.com"],
+      "allowedUrlPatterns": ["*/us/en/experience/*", "*/us/en/help-center/*", "*/en_us/travel-information/*"],
+      "seedUrls": ["https://www.latamairlines.com/us/en/experience/prepare-your-trip/baggage"], "skipIngestion": false
+    },
+    "etihad": {
+      "airlineCode": "EY", "airlineName": "Etihad Airways", "extraDepth": 1,
+      "maxAdditionalPages": 20, "allowedHostnames": ["etihad.com", "www.etihad.com"],
+      "allowedUrlPatterns": ["*/en/help/*", "*/en-us/help/*", "*/en/before-you-fly/*", "*/en-us/before-you-fly/*", "*/en/plan/travel-companion/*", "*/en-us/plan/travel-companion/*"],
+      "seedUrls": ["https://www.etihad.com/en-us/help/baggage-information"], "skipIngestion": false
+    },
+    "qatar": {
+      "airlineCode": "QR", "airlineName": "Qatar Airways", "extraDepth": 1,
+      "maxAdditionalPages": 20,
+      "allowedHostnames": ["qatarairways.com", "www.qatarairways.com"],
+      "allowedUrlPatterns": ["*/en/baggage*", "*/en-us/baggage*", "*/en/family*", "*/en-us/family*", "*/en/services*", "*/en-us/services*", "*/en/travel-alerts*", "*/en-us/travel-alerts*", "*/en/legal*", "*/en-us/legal*"],
+      "seedUrls": ["https://www.qatarairways.com/en-us/baggage.html"], "skipIngestion": false
+    },
+    "vivaaerobus-com": {
+      "airlineCode": "VB", "airlineName": "Viva", "extraDepth": 1,
+      "maxAdditionalPages": 20,
+      "allowedHostnames": ["vivaaerobus.com", "www.vivaaerobus.com"],
+      "allowedUrlPatterns": ["*/en/info/get-ready-to-fly/*", "*/en-us/info/get-ready-to-fly/*", "*/en/info/policies/*", "*/en-us/info/policies/*"],
+      "seedUrls": ["https://www.vivaaerobus.com/en-us/info/get-ready-to-fly/baggage-policies"], "skipIngestion": false
+    },
+    "philippine": {
+      "airlineCode": "PR", "airlineName": "Philippine Airlines", "extraDepth": 1,
+      "maxAdditionalPages": 20,
+      "allowedHostnames": ["philippineairlines.com", "www.philippineairlines.com"],
+      "allowedUrlPatterns": ["*/before-you-fly/*", "*/travel-information/*", "*/about-us/legal-notices/*"],
+      "seedUrls": ["https://www.philippineairlines.com/ph/en/before-you-fly/baggage-information/baggage-allowance/baggage-allowance-fees.html"],
+      "skipIngestion": false
+    },
+    "ethiopian": {
+      "airlineCode": "ET", "airlineName": "Ethiopian Airlines", "extraDepth": 1,
+      "maxAdditionalPages": 20,
+      "allowedHostnames": ["ethiopianairlines.com", "www.ethiopianairlines.com"],
+      "allowedUrlPatterns": ["*/in/information/*", "*/us/information/*", "*/aa/information/*"],
+      "seedUrls": ["https://www.ethiopianairlines.com/in/information/baggage-information/free-baggage-allowance"],
+      "skipIngestion": false
+    },
+    "southwest": {
+      "airlineCode": "WN", "airlineName": "Southwest Airlines", "extraDepth": 1,
+      "maxAdditionalPages": 20,
+      "allowedHostnames": ["southwest.com", "www.southwest.com", "support.southwest.com"],
+      "allowedUrlPatterns": ["*/help/*", "*/helpcenter/article/*", "*/helpcenter/s/article/*", "*/helpcenter/topic/*"],
+      "seedUrls": ["https://support.southwest.com/helpcenter/article/checked-baggage-policy", "https://support.southwest.com/helpcenter/article/carryon-baggage-policy"],
+      "skipIngestion": false
+    }
+  }
+}
