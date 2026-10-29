@@ -1,37 +1,31 @@
-Thoroughly investigate and improve our Airline Baggage Directory crawling and indexing quality.
+We need to **rebuild our Airline Baggage RAG collection for October 29, 2026**, optimize retrieval, and thoroughly validate the complete pipeline.
 
-I've identified two major issues:
+### 1. Review Retrieval Strategy
+- Inspect our existing retrieval implementation and identify possible improvements.
+- **First prioritize increasing the retrieved chunk limit (`topK`)**, rather than adding custom filtering or complex retrieval logic.
+- Test progressively with different limits (5, 8, 10, 12, 15) and identify the best balance between accuracy, relevance, latency, and token usage.
+- Preserve the legacy retrieval approach if it performs well. Introduce additional logic only when testing demonstrates a clear need.
 
-1. Crawling Depth: Some airlines provide baggage details on secondary pages, but our current depth-1 crawling misses them.
-2. Image-Based Content: Some airlines display baggage allowances, weights, or policies inside images, which our text-only extraction cannot capture.
+### 2. Rebuild the Collection
+- Create a fresh collection using our existing naming convention for **October 29**.
+- Run the complete Airline Baggage Directory crawling and indexing pipeline end-to-end.
+- Verify successful indexing, chunk generation, and vector DB storage.
+- Delete the older **October 28** collection only after confirming the new collection is healthy and no active service depends on the old one.
 
-Your Task
+### 3. Thorough Retrieval Testing
+- Test baggage-related queries across different airlines, including checked baggage, cabin baggage, weight limits, and allowances.
+- Verify that retrieved chunks contain the actual information needed to answer each query.
+- Compare retrieval results across different `topK` values.
+- Identify failures, irrelevant chunks, and missing information.
+- Independently implement necessary improvements and rerun tests until retrieval quality is satisfactory.
 
-- Audit every indexed airline and verify whether the actual baggage information is present in our indexed content.
-- Identify missing or incomplete information and investigate its root cause for each airline.
-- Explore and implement intelligent multi-level crawling using Crawl4AI, following relevant baggage links without crawling unnecessary pages.
-- Investigate reliable extraction of baggage information from images, tables, PDFs, and dynamic content wherever applicable.
-- Improve crawling configurations, extraction, chunking, and indexing based on the findings.
-- Independently diagnose issues, implement fixes, and rerun affected airlines until the highest practical content coverage is achieved.
-- Validate that extracted baggage details are accurate, relevant, and correctly indexed in the vector DB.
+### Important
+- **Airline Baggage Directory only.**
+- Avoid unnecessary custom filters, extra retrieval layers, wrappers, or overengineering.
+- Prefer simple configuration improvements before architectural changes.
+- Reuse existing implementations wherever possible.
+- Make technical decisions independently and complete the execution and verification.
 
-Important
+**Final Report:** Collection details, indexing coverage, retrieval accuracy, optimal `topK`, improvements made, and remaining limitations.
 
-- Focus exclusively on the Baggage Directory.
-- Measure actual baggage-information coverage, not just successful crawling or HTTP responses.
-- Avoid duplicate records, unnecessary crawling, and excessive complexity.
-- Respect website restrictions and rate limits.
-- Make technical decisions independently. Don't wait for my approval for routine fixes.
-
-Final Report
-
-Provide an airline-wise audit showing:
-
-- Missing baggage information and root causes.
-- Fixes implemented and retest results.
-- Successfully indexed versus partially indexed airlines.
-- Remaining limitations and overall content-coverage percentage.
-
-Goal: Achieve the highest practical accuracy and completeness of baggage information across all airlines, including content hidden behind secondary links or embedded in images.
-
-You have approval to investigate, implement, test, and iteratively improve the existing pipeline within this scope.
+**Goal:** Achieve highly accurate baggage-information retrieval using the simplest reliable architecture, preferably retaining our existing retrieval strategy.
