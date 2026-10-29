@@ -1,21 +1,23 @@
-Perform targeted **R&D to recover failed airline URLs** from our Airline Baggage Directory crawling process.
-
-I'll provide research documentation covering advanced Crawl4AI configurations and possible solutions for blocked websites.
+Once the failed airline URL recovery is completed, perform a **comprehensive RAG retrieval accuracy evaluation** for our Airline Baggage Directory.
 
 ### Tasks
-1. Identify and isolate airline URLs that failed during previous crawling/indexing runs.
-2. Thoroughly review my research and evaluate applicable Crawl4AI configurations.
-3. Test the proposed configurations against failed URLs individually.
-4. Identify which airlines can be recovered and implement effective fixes.
-5. Re-test recovered URLs and verify actual baggage content extraction, not just HTTP success.
-6. Avoid affecting airlines that are already crawling successfully.
 
-**Important:**
-- Focus only on previously failed airline URLs.
-- Respect website restrictions, rate limits, and access controls; do not bypass protections.
-- Keep changes minimal and avoid unnecessary custom logic.
-- Independently investigate, implement, and test improvements.
+1. **Airline Selection:** Select approximately 100 airlines, prioritizing the **20 most popular airlines** for deeper testing.
+2. **Test Suite:** Create diverse, challenging, and multi-turn test cases covering checked baggage, cabin baggage, weight limits, fare types, routes, exceptions, and ambiguous queries.
+3. **End-to-End Validation:** Execute tests against our actual retrieval + LLM pipeline and evaluate factual accuracy, completeness, relevance, and hallucinations.
+4. **Ground Truth:** Verify answers against indexed source documents. Clearly distinguish missing source data from retrieval failures and LLM interpretation errors.
+5. **Retrieval Optimization:** If relevant information exists in the indexed documents but isn't retrieved, investigate and improve retrieval accuracy.
+6. **Iterative Testing:** Independently implement necessary improvements, rerun failed scenarios, and measure accuracy before and after changes.
 
-**Final report:** Recovered airlines, remaining failures, configurations tested, successful fixes, and reasons for unresolved failures.
+### Important
+- Prioritize **retrieval quality over unnecessary architectural changes**.
+- Start with simple optimizations such as `topK`, chunk relevance, and query formulation.
+- Avoid custom filtering layers or complicated retrieval strategies unless testing proves they're necessary.
+- Do not modify the crawling pipeline unless a proven indexing issue requires it.
+- Preserve existing working functionality.
 
-**Goal:** Maximize legitimate crawling recovery using advanced Crawl4AI capabilities while preserving our existing pipeline.
+**Final Report:** Airlines tested, test cases executed, accuracy percentages, failure categories, retrieval improvements, before/after results, and remaining limitations.
+
+**Goal:** Build a reliable, evidence-based evaluation suite and achieve the highest practical baggage-information retrieval accuracy.
+
+**Take independent decisions, implement improvements, and thoroughly validate the results.**
