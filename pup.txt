@@ -1,60 +1,83 @@
-We need to rethink **Pre-Booking vs Post-Booking intent detection in Manager V2** before implementing the recent Gateway enhancements.
+We need to enhance **Manager V2's pre-booking/post-booking intent handling and suggested-question generation**.
 
-### Core Architecture Question
+### 1. Centralized Intent Understanding
 
-Should the Manager centrally identify whether a user's request is pre-booking or post-booking, rather than delegating this responsibility to individual specialists?
+Explore whether the Manager should own high-level pre-booking vs post-booking intent classification, rather than relying entirely on individual specialist agents.
 
-This distinction applies across multiple domains:
-- Flight searches vs existing flight bookings.
-- Baggage policies vs adding baggage to a booking.
-- Cancellation policies vs canceling an existing reservation.
-- Future hotel searches vs hotel booking modifications.
+Review our completed Gateway implementation, Guardian Decision API, and existing Manager routing.
 
-We want intelligent, scalable routing without increasing latency through unnecessary specialist calls.
+Use these contextual signals intelligently:
+- `hasUpcomingTrips` — Whether the user has upcoming bookings.
+- `searchKey` — Whether an active flight search exists.
+- Conversation history and previously established intent.
+- Explicit references to existing bookings.
 
-### R&D Requirements
+**Examples:**
+- "Baggage" → Clarify whether the user wants to add baggage to an existing booking or check baggage policies.
+- "Cancellation" → Clarify whether the user wants to cancel a booking or understand cancellation policies.
+- "Baggage allowance" after a flight search → Consider the active search context.
+- "Cancel my existing booking" → Recognize explicit post-booking intent.
 
-1. **Review the existing Gateway implementation**, including the Guardian Decision API, Pages Agent handling, and recent ambiguity improvements.
-2. Inspect Manager V2's current routing, guardrails, specialist tools, and available conversation context.
-3. Compare **Manager-level classification, specialist-level classification, and a hybrid approach** for accuracy, latency, maintainability, and extensibility.
-4. Evaluate how these signals should influence decisions:
-   - `hasUpcomingTrips`
-   - `searchKey`
-   - Conversation history
-   - Explicit booking references and user intent
-5. Determine when the Manager should directly ask for clarification instead of calling a specialist.
+Evaluate Manager-level, Guardian-level, and hybrid approaches for accuracy, latency, and future scalability across Flight, Trip Planner, and Hotel Agents.
 
-### Expected Examples
+Preserve necessary post-booking guardrails and avoid unnecessary specialist invocations.
 
-- **"Baggage"** → Ambiguous; clarify whether the user wants policy information or to manage existing baggage.
-- **"Cancellation" + upcoming booking** → Consider post-booking context, but don't assume cancellation intent.
-- **"Baggage allowance" + active flight search** → Prefer the relevant pre-booking flow.
-- **"Cancel my existing booking"** → Recognize explicit post-booking intent.
-- **Future hotel-related requests** → The architecture should support additional domains without duplicating classification logic.
+### 2. Manager-Owned Suggested Questions Tool
 
-### My Preferred Direction
+Currently, specialist agents generate fresh suggested questions whenever they are invoked. However, when the Manager handles a query independently, no fresh suggested questions are generated.
 
-Explore making **Manager the central owner of high-level intent classification and routing**, while retaining specialist-level validation where necessary.
+**Required behavior:**
 
-Reuse our existing Decision API capabilities wherever appropriate. Avoid duplicate classification calls, rigid keyword rules, or unnecessary abstractions.
+- **Specialist invoked:** Continue using the specialist-generated suggested questions.
+- **No specialist invoked:** The Manager must invoke its own `update_suggested_questions` tool and generate fresh, context-aware suggestions.
+- Never reuse stale suggested questions from previous turns.
+- Never invoke Flight Agent or Trip Planner solely to generate suggested questions.
+- Preserve our existing `summary.suggestedQuestions` hydration contract.
+- Avoid duplicate tool invocations or unnecessary additional LLM calls.
 
-### Execution Plan
+**Example 1 — Ambiguous cancellation**
 
-**Phase 1 — Planning**
-- Thoroughly evaluate the options.
-- Recommend the best architecture and explain the trade-offs.
-- Identify exact files, prompts, and services requiring changes.
-- Provide an implementation and testing plan, including latency considerations.
+User: "Cancellation"
 
-**Phase 2 — Implementation**
-- After reviewing and approving the plan, implement the selected approach in Manager V2.
-- Test ambiguous, explicit, multi-turn, and conflicting-context scenarios.
-- Verify routing accuracy, clarification quality, and unnecessary specialist calls.
+Manager asks: "Do you want to cancel an existing booking or check cancellation policies?"
+
+Expected suggested questions:
+- Cancel my existing booking
+- Check cancellation policies for a new trip
+
+**Example 2 — Ambiguous baggage**
+
+User: "Baggage"
+
+Expected suggested questions:
+- Add baggage to my existing booking
+- Check baggage allowances for a flight
+
+**Example 3 — Trip Planner Zoom-In**
+
+User: "Explain Day 2 in more detail."
+
+Manager answers using existing itinerary context without invoking Trip Planner.
+
+Expected suggested questions:
+- Show Day 2 travel timings
+- Find restaurants near Day 2 attractions
+- Make Day 2 more relaxed
+
+The suggested questions must be generated fresh using the current conversation, not hardcoded responses.
+
+### 3. Planning & Implementation
+
+1. Inspect the existing Manager, Guardian, specialist tool definitions, and CTA hydration lifecycle.
+2. Recommend the best architecture for centralized intent handling.
+3. Explore how to expose a lightweight suggested-questions tool directly to the Manager, preferably reusing existing functionality.
+4. Ensure Manager-only responses always trigger fresh suggested-question generation.
+5. Evaluate routing accuracy, streaming compatibility, latency, and token consumption.
+6. Provide affected files, a minimal implementation plan, and test scenarios covering Manager-only, single-agent, multi-agent, and ambiguous conversations.
 
 **Important:**
-- Focus on **Manager V2 only**.
-- Preserve Gateway V1.
-- Reuse existing functionality wherever possible.
-- Keep the implementation minimal and intelligent.
+- **Manager V2 only. Gateway V1 must remain unchanged.**
+- Avoid stale suggestions, unnecessary agent calls, rigid keyword rules, and overengineering.
+- **First complete the R&D and architecture plan. Wait for approval before implementation.**
 
-**Goal:** Build a centralized, context-aware routing strategy that accurately distinguishes pre-booking and post-booking intent across current and future specialist agents, without unnecessary latency.
+**Goal:** Make Manager V2 independently capable of understanding ambiguous user intent, responding intelligently, and always generating fresh, contextual suggested questions—even when no specialist agent is invoked.
