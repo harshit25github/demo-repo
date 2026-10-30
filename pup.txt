@@ -1,40 +1,20 @@
-We need to improve **Pre-Booking vs Post-Booking intent detection**, focusing on **Gateway V1 only** for now.
+We have completed the **Pre-Booking vs Post-Booking ambiguity enhancements in Gateway V1**. Now implement equivalent behavior in **Manager V2**.
 
-### Phase 1 — Migrate Existing Decision API Implementation
+### Requirements
 
-- Inspect branch `DV-Bugs-10-13-2026`.
-- Identify the Post-Booking Guardian Agent changes using the **OpenAI Decisions API + Luna model**.
-- Carefully migrate the relevant implementation into the `fix-manager` branch.
-- Preserve existing functionality and verify the migration. Avoid unrelated changes.
+1. **Review Gateway Implementation:** Understand the recently implemented Guardian Decision API changes, Pages Agent improvements, and ambiguity-handling logic.
+2. **Manager Integration:** Inspect Manager V2's guardrails, routing, and specialist execution. Adapt the same intelligence to its architecture.
+3. **Context Awareness:** Incorporate `hasUpcomingTrips`, `searchKey`, and conversation history to distinguish existing-booking requests from flight-search queries.
+4. **Ambiguous Queries:** For inputs like "baggage", "cancellation", or "change flight", intelligently clarify user intent when context is insufficient instead of making assumptions.
+5. **Reuse Existing Logic:** Share suitable components where practical, without introducing unnecessary wrappers or duplicated logic.
 
-### Phase 2 — Explore Ambiguous Intent Handling
+### Implementation & Testing
 
-Users sometimes provide minimal queries like **"baggage"**, **"cancellation"**, or **"change flight"**, which could refer to either an existing booking or a new flight search.
+- Implement the required Manager V2 changes.
+- Test ambiguous queries, clear post-booking requests, active flight searches, and multi-turn conversations.
+- Verify correct routing, clarification behavior, and Decision API integration.
+- Ensure **Gateway V1 remains unchanged and fully functional**.
 
-Investigate improvements in both the **Guardial Agent and Pages Agent**.
+**Goal:** Achieve consistent, intelligent pre-booking/post-booking intent detection across Gateway and Manager while preserving their independent execution architectures.
 
-Consider these contextual signals:
-
-1. **`hasUpcomingTrips` (boolean):** Indicates whether the user has upcoming bookings. Use it as a confidence signal, not definitive proof of post-booking intent.
-2. **`searchKey`:** Indicates an existing flight search. Use it alongside conversation history to understand whether the user is discussing search results.
-3. **Conversation Context:** Understand recent searches, previous messages, and explicitly stated intentions.
-
-### Expected Behavior
-
-- **"Baggage"** → If intent remains unclear, ask whether the user wants to add baggage to an existing booking or check baggage policies.
-- **"Cancellation"** → Clarify whether they want to cancel an existing booking or understand cancellation policies.
-- If the user recently searched flights, intelligently consider that context without automatically assuming pre-booking.
-- If the user clearly references an existing booking, route appropriately.
-- Avoid false post-booking tripwires and incorrect Pages Agent responses.
-
-### Your Task
-
-- Inspect the existing Guardrail decision policy, Pages Agent prompts, and routing flow.
-- Determine where `hasUpcomingTrips` and `searchKey` should be hydrated and how they should influence intent confidence.
-- Explore additional intelligent signals and propose improvements independently.
-- Recommend a simple, reliable approach with example scenarios and a testing strategy.
-- Identify exact files requiring changes.
-
-**Important:** Complete the Decision API migration first. Then **plan the ambiguity enhancements without implementing them yet**.
-
-**Goal:** Improve pre-booking/post-booking intent accuracy through contextual reasoning and intelligent clarification, without introducing unnecessary hardcoded rules or complexity.
+Keep the implementation minimal and thoroughly test it.
