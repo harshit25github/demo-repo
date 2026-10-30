@@ -1,23 +1,40 @@
-Once the failed airline URL recovery is completed, perform a **comprehensive RAG retrieval accuracy evaluation** for our Airline Baggage Directory.
+We need to improve **Pre-Booking vs Post-Booking intent detection**, focusing on **Gateway V1 only** for now.
 
-### Tasks
+### Phase 1 — Migrate Existing Decision API Implementation
 
-1. **Airline Selection:** Select approximately 100 airlines, prioritizing the **20 most popular airlines** for deeper testing.
-2. **Test Suite:** Create diverse, challenging, and multi-turn test cases covering checked baggage, cabin baggage, weight limits, fare types, routes, exceptions, and ambiguous queries.
-3. **End-to-End Validation:** Execute tests against our actual retrieval + LLM pipeline and evaluate factual accuracy, completeness, relevance, and hallucinations.
-4. **Ground Truth:** Verify answers against indexed source documents. Clearly distinguish missing source data from retrieval failures and LLM interpretation errors.
-5. **Retrieval Optimization:** If relevant information exists in the indexed documents but isn't retrieved, investigate and improve retrieval accuracy.
-6. **Iterative Testing:** Independently implement necessary improvements, rerun failed scenarios, and measure accuracy before and after changes.
+- Inspect branch `DV-Bugs-10-13-2026`.
+- Identify the Post-Booking Guardian Agent changes using the **OpenAI Decisions API + Luna model**.
+- Carefully migrate the relevant implementation into the `fix-manager` branch.
+- Preserve existing functionality and verify the migration. Avoid unrelated changes.
 
-### Important
-- Prioritize **retrieval quality over unnecessary architectural changes**.
-- Start with simple optimizations such as `topK`, chunk relevance, and query formulation.
-- Avoid custom filtering layers or complicated retrieval strategies unless testing proves they're necessary.
-- Do not modify the crawling pipeline unless a proven indexing issue requires it.
-- Preserve existing working functionality.
+### Phase 2 — Explore Ambiguous Intent Handling
 
-**Final Report:** Airlines tested, test cases executed, accuracy percentages, failure categories, retrieval improvements, before/after results, and remaining limitations.
+Users sometimes provide minimal queries like **"baggage"**, **"cancellation"**, or **"change flight"**, which could refer to either an existing booking or a new flight search.
 
-**Goal:** Build a reliable, evidence-based evaluation suite and achieve the highest practical baggage-information retrieval accuracy.
+Investigate improvements in both the **Guardial Agent and Pages Agent**.
 
-**Take independent decisions, implement improvements, and thoroughly validate the results.**
+Consider these contextual signals:
+
+1. **`hasUpcomingTrips` (boolean):** Indicates whether the user has upcoming bookings. Use it as a confidence signal, not definitive proof of post-booking intent.
+2. **`searchKey`:** Indicates an existing flight search. Use it alongside conversation history to understand whether the user is discussing search results.
+3. **Conversation Context:** Understand recent searches, previous messages, and explicitly stated intentions.
+
+### Expected Behavior
+
+- **"Baggage"** → If intent remains unclear, ask whether the user wants to add baggage to an existing booking or check baggage policies.
+- **"Cancellation"** → Clarify whether they want to cancel an existing booking or understand cancellation policies.
+- If the user recently searched flights, intelligently consider that context without automatically assuming pre-booking.
+- If the user clearly references an existing booking, route appropriately.
+- Avoid false post-booking tripwires and incorrect Pages Agent responses.
+
+### Your Task
+
+- Inspect the existing Guardrail decision policy, Pages Agent prompts, and routing flow.
+- Determine where `hasUpcomingTrips` and `searchKey` should be hydrated and how they should influence intent confidence.
+- Explore additional intelligent signals and propose improvements independently.
+- Recommend a simple, reliable approach with example scenarios and a testing strategy.
+- Identify exact files requiring changes.
+
+**Important:** Complete the Decision API migration first. Then **plan the ambiguity enhancements without implementing them yet**.
+
+**Goal:** Improve pre-booking/post-booking intent accuracy through contextual reasoning and intelligent clarification, without introducing unnecessary hardcoded rules or complexity.
