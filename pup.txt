@@ -1,20 +1,60 @@
-We have completed the **Pre-Booking vs Post-Booking ambiguity enhancements in Gateway V1**. Now implement equivalent behavior in **Manager V2**.
+We need to rethink **Pre-Booking vs Post-Booking intent detection in Manager V2** before implementing the recent Gateway enhancements.
 
-### Requirements
+### Core Architecture Question
 
-1. **Review Gateway Implementation:** Understand the recently implemented Guardian Decision API changes, Pages Agent improvements, and ambiguity-handling logic.
-2. **Manager Integration:** Inspect Manager V2's guardrails, routing, and specialist execution. Adapt the same intelligence to its architecture.
-3. **Context Awareness:** Incorporate `hasUpcomingTrips`, `searchKey`, and conversation history to distinguish existing-booking requests from flight-search queries.
-4. **Ambiguous Queries:** For inputs like "baggage", "cancellation", or "change flight", intelligently clarify user intent when context is insufficient instead of making assumptions.
-5. **Reuse Existing Logic:** Share suitable components where practical, without introducing unnecessary wrappers or duplicated logic.
+Should the Manager centrally identify whether a user's request is pre-booking or post-booking, rather than delegating this responsibility to individual specialists?
 
-### Implementation & Testing
+This distinction applies across multiple domains:
+- Flight searches vs existing flight bookings.
+- Baggage policies vs adding baggage to a booking.
+- Cancellation policies vs canceling an existing reservation.
+- Future hotel searches vs hotel booking modifications.
 
-- Implement the required Manager V2 changes.
-- Test ambiguous queries, clear post-booking requests, active flight searches, and multi-turn conversations.
-- Verify correct routing, clarification behavior, and Decision API integration.
-- Ensure **Gateway V1 remains unchanged and fully functional**.
+We want intelligent, scalable routing without increasing latency through unnecessary specialist calls.
 
-**Goal:** Achieve consistent, intelligent pre-booking/post-booking intent detection across Gateway and Manager while preserving their independent execution architectures.
+### R&D Requirements
 
-Keep the implementation minimal and thoroughly test it.
+1. **Review the existing Gateway implementation**, including the Guardian Decision API, Pages Agent handling, and recent ambiguity improvements.
+2. Inspect Manager V2's current routing, guardrails, specialist tools, and available conversation context.
+3. Compare **Manager-level classification, specialist-level classification, and a hybrid approach** for accuracy, latency, maintainability, and extensibility.
+4. Evaluate how these signals should influence decisions:
+   - `hasUpcomingTrips`
+   - `searchKey`
+   - Conversation history
+   - Explicit booking references and user intent
+5. Determine when the Manager should directly ask for clarification instead of calling a specialist.
+
+### Expected Examples
+
+- **"Baggage"** → Ambiguous; clarify whether the user wants policy information or to manage existing baggage.
+- **"Cancellation" + upcoming booking** → Consider post-booking context, but don't assume cancellation intent.
+- **"Baggage allowance" + active flight search** → Prefer the relevant pre-booking flow.
+- **"Cancel my existing booking"** → Recognize explicit post-booking intent.
+- **Future hotel-related requests** → The architecture should support additional domains without duplicating classification logic.
+
+### My Preferred Direction
+
+Explore making **Manager the central owner of high-level intent classification and routing**, while retaining specialist-level validation where necessary.
+
+Reuse our existing Decision API capabilities wherever appropriate. Avoid duplicate classification calls, rigid keyword rules, or unnecessary abstractions.
+
+### Execution Plan
+
+**Phase 1 — Planning**
+- Thoroughly evaluate the options.
+- Recommend the best architecture and explain the trade-offs.
+- Identify exact files, prompts, and services requiring changes.
+- Provide an implementation and testing plan, including latency considerations.
+
+**Phase 2 — Implementation**
+- After reviewing and approving the plan, implement the selected approach in Manager V2.
+- Test ambiguous, explicit, multi-turn, and conflicting-context scenarios.
+- Verify routing accuracy, clarification quality, and unnecessary specialist calls.
+
+**Important:**
+- Focus on **Manager V2 only**.
+- Preserve Gateway V1.
+- Reuse existing functionality wherever possible.
+- Keep the implementation minimal and intelligent.
+
+**Goal:** Build a centralized, context-aware routing strategy that accurately distinguishes pre-booking and post-booking intent across current and future specialist agents, without unnecessary latency.
