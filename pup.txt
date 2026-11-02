@@ -1,31 +1,12 @@
-We need to enhance our **Crawl4AI Crawler Adapter** to handle airline websites containing dynamic and interactive content.
+Once the ongoing airline crawling is completed, perform the following:
 
-**Reference:** https://www.united.com/en/us/fly/baggage.html
+1. **Indexing:** Index all successfully crawled data into our **existing vector DB collection**. Do not create a new collection or duplicate existing records.
+2. **Dynamic Content Validation:** Thoroughly test the airlines list given .
+3. **Content Verification:** Confirm that expandable sections, hidden links, and JavaScript-loaded baggage information are actually extracted and indexed.
+4. **Retrieval Testing:** Run relevant baggage queries and verify that the indexed dynamic content is correctly retrieved.
+5. **Fix & Retest:** Investigate missing content, implement necessary improvements, and rerun affected airlines.
 
-United Airlines has expandable sections, such as **Special Items**, where additional links or content become visible after user interaction.
+**Final Report:** Airlines tested, dynamic content successfully extracted, indexing/retrieval results, remaining gaps, and fixes applied.
 
-### Your Task
+**Important:** Reuse the existing collection and pipeline. Keep changes minimal, avoid unnecessary complexity, and complete the testing end-to-end.
 
-1. **Analyze the top 20 airlines** (I'll provide the list) and identify which baggage pages contain accordions, expandable sections, tabs, dynamically loaded links, or other interactive elements.
-2. **Inspect existing crawling behavior** to determine whether we're missing links or baggage information hidden behind these interactions.
-3. **Explore Crawl4AI capabilities** for JavaScript execution, browser interactions, element clicking, waiting for dynamic content, and extracting newly revealed links.
-4. Determine whether hidden links can be extracted directly from the DOM or whether actual browser interactions are required.
-5. Test suitable approaches on affected airlines and compare extracted URLs and content before and after.
-6. Recommend a **reusable, minimal solution** that works across multiple airlines without unnecessary website-specific hardcoding.
-
-### Expected Output
-
-- List of airlines requiring dynamic interaction.
-- Missing links/content identified for each airline.
-- Recommended Crawl4AI configuration or JavaScript interaction strategy.
-- Working code examples from isolated tests.
-- File-specific implementation plan and potential performance impact.
-
-**Important:**
-- Focus exclusively on baggage-related pages and links.
-- Avoid unnecessary clicks, duplicate crawling, and unrelated navigation.
-- Preserve existing successful crawling behavior.
-- Respect website access restrictions and rate limits.
-- **R&D and planning first. Do not implement production changes yet.**
-
-**Goal:** Maximize baggage-content coverage by intelligently discovering and extracting links hidden behind dynamic website interactions.
