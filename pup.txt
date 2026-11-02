@@ -1,83 +1,31 @@
-We need to enhance **Manager V2's pre-booking/post-booking intent handling and suggested-question generation**.
+We need to enhance our **Crawl4AI Crawler Adapter** to handle airline websites containing dynamic and interactive content.
 
-### 1. Centralized Intent Understanding
+**Reference:** https://www.united.com/en/us/fly/baggage.html
 
-Explore whether the Manager should own high-level pre-booking vs post-booking intent classification, rather than relying entirely on individual specialist agents.
+United Airlines has expandable sections, such as **Special Items**, where additional links or content become visible after user interaction.
 
-Review our completed Gateway implementation, Guardian Decision API, and existing Manager routing.
+### Your Task
 
-Use these contextual signals intelligently:
-- `hasUpcomingTrips` — Whether the user has upcoming bookings.
-- `searchKey` — Whether an active flight search exists.
-- Conversation history and previously established intent.
-- Explicit references to existing bookings.
+1. **Analyze the top 20 airlines** (I'll provide the list) and identify which baggage pages contain accordions, expandable sections, tabs, dynamically loaded links, or other interactive elements.
+2. **Inspect existing crawling behavior** to determine whether we're missing links or baggage information hidden behind these interactions.
+3. **Explore Crawl4AI capabilities** for JavaScript execution, browser interactions, element clicking, waiting for dynamic content, and extracting newly revealed links.
+4. Determine whether hidden links can be extracted directly from the DOM or whether actual browser interactions are required.
+5. Test suitable approaches on affected airlines and compare extracted URLs and content before and after.
+6. Recommend a **reusable, minimal solution** that works across multiple airlines without unnecessary website-specific hardcoding.
 
-**Examples:**
-- "Baggage" → Clarify whether the user wants to add baggage to an existing booking or check baggage policies.
-- "Cancellation" → Clarify whether the user wants to cancel a booking or understand cancellation policies.
-- "Baggage allowance" after a flight search → Consider the active search context.
-- "Cancel my existing booking" → Recognize explicit post-booking intent.
+### Expected Output
 
-Evaluate Manager-level, Guardian-level, and hybrid approaches for accuracy, latency, and future scalability across Flight, Trip Planner, and Hotel Agents.
-
-Preserve necessary post-booking guardrails and avoid unnecessary specialist invocations.
-
-### 2. Manager-Owned Suggested Questions Tool
-
-Currently, specialist agents generate fresh suggested questions whenever they are invoked. However, when the Manager handles a query independently, no fresh suggested questions are generated.
-
-**Required behavior:**
-
-- **Specialist invoked:** Continue using the specialist-generated suggested questions.
-- **No specialist invoked:** The Manager must invoke its own `update_suggested_questions` tool and generate fresh, context-aware suggestions.
-- Never reuse stale suggested questions from previous turns.
-- Never invoke Flight Agent or Trip Planner solely to generate suggested questions.
-- Preserve our existing `summary.suggestedQuestions` hydration contract.
-- Avoid duplicate tool invocations or unnecessary additional LLM calls.
-
-**Example 1 — Ambiguous cancellation**
-
-User: "Cancellation"
-
-Manager asks: "Do you want to cancel an existing booking or check cancellation policies?"
-
-Expected suggested questions:
-- Cancel my existing booking
-- Check cancellation policies for a new trip
-
-**Example 2 — Ambiguous baggage**
-
-User: "Baggage"
-
-Expected suggested questions:
-- Add baggage to my existing booking
-- Check baggage allowances for a flight
-
-**Example 3 — Trip Planner Zoom-In**
-
-User: "Explain Day 2 in more detail."
-
-Manager answers using existing itinerary context without invoking Trip Planner.
-
-Expected suggested questions:
-- Show Day 2 travel timings
-- Find restaurants near Day 2 attractions
-- Make Day 2 more relaxed
-
-The suggested questions must be generated fresh using the current conversation, not hardcoded responses.
-
-### 3. Planning & Implementation
-
-1. Inspect the existing Manager, Guardian, specialist tool definitions, and CTA hydration lifecycle.
-2. Recommend the best architecture for centralized intent handling.
-3. Explore how to expose a lightweight suggested-questions tool directly to the Manager, preferably reusing existing functionality.
-4. Ensure Manager-only responses always trigger fresh suggested-question generation.
-5. Evaluate routing accuracy, streaming compatibility, latency, and token consumption.
-6. Provide affected files, a minimal implementation plan, and test scenarios covering Manager-only, single-agent, multi-agent, and ambiguous conversations.
+- List of airlines requiring dynamic interaction.
+- Missing links/content identified for each airline.
+- Recommended Crawl4AI configuration or JavaScript interaction strategy.
+- Working code examples from isolated tests.
+- File-specific implementation plan and potential performance impact.
 
 **Important:**
-- **Manager V2 only. Gateway V1 must remain unchanged.**
-- Avoid stale suggestions, unnecessary agent calls, rigid keyword rules, and overengineering.
-- **First complete the R&D and architecture plan. Wait for approval before implementation.**
+- Focus exclusively on baggage-related pages and links.
+- Avoid unnecessary clicks, duplicate crawling, and unrelated navigation.
+- Preserve existing successful crawling behavior.
+- Respect website access restrictions and rate limits.
+- **R&D and planning first. Do not implement production changes yet.**
 
-**Goal:** Make Manager V2 independently capable of understanding ambiguous user intent, responding intelligently, and always generating fresh, contextual suggested questions—even when no specialist agent is invoked.
+**Goal:** Maximize baggage-content coverage by intelligently discovering and extracting links hidden behind dynamic website interactions.
