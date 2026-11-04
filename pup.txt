@@ -1,12 +1,34 @@
-Once the ongoing airline crawling is completed, perform the following:
+Refactor the **Flight Specialist in both Gateway V1 and Manager V2** to remove legacy filtering logic from `flight_search`.
 
-1. **Indexing:** Index all successfully crawled data into our **existing vector DB collection**. Do not create a new collection or duplicate existing records.
-2. **Dynamic Content Validation:** Thoroughly test the airlines list given .
-3. **Content Verification:** Confirm that expandable sections, hidden links, and JavaScript-loaded baggage information are actually extracted and indexed.
-4. **Retrieval Testing:** Run relevant baggage queries and verify that the indexed dynamic content is correctly retrieved.
-5. **Fix & Retest:** Investigate missing content, implement necessary improvements, and rerun affected airlines.
+### Required Changes
 
-**Final Report:** Airlines tested, dynamic content successfully extracted, indexing/retrieval results, remaining gaps, and fixes applied.
+1. **Remove legacy filters from `flight_search`:**
 
-**Important:** Reuse the existing collection and pipeline. Keep changes minimal, avoid unnecessary complexity, and complete the testing end-to-end.
+   - Remove `directFlight` / direct-flight boolean.
+   - Remove airline preference/filter parameters.
+   - Remove these fields from tool schemas, prompts, payload mappings, and any supporting logic where no longer needed.
 
+2. **Use `apply_filter` exclusively:**
+
+   - `flight_search` should initiate the search using core flight criteria.
+   - Once a valid `searchKey` exists, use `apply_filter` for airline preferences and stop-count filtering.
+   - Preserve existing stop mapping: `0` = nonstop, 2 = one stop, 3 = two or more stops.
+   - Support combined user requests by searching first and then applying relevant filters.
+
+3. **Update Both Agents:**
+
+   - Update Gateway and Manager Flight Agent instructions and tool definitions consistently.
+   - Remove outdated few-shot examples and conflicting rules.
+   - Inspect and clean up legacy defaults, context fields, and tool payload handling.
+
+4. **Verification:**
+
+   - Test search-only, nonstop, one-stop, two-plus stops, airline selection, and combined-filter scenarios.
+   - Verify actual tool-call order and payloads.
+   - Ensure no legacy airline/direct-flight fields reach `flight_search`.
+
+**Important:** Preserve airline-selection behavior that requires a new search only if the current backend contract explicitly requires it; otherwise, use `apply_filter` as the source of truth for filtering.
+
+Keep changes minimal and avoid unnecessary refactoring.
+
+**Goal:** `flight_search` handles searching; `apply_filter` handles airline and stop-count filtering consistently across Gateway and Manager.
