@@ -1,34 +1,29 @@
-Refactor the **Flight Specialist in both Gateway V1 and Manager V2** to remove legacy filtering logic from `flight_search`.
+Perform **Obscura Browser R&D** to evaluate whether it can recover airline baggage pages that Crawl4AI currently fails to retrieve.
 
-### Required Changes
+**Repository:** https://github.com/h4ckf0r0day/obscura
 
-1. **Remove legacy filters from `flight_search`:**
+### 1. Local Setup
+- Download and install the latest compatible **Obscura executable with stealth support**.
+- Do not use Docker.
+- Enable **Stealth Mode (`--stealth`)** and verify it works correctly.
+- Test basic browser functionality and JavaScript rendering.
 
-   - Remove `directFlight` / direct-flight boolean.
-   - Remove airline preference/filter parameters.
-   - Remove these fields from tool schemas, prompts, payload mappings, and any supporting logic where no longer needed.
+### 2. WestJet — First Priority
+- Start with **WestJet Airlines**, which currently fails due to anti-bot restrictions.
+- Compare Crawl4AI against Obscura in normal and stealth modes.
+- Investigate whether stealth mode improves legitimate access, JavaScript rendering, and baggage-content extraction.
+- Respect website restrictions; do not bypass authentication, CAPTCHAs, or explicit access denials.
 
-2. **Use `apply_filter` exclusively:**
+### 3. Other Failed Airlines
+- After WestJet, evaluate the remaining failed airline URLs.
+- Compare success rates, extraction quality, latency, and reliability.
+- Determine whether Obscura can serve as a fallback to Crawl4AI.
 
-   - `flight_search` should initiate the search using core flight criteria.
-   - Once a valid `searchKey` exists, use `apply_filter` for airline preferences and stop-count filtering.
-   - Preserve existing stop mapping: `0` = nonstop, 2 = one stop, 3 = two or more stops.
-   - Support combined user requests by searching first and then applying relevant filters.
+**Important:**
+- R&D only. Do not modify production crawling or indexing.
+- Keep experiments isolated and avoid unnecessary complexity.
+- Test URLs individually and investigate failures before proceeding.
 
-3. **Update Both Agents:**
+**Final Report:** Installation results, WestJet findings, normal vs. stealth comparison, recovered airline URLs, remaining failures, and integration recommendations.
 
-   - Update Gateway and Manager Flight Agent instructions and tool definitions consistently.
-   - Remove outdated few-shot examples and conflicting rules.
-   - Inspect and clean up legacy defaults, context fields, and tool payload handling.
-
-4. **Verification:**
-
-   - Test search-only, nonstop, one-stop, two-plus stops, airline selection, and combined-filter scenarios.
-   - Verify actual tool-call order and payloads.
-   - Ensure no legacy airline/direct-flight fields reach `flight_search`.
-
-**Important:** Preserve airline-selection behavior that requires a new search only if the current backend contract explicitly requires it; otherwise, use `apply_filter` as the source of truth for filtering.
-
-Keep changes minimal and avoid unnecessary refactoring.
-
-**Goal:** `flight_search` handles searching; `apply_filter` handles airline and stop-count filtering consistently across Gateway and Manager.
+**Goal:** Determine whether Obscura's stealth-enabled executable provides measurable improvements for our failed airline baggage crawling scenarios.
