@@ -1,33 +1,59 @@
-Investigate and plan improvements to our **Human Handoff Guardrail**, including potential migration to the **OpenAI Decisions API**.
+Enhance logging for both **Gateway V1 and Manager V2** to generate a **detailed execution timing summary** for every chat request.
 
-### Existing Problem — Inconsistent Human Handoff
+### Requirements
 
-Our current guardrail behaves inconsistently in multi-turn conversations.
+1. Track the time taken by each major operation:
+   - Chat initialization and request processing.
+   - Context hydration and database operations.
+   - Guardrail execution.
+   - Gateway or Manager Agent execution.
+   - Individual specialist execution (Flight Agent, Trip Planner, etc.).
+   - Every tool invocation, including repeated calls.
+   - Summary extraction, image/icon hydration, and other processing stages.
+   - Streaming duration and total end-to-end request time.
+
+2. Once the stream completes, generate **one consolidated log entry** containing a readable timing breakdown.
 
 **Example:**
-1. User: "I need to speak to someone live."
-2. Agent: Performs a soft handoff because search criteria are missing.
-3. User: "No, I still want to speak to someone before purchasing."
 
-**Issue:** Sometimes the guardrail correctly triggers human handoff on the second request, but other times it fails or repeats the soft handoff. This behavior is inconsistent and needs to be resolved.
+```text
+========== CHAT EXECUTION SUMMARY ==========
+Request ID: abc123
+Platform: Manager V2
 
-### Expected Behavior
+Operation                  Duration
+-----------------------------------
+Request Initialization      120 ms
+Context Hydration           340 ms
+Guardrail Execution         450 ms
+Manager Execution         2,100 ms
+Flight Agent              3,200 ms
+Trip Planner              4,500 ms
+Flight Search Tool        1,800 ms
+Summary Extraction        1,200 ms
+Image Hydration             350 ms
+-----------------------------------
+Total Request Duration    8,900 ms
+============================================
+```
 
-- **Search criteria available:** Direct human handoff.
-- **Search criteria missing:** Soft handoff on the initial request.
-- **User insists after soft handoff:** Always trigger human handoff, regardless of search criteria.
+3. **Important considerations:**
+   - Log each agent and tool independently, including multiple invocations.
+   - Account for parallel agent execution without double-counting total duration.
+   - Include request ID, platform, execution status, and timestamps.
+   - Generate the summary once on completion, failure, timeout, or cancellation.
+   - Preserve existing logs and streaming behavior.
+   - Ensure the summary is visible as a **single Kibana log event**, preferably with structured timing fields for filtering and analysis.
+   - Never expose sensitive user data or credentials.
 
-### Your Task
+### Implementation
 
-1. Investigate the root cause of the inconsistency in the existing guardrail.
-2. Explore migrating the classification logic to the **OpenAI Decisions API**, similar to our Post-Booking Guardrail.
-3. Evaluate how conversation history, previous soft handoffs, and repeated user intent should influence classification.
-4. Determine whether explicit handoff-state tracking is necessary.
-5. Compare the current implementation with a Decision API approach for accuracy, consistency, and latency.
-6. Design challenging multi-turn test cases and recommend the simplest reliable solution.
+Inspect the existing Winston/logger infrastructure and execution flows for both Gateway V1 and Manager V2.
 
-**Important:** R&D and planning only. Do not implement yet. Avoid unnecessary wrappers or hardcoded logic.
+Implement lightweight timing instrumentation using existing utilities wherever possible. Avoid unnecessary wrappers or architectural changes.
 
-**Expected Output:** Root-cause analysis, recommended Decision API integration design, affected files, and testing plan.
+**Important:** This is backend observability only. Do not send the timing summary as an SSE chunk to the client.
 
-**Goal:** Eliminate inconsistent human-handoff behavior, especially when users repeatedly request a live agent after receiving a soft handoff.
+**Goal:** At the end of every chat request, I should see one detailed timing summary in Kibana explaining exactly where time was spent, including individual agents, tools, and overall latency.
+
+Implement and verify the behavior for both V1 and V2.
