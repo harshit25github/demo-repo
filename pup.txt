@@ -1,29 +1,30 @@
-Perform **Obscura Browser R&D** to evaluate whether it can recover airline baggage pages that Crawl4AI currently fails to retrieve.
+Investigate and plan improvements to our **Human Handoff Guardrail**, which currently behaves inconsistently.
 
-**Repository:** https://github.com/h4ckf0r0day/obscura
+### Current Expected Behavior
 
-### 1. Local Setup
-- Download and install the latest compatible **Obscura executable with stealth support**.
-- Do not use Docker.
-- Enable **Stealth Mode (`--stealth`)** and verify it works correctly.
-- Test basic browser functionality and JavaScript rendering.
+1. **Search criteria already available:** Directly trigger human handoff.
+2. **No search criteria available:** Perform a soft handoff first, encouraging the user to plan/search before connecting.
+3. **User insists after soft handoff:** Trigger human handoff, even if search criteria is still missing.
 
-### 2. WestJet — First Priority
-- Start with **WestJet Airlines**, which currently fails due to anti-bot restrictions.
-- Compare Crawl4AI against Obscura in normal and stealth modes.
-- Investigate whether stealth mode improves legitimate access, JavaScript rendering, and baggage-content extraction.
-- Respect website restrictions; do not bypass authentication, CAPTCHAs, or explicit access denials.
+### Current Problem
 
-### 3. Other Failed Airlines
-- After WestJet, evaluate the remaining failed airline URLs.
-- Compare success rates, extraction quality, latency, and reliability.
-- Determine whether Obscura can serve as a fallback to Crawl4AI.
+For multi-turn conversations such as:
 
-**Important:**
-- R&D only. Do not modify production crawling or indexing.
-- Keep experiments isolated and avoid unnecessary complexity.
-- Test URLs individually and investigate failures before proceeding.
+- User: "I need to speak to someone live."
+- Agent: Provides a soft-handoff message.
+- User: "No, I still want to speak to someone before purchasing."
 
-**Final Report:** Installation results, WestJet findings, normal vs. stealth comparison, recovered airline URLs, remaining failures, and integration recommendations.
+Sometimes the guardrail triggers human handoff correctly, but sometimes it fails.
 
-**Goal:** Determine whether Obscura's stealth-enabled executable provides measurable improvements for our failed airline baggage crawling scenarios.
+### Your Task
+
+- Thoroughly inspect the existing Human Handoff Guardrail, prompts, conversation history, and state handling.
+- Identify why repeated handoff requests are inconsistently classified.
+- Explore whether we need better context awareness, explicit soft-handoff state tracking, improved prompting, or another minimal solution.
+- Compare possible approaches and recommend the most reliable one.
+- Prepare multi-turn test scenarios covering direct handoffs, soft handoffs, repeated requests, missing search criteria, and existing search criteria.
+- Provide an evidence-based root cause and a minimal implementation and testing plan.
+
+**Important:** R&D and planning only. Do not implement yet. Avoid unnecessary wrappers or complex custom logic.
+
+**Goal:** Make human handoff consistent: soft handoff when appropriate, but always respect a user's repeated request to speak with a human.
