@@ -1,35 +1,22 @@
-Investigate and fix the **inconsistent trip-type handling in Flight Agent**, across both **Gateway V1 and Manager V2**.
+Investigate a possible **regression in Flight Agent's ambiguous-location handling** across both **Gateway V1 and Manager V2**.
+
+### Previous Expected Behavior
+- When users provide ambiguous destinations (e.g., "Spain", "Prague", or locations with multiple airport matches), the Flight Agent uses the existing `flight_search` tool's **Destination API** to resolve available locations.
+- The tool returns relevant city/airport options, which the Agent presents to the user for clarification.
+- The Agent must not arbitrarily select an airport or initiate an actual flight search with an unresolved destination.
 
 ### Current Problem
+I suspect recent changes have removed or broken this behavior.
 
-Trip type is now a required field that must be explicitly provided by the user. However, in some conversations, especially multi-agent flows, the Agent still assumes `one-way` or another trip type without user confirmation.
+### Your Task
+1. Inspect the current Flight Agent prompts, `flight_search` tool, Destination API integration, and location-validation feedback.
+2. Review Git history to identify whether this functionality was removed or modified.
+3. Trace ambiguous-location requests through both Gateway and Manager flows.
+4. Identify the root cause and restore the intended behavior if broken.
+5. Test country-level queries, multiple-airport cities, misspellings, and multi-turn location selections.
 
-I will provide actual conversation evidence of this behavior.
+**Important:** Preserve the existing trip-type validation and other flight-search rules. Reuse the Destination API rather than introducing hardcoded location mappings or regex-based logic.
 
-### Investigation
+**Goal:** Ensure both Flight Agents intelligently resolve ambiguous locations through actual Destination API feedback and present valid options before proceeding with flight searches.
 
-1. Thoroughly inspect both Flight Agent prompts, Manager/Gateway instructions, dynamic prompt hydration, and conversation context.
-2. Trace trip type through the entire lifecycle: user input → context hydration → agent reasoning → tool arguments → `flight_search`.
-3. Identify any hidden defaults, fallback assignments, schema defaults, or conflicting instructions.
-4. Compare successful and failing conversations to determine the root cause.
-
-### Expected Behavior
-
-- Trip type must come from explicit user intent or previously confirmed conversation context.
-- Never infer or default to `one-way`, `round-trip`, or `multi-city` without sufficient evidence.
-- If trip type is missing, ask the user to clarify before initiating `flight_search`.
-- Ensure the same behavior across Gateway, Manager, and multi-agent conversations.
-
-### Solution Requirements
-
-- **Prioritize LLM intelligence and prompt/context improvements.**
-- Do not introduce regex, keyword-matching handlers, or language-specific routing logic.
-- Preserve tool-level validation as a final safeguard against missing trip types.
-- Follow the same reliable approach already used for origin, destination, and date handling.
-- Avoid unnecessary wrappers or overengineering.
-
-Thoroughly test single-turn, multi-turn, multilingual, and multi-agent scenarios, including the evidence I provide.
-
-**Goal:** Make trip-type handling consistently reliable, with no silent defaults or unsupported assumptions.
-
-First provide the root cause and recommended minimal solution. Then implement and validate the necessary fixes.
+First explain the findings and proposed fix, then implement and verify the necessary changes.
