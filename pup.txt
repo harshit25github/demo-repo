@@ -1,59 +1,35 @@
-Enhance logging for both **Gateway V1 and Manager V2** to generate a **detailed execution timing summary** for every chat request.
+Investigate and fix the **inconsistent trip-type handling in Flight Agent**, across both **Gateway V1 and Manager V2**.
 
-### Requirements
+### Current Problem
 
-1. Track the time taken by each major operation:
-   - Chat initialization and request processing.
-   - Context hydration and database operations.
-   - Guardrail execution.
-   - Gateway or Manager Agent execution.
-   - Individual specialist execution (Flight Agent, Trip Planner, etc.).
-   - Every tool invocation, including repeated calls.
-   - Summary extraction, image/icon hydration, and other processing stages.
-   - Streaming duration and total end-to-end request time.
+Trip type is now a required field that must be explicitly provided by the user. However, in some conversations, especially multi-agent flows, the Agent still assumes `one-way` or another trip type without user confirmation.
 
-2. Once the stream completes, generate **one consolidated log entry** containing a readable timing breakdown.
+I will provide actual conversation evidence of this behavior.
 
-**Example:**
+### Investigation
 
-```text
-========== CHAT EXECUTION SUMMARY ==========
-Request ID: abc123
-Platform: Manager V2
+1. Thoroughly inspect both Flight Agent prompts, Manager/Gateway instructions, dynamic prompt hydration, and conversation context.
+2. Trace trip type through the entire lifecycle: user input → context hydration → agent reasoning → tool arguments → `flight_search`.
+3. Identify any hidden defaults, fallback assignments, schema defaults, or conflicting instructions.
+4. Compare successful and failing conversations to determine the root cause.
 
-Operation                  Duration
------------------------------------
-Request Initialization      120 ms
-Context Hydration           340 ms
-Guardrail Execution         450 ms
-Manager Execution         2,100 ms
-Flight Agent              3,200 ms
-Trip Planner              4,500 ms
-Flight Search Tool        1,800 ms
-Summary Extraction        1,200 ms
-Image Hydration             350 ms
------------------------------------
-Total Request Duration    8,900 ms
-============================================
-```
+### Expected Behavior
 
-3. **Important considerations:**
-   - Log each agent and tool independently, including multiple invocations.
-   - Account for parallel agent execution without double-counting total duration.
-   - Include request ID, platform, execution status, and timestamps.
-   - Generate the summary once on completion, failure, timeout, or cancellation.
-   - Preserve existing logs and streaming behavior.
-   - Ensure the summary is visible as a **single Kibana log event**, preferably with structured timing fields for filtering and analysis.
-   - Never expose sensitive user data or credentials.
+- Trip type must come from explicit user intent or previously confirmed conversation context.
+- Never infer or default to `one-way`, `round-trip`, or `multi-city` without sufficient evidence.
+- If trip type is missing, ask the user to clarify before initiating `flight_search`.
+- Ensure the same behavior across Gateway, Manager, and multi-agent conversations.
 
-### Implementation
+### Solution Requirements
 
-Inspect the existing Winston/logger infrastructure and execution flows for both Gateway V1 and Manager V2.
+- **Prioritize LLM intelligence and prompt/context improvements.**
+- Do not introduce regex, keyword-matching handlers, or language-specific routing logic.
+- Preserve tool-level validation as a final safeguard against missing trip types.
+- Follow the same reliable approach already used for origin, destination, and date handling.
+- Avoid unnecessary wrappers or overengineering.
 
-Implement lightweight timing instrumentation using existing utilities wherever possible. Avoid unnecessary wrappers or architectural changes.
+Thoroughly test single-turn, multi-turn, multilingual, and multi-agent scenarios, including the evidence I provide.
 
-**Important:** This is backend observability only. Do not send the timing summary as an SSE chunk to the client.
+**Goal:** Make trip-type handling consistently reliable, with no silent defaults or unsupported assumptions.
 
-**Goal:** At the end of every chat request, I should see one detailed timing summary in Kibana explaining exactly where time was spent, including individual agents, tools, and overall latency.
-
-Implement and verify the behavior for both V1 and V2.
+First provide the root cause and recommended minimal solution. Then implement and validate the necessary fixes.
