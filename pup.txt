@@ -1,22 +1,28 @@
-Investigate a possible **regression in Flight Agent's ambiguous-location handling** across both **Gateway V1 and Manager V2**.
-
-### Previous Expected Behavior
-- When users provide ambiguous destinations (e.g., "Spain", "Prague", or locations with multiple airport matches), the Flight Agent uses the existing `flight_search` tool's **Destination API** to resolve available locations.
-- The tool returns relevant city/airport options, which the Agent presents to the user for clarification.
-- The Agent must not arbitrarily select an airport or initiate an actual flight search with an unresolved destination.
+Investigate and plan a solution for **infinite/repeated tool-call loops** in our agent execution.
 
 ### Current Problem
-I suspect recent changes have removed or broken this behavior.
 
-### Your Task
-1. Inspect the current Flight Agent prompts, `flight_search` tool, Destination API integration, and location-validation feedback.
-2. Review Git history to identify whether this functionality was removed or modified.
-3. Trace ambiguous-location requests through both Gateway and Manager flows.
-4. Identify the root cause and restore the intended behavior if broken.
-5. Test country-level queries, multiple-airport cities, misspellings, and multi-turn location selections.
+Rarely, agents repeatedly invoke the same tools for 2–5+ minutes until the client aborts and reports a connection-lost error.
 
-**Important:** Preserve the existing trip-type validation and other flight-search rules. Reuse the Destination API rather than introducing hardcoded location mappings or regex-based logic.
+Previously, we addressed a similar issue with `update_suggested_questions` by disabling the tool after its first invocation within a user turn.
 
-**Goal:** Ensure both Flight Agents intelligently resolve ambiguous locations through actual Destination API feedback and present valid options before proceeding with flight searches.
+### R&D Requirements
 
-First explain the findings and proposed fix, then implement and verify the necessary changes.
+1. Inspect all agent tools across **Gateway V1 and Manager V2**, including their execution and retry behavior.
+2. Analyze logs/traces to identify repeated calls, legitimate multi-step invocations, and actual loops.
+3. Determine a reasonable **per-tool maximum call count per user turn**, based on each tool's purpose and real usage.
+4. Explore OpenAI Agents SDK capabilities for dynamically enabling/disabling tools during execution.
+5. Evaluate how to track invocation counts per request and disable a tool once its limit is reached.
+6. Ensure limits reset on every new user turn and don't interfere with legitimate retries or multi-agent execution.
+7. Define graceful recovery when a tool reaches its limit, so the Agent can respond intelligently instead of looping or failing.
+
+### Important
+
+- Avoid one global limit for every tool.
+- Preserve legitimate search → filter → re-search workflows.
+- Keep implementation minimal, without unnecessary wrappers or complex tracking layers.
+- **R&D and planning only. Do not implement yet.**
+
+**Expected Output:** Root cause, recommended per-tool call limits, SDK implementation approach with code examples, affected files, and testing strategy.
+
+**Goal:** Prevent runaway tool-call loops while preserving valid agent workflows and reducing unnecessary latency and token costs.
