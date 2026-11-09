@@ -1,67 +1,28 @@
-We need to plan a **self-healing, automated indexing system** with proper Dev/Prod collection isolation and job-level diagnostics.
+Thoroughly investigate our recently implemented **Pre-Booking vs Post-Booking intent handling**, especially ambiguous queries.
 
-### 1. Collection Management & Environment Isolation
+I'm observing multiple routing failures and want to understand how the current implementation actually works.
 
-Currently, Dev and Prod may point to the same vector DB collection.
+### Tasks
 
-- Investigate how to identify which collection is actively used by Production.
-- **Never allow Dev indexing or cron jobs to modify a production collection.**
-- If Dev and Prod share a collection, plan how to create a separate Dev collection safely.
-- Determine how to identify and maintain the latest eligible Dev collection.
-- Explore collection creation, versioning, and promotion strategies without affecting existing data.
+1. **Test First:** Create and execute realistic multi-turn test cases covering:
+   - Clearly pre-booking queries.
+   - Clearly post-booking queries.
+   - Ambiguous queries like "baggage", "cancellation", and "change flight".
+   - Conflicting context involving `hasUpcomingTrips`, `searchKey`, and conversation history.
 
-### 2. Weekly Automated Indexing
+2. **Inspect Actual Execution:** For each case, verify the context passed to the Guardian/Decision API, classification output, confidence signals, and final routing or clarification behavior.
 
-- Design a weekly cron job that automatically crawls and updates the latest eligible Dev collection.
-- No manual API triggering should be required for scheduled execution.
-- Preserve our existing ad hoc indexing API.
-- Support self-healing: retry or recover previously failed URLs and update changed content.
-- Prevent overlapping jobs, duplicate indexing, and accidental production modifications.
+3. **Identify Failures:** Explain incorrect classifications, missed post-booking intents, and cases where clarification should have been requested.
 
-### 3. Job-Level Diagnostics in Database
+4. **Explain Current Implementation:** **Only after testing**, provide a concise, evidence-based explanation of how we currently distinguish:
+   - Pre-booking intent.
+   - Post-booking intent.
+   - Ambiguous intent requiring clarification.
 
-We already have job IDs for crawling/indexing requests.
+Include relevant file references and actual test evidence.
 
-Enhance job tracking so every job maintains detailed diagnostic information, including:
+**Important:** No assumptions or unverified claims. Run tests sequentially, inspect real traces, and clearly distinguish observed behavior from intended behavior.
 
-- Total, successful, failed, and partially processed URLs.
-- Exact failed URLs with error reasons.
-- Newly discovered links and content changes.
-- Crawling and indexing results, timestamps, and execution status.
+**Do not implement fixes yet.** First provide the test results, root causes, and a short explanation of our current decision-making flow.
 
-Explore storing detailed diagnostics in a **JSONB column**, associated with each job ID, while keeping essential searchable fields structured.
-
-### 4. Swagger & Collection Visibility
-
-Explore how developers can use Swagger to:
-
-- Identify current Dev and Production collections.
-- View collection status and indexing history.
-- Safely create a new Dev collection when required.
-- Trigger existing ad hoc indexing and inspect job diagnostics.
-- Clearly distinguish production-protected collections from writable Dev collections.
-
-### 5. Your Task
-
-Thoroughly inspect our existing Python Crawler Adapter, JavaScript Indexing Service, database schemas, collection configuration, and APIs.
-
-Identify what's already implemented, what's missing, and recommend the simplest reliable architecture.
-
-Provide:
-- Proposed collection lifecycle and production-safety mechanism.
-- Weekly cron and self-healing strategy.
-- Job diagnostics schema and example JSONB structure.
-- Required API/Swagger changes.
-- Exact affected files and a step-by-step implementation plan.
-- Testing strategy covering shared collections, cron failures, concurrent jobs, and recovery.
-
-**Important:**
-- **Planning only. Do not implement yet.**
-- Production collections must remain protected.
-- Reuse existing workers, APIs, and indexing infrastructure.
-- Avoid unnecessary abstractions or overengineering.
-- Do not modify the retrieval pipeline.
-
-**Goal:** Build a safe, automated weekly Dev indexing process with complete job diagnostics and clear collection management, without risking production data.
-
-First present the architecture and implementation plan for my approval.
+**Goal:** Understand exactly how our system makes pre-booking/post-booking decisions, why failures occur, and what needs improvement.
