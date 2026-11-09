@@ -1,28 +1,67 @@
-Investigate and plan a solution for **infinite/repeated tool-call loops** in our agent execution.
+We need to plan a **self-healing, automated indexing system** with proper Dev/Prod collection isolation and job-level diagnostics.
 
-### Current Problem
+### 1. Collection Management & Environment Isolation
 
-Rarely, agents repeatedly invoke the same tools for 2–5+ minutes until the client aborts and reports a connection-lost error.
+Currently, Dev and Prod may point to the same vector DB collection.
 
-Previously, we addressed a similar issue with `update_suggested_questions` by disabling the tool after its first invocation within a user turn.
+- Investigate how to identify which collection is actively used by Production.
+- **Never allow Dev indexing or cron jobs to modify a production collection.**
+- If Dev and Prod share a collection, plan how to create a separate Dev collection safely.
+- Determine how to identify and maintain the latest eligible Dev collection.
+- Explore collection creation, versioning, and promotion strategies without affecting existing data.
 
-### R&D Requirements
+### 2. Weekly Automated Indexing
 
-1. Inspect all agent tools across **Gateway V1 and Manager V2**, including their execution and retry behavior.
-2. Analyze logs/traces to identify repeated calls, legitimate multi-step invocations, and actual loops.
-3. Determine a reasonable **per-tool maximum call count per user turn**, based on each tool's purpose and real usage.
-4. Explore OpenAI Agents SDK capabilities for dynamically enabling/disabling tools during execution.
-5. Evaluate how to track invocation counts per request and disable a tool once its limit is reached.
-6. Ensure limits reset on every new user turn and don't interfere with legitimate retries or multi-agent execution.
-7. Define graceful recovery when a tool reaches its limit, so the Agent can respond intelligently instead of looping or failing.
+- Design a weekly cron job that automatically crawls and updates the latest eligible Dev collection.
+- No manual API triggering should be required for scheduled execution.
+- Preserve our existing ad hoc indexing API.
+- Support self-healing: retry or recover previously failed URLs and update changed content.
+- Prevent overlapping jobs, duplicate indexing, and accidental production modifications.
 
-### Important
+### 3. Job-Level Diagnostics in Database
 
-- Avoid one global limit for every tool.
-- Preserve legitimate search → filter → re-search workflows.
-- Keep implementation minimal, without unnecessary wrappers or complex tracking layers.
-- **R&D and planning only. Do not implement yet.**
+We already have job IDs for crawling/indexing requests.
 
-**Expected Output:** Root cause, recommended per-tool call limits, SDK implementation approach with code examples, affected files, and testing strategy.
+Enhance job tracking so every job maintains detailed diagnostic information, including:
 
-**Goal:** Prevent runaway tool-call loops while preserving valid agent workflows and reducing unnecessary latency and token costs.
+- Total, successful, failed, and partially processed URLs.
+- Exact failed URLs with error reasons.
+- Newly discovered links and content changes.
+- Crawling and indexing results, timestamps, and execution status.
+
+Explore storing detailed diagnostics in a **JSONB column**, associated with each job ID, while keeping essential searchable fields structured.
+
+### 4. Swagger & Collection Visibility
+
+Explore how developers can use Swagger to:
+
+- Identify current Dev and Production collections.
+- View collection status and indexing history.
+- Safely create a new Dev collection when required.
+- Trigger existing ad hoc indexing and inspect job diagnostics.
+- Clearly distinguish production-protected collections from writable Dev collections.
+
+### 5. Your Task
+
+Thoroughly inspect our existing Python Crawler Adapter, JavaScript Indexing Service, database schemas, collection configuration, and APIs.
+
+Identify what's already implemented, what's missing, and recommend the simplest reliable architecture.
+
+Provide:
+- Proposed collection lifecycle and production-safety mechanism.
+- Weekly cron and self-healing strategy.
+- Job diagnostics schema and example JSONB structure.
+- Required API/Swagger changes.
+- Exact affected files and a step-by-step implementation plan.
+- Testing strategy covering shared collections, cron failures, concurrent jobs, and recovery.
+
+**Important:**
+- **Planning only. Do not implement yet.**
+- Production collections must remain protected.
+- Reuse existing workers, APIs, and indexing infrastructure.
+- Avoid unnecessary abstractions or overengineering.
+- Do not modify the retrieval pipeline.
+
+**Goal:** Build a safe, automated weekly Dev indexing process with complete job diagnostics and clear collection management, without risking production data.
+
+First present the architecture and implementation plan for my approval.
