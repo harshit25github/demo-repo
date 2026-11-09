@@ -1,28 +1,20 @@
-Thoroughly investigate our recently implemented **Pre-Booking vs Post-Booking intent handling**, especially ambiguous queries.
+Our current **Pre-Booking vs Post-Booking ambiguity handling is not reliable**.
 
-I'm observing multiple routing failures and want to understand how the current implementation actually works.
+Queries like "baggage" and "cancellation" work mainly because we explicitly added them to the prompt. However, ambiguous queries like **"refund", "seat", "meal", "upgrade", and "payment"** are often not even recognized as potentially post-booking.
 
-### Tasks
+We cannot solve this by continuously adding keywords or examples.
 
-1. **Test First:** Create and execute realistic multi-turn test cases covering:
-   - Clearly pre-booking queries.
-   - Clearly post-booking queries.
-   - Ambiguous queries like "baggage", "cancellation", and "change flight".
-   - Conflicting context involving `hasUpcomingTrips`, `searchKey`, and conversation history.
+**Your task:**
 
-2. **Inspect Actual Execution:** For each case, verify the context passed to the Guardian/Decision API, classification output, confidence signals, and final routing or clarification behavior.
+1. Deeply investigate why our existing Guardian/Decision API fails to recognize broader ambiguous booking-related intents.
+2. Evaluate whether our classification policy, training examples, context hydration, or decision boundaries are fundamentally inadequate.
+3. Explore a **generalizable, LLM-driven approach** that understands user intent semantically rather than relying on predefined keywords.
+4. Ensure ambiguous queries trigger intelligent clarification using `hasUpcomingTrips`, `searchKey`, and conversation history as supporting signals—not definitive assumptions.
+5. Design challenging, unseen test cases across different booking-related categories to verify genuine generalization.
+6. Recommend a reliable architecture and implementation plan, supported by actual test evidence.
 
-3. **Identify Failures:** Explain incorrect classifications, missed post-booking intents, and cases where clarification should have been requested.
+**Important:** Do not simply add more keywords, regex, or hardcoded conditions. Challenge the current implementation and propose a better approach if necessary.
 
-4. **Explain Current Implementation:** **Only after testing**, provide a concise, evidence-based explanation of how we currently distinguish:
-   - Pre-booking intent.
-   - Post-booking intent.
-   - Ambiguous intent requiring clarification.
+**Planning only. Do not implement yet.**
 
-Include relevant file references and actual test evidence.
-
-**Important:** No assumptions or unverified claims. Run tests sequentially, inspect real traces, and clearly distinguish observed behavior from intended behavior.
-
-**Do not implement fixes yet.** First provide the test results, root causes, and a short explanation of our current decision-making flow.
-
-**Goal:** Understand exactly how our system makes pre-booking/post-booking decisions, why failures occur, and what needs improvement.
+**Goal:** Build consistent, scalable pre-booking/post-booking intent understanding that works for unseen queries, not just examples explicitly mentioned in the prompt.
