@@ -1,20 +1,40 @@
-Our current **Pre-Booking vs Post-Booking ambiguity handling is not reliable**.
+We need a **deep R&D investigation of Gateway V1's Pre-Booking vs Post-Booking ambiguity handling**. Our current implementation is inconsistent and often fails to understand context or recognize unseen ambiguous queries.
 
-Queries like "baggage" and "cancellation" work mainly because we explicitly added them to the prompt. However, ambiguous queries like **"refund", "seat", "meal", "upgrade", and "payment"** are often not even recognized as potentially post-booking.
+### 1. Validate User Stories First
+- Review all user stories I'll provide.
+- Identify valid, invalid, redundant, and logically questionable scenarios.
+- Clearly distinguish **ambiguous intent** from **whether a post-booking action is possible**.
+- For example, if `hasUpcomingTrips = false` and no booking exists, investigate whether asking about existing-booking actions is actually useful.
+- Challenge incorrect assumptions before designing a solution.
 
-We cannot solve this by continuously adding keywords or examples.
+### 2. Investigate Context Hydration
+- Trace `hasUpcomingTrips`, `searchKey`, conversation history, and Guardrail/Decision API outputs.
+- Verify whether context and ambiguity signals actually reach Gateway and Pages Agent.
+- Identify lost, overwritten, or incorrectly hydrated context using actual execution evidence.
 
-**Your task:**
+### 3. Compare Classification Approaches
+Isolate and test:
+- **OpenAI Decisions API** — current approach.
+- **Responses API with Luna** — alternative approach.
 
-1. Deeply investigate why our existing Guardian/Decision API fails to recognize broader ambiguous booking-related intents.
-2. Evaluate whether our classification policy, training examples, context hydration, or decision boundaries are fundamentally inadequate.
-3. Explore a **generalizable, LLM-driven approach** that understands user intent semantically rather than relying on predefined keywords.
-4. Ensure ambiguous queries trigger intelligent clarification using `hasUpcomingTrips`, `searchKey`, and conversation history as supporting signals—not definitive assumptions.
-5. Design challenging, unseen test cases across different booking-related categories to verify genuine generalization.
-6. Recommend a reliable architecture and implementation plan, supported by actual test evidence.
+Run identical ambiguous, pre-booking, and post-booking queries against both in isolation, without invoking the complete chat API.
 
-**Important:** Do not simply add more keywords, regex, or hardcoded conditions. Challenge the current implementation and propose a better approach if necessary.
+Evaluate classification accuracy, consistency, latency, token usage, and multilingual/generalization capabilities.
 
-**Planning only. Do not implement yet.**
+### 4. Explore Confidence-Based Ambiguity
+- Investigate whether calibrated confidence scores or decision uncertainty can reliably identify ambiguous requests.
+- Determine whether ambiguity signals should be passed to Gateway, Pages Agent, or both.
+- Explore how agents should use these signals to ask contextual clarification questions rather than incorrectly routing requests.
+- Avoid arbitrary percentage thresholds without test evidence.
 
-**Goal:** Build consistent, scalable pre-booking/post-booking intent understanding that works for unseen queries, not just examples explicitly mentioned in the prompt.
+### 5. Recommend a Reliable Solution
+- Identify root causes based on actual tests, not assumptions.
+- Recommend the best classification approach and context-hydration design.
+- Create a minimal implementation plan supported by test results.
+- Avoid keyword-based fixes, regex, and unnecessary wrappers.
+
+**Important:** R&D and planning only. Do not modify the existing Gateway API yet. Run isolated, cost-conscious tests sequentially.
+
+**Goal:** Build a scalable, context-aware ambiguity detection system that generalizes to unseen queries and consistently distinguishes pre-booking, post-booking, and genuine clarification scenarios.
+
+**First deliver:** User-story validation, context-flow findings, Decision API vs Responses API comparison, and the recommended architecture for my approval.
