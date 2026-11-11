@@ -1,26 +1,34 @@
-Thoroughly analyze the provided **Hotel MCP codebase** to understand the APIs and services required for our upcoming Hotel Specialist.
+We need to **plan and implement a Hotel Specialist for Manager V2 only**. Do not modify Gateway V1.
 
-### Your Task
+We have already analyzed the Python Hotel MCP codebase and documented the required APIs and services in `HOTEL_API_ARCHITECTURE.md`.
 
-1. **API Discovery:** Identify all APIs used for hotel search, hotel filtering, location search, and related operations.
-2. **API Contracts:** Document each API's endpoint, method, authentication, request payload, response structure, and required parameters.
-3. **Execution Flow:** Explain how these APIs interact, including dependencies, search keys, filtering sequences, and location resolution.
-4. **Service Segregation:** Recommend which backend services we should create, similar to our existing Flight Search, Apply Filter, and Location services.
-5. **Code References:** Include exact files and functions where these APIs are currently implemented or invoked.
+### Phase 1 — Architecture & Tool Planning
 
-### Deliverable
+1. Thoroughly inspect our existing **Flight Agent**, especially its tools, service architecture, input/output schemas, prompts, and structured feedback to the Manager.
+2. Review `HOTEL_API_ARCHITECTURE.md` and the Python MCP implementation to identify the required Hotel APIs, parameters, and dependencies.
+3. Decide **how many Hotel Agent tools we actually need**, such as hotel search, hotel filtering, and location resolution. Avoid unnecessary tools.
+4. Design each tool's input schema, output structure, validation rules, and contextual feedback for success, missing information, ambiguous locations, API failures, and filtering scenarios.
+5. Define Hotel Agent instructions, multi-turn context handling, Manager routing, and specialist-to-Manager feedback, following the same systematic architecture as Flight Agent.
 
-Create a concise but explanatory **`HOTEL_API_ARCHITECTURE.md`** containing:
-- API inventory and responsibilities.
-- Request/response examples from the actual code.
-- End-to-end API execution flow.
-- Recommended backend service structure.
-- Any missing information or dependencies.
+### Phase 2 — Implementation
 
-**Important:**
-- Analyze the actual codebase; do not assume API behavior.
-- Focus strictly on **API discovery, documentation, and service planning**.
-- Do not create Hotel Agents or agent tools yet.
-- Do not modify existing code.
+- Implement all Hotel services and tools in our **existing TypeScript backend codebase**, translating the necessary logic from the Python MCP implementation.
+- Reuse existing backend patterns, utilities, and agent architecture.
+- Build the Hotel Specialist and integrate it into **Manager V2's agent-as-tool orchestration**.
+- Ensure the Manager receives rich, structured feedback and can intelligently handle hotel-related queries.
+- Preserve existing Flight Agent, Trip Planner, streaming, and conversation functionality.
 
-**Goal:** Establish a clear understanding of all hotel APIs and the services we'll need before discussing agent and tool implementation.
+### Phase 3 — Verification
+
+Test hotel search, filtering, location ambiguity, missing parameters, API failures, and multi-turn workflows.
+
+Verify actual API payloads, tool feedback, Manager routing, and final responses. Fix issues and rerun failed scenarios.
+
+### Important
+
+- **First complete the architecture and tool-design plan**, including exact proposed tools, schemas, feedback contracts, and files.
+- Make appropriate technical decisions based on the existing Flight architecture and Hotel API documentation.
+- **Wait for my review before starting implementation.**
+- Keep everything simple, maintainable, and free from unnecessary wrappers or abstractions.
+
+**Goal:** Build a production-ready Hotel Specialist in Manager V2 using our existing TypeScript backend and Flight Agent's reliable tool-feedback patterns.
