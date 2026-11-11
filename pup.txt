@@ -1,11 +1,26 @@
-Review how **`hasUpcomingTrips`** affects our Post-Booking Guardrail's confidence and classification.
+Thoroughly analyze the provided **Hotel MCP codebase** to understand the APIs and services required for our upcoming Hotel Specialist.
 
-**Scenario:** A logged-in user has `hasUpcomingTrips = false` but requests help with a booking made through another account or provides a booking reference.
+### Your Task
 
-Please:
-1. Verify how our current implementation handles this scenario.
-2. Identify potential misclassification risks caused by low post-booking confidence.
-3. Explain whether explicit booking intent should outweigh `hasUpcomingTrips = false`.
-4. Recommend possible solutions.
+1. **API Discovery:** Identify all APIs used for hotel search, hotel filtering, location search, and related operations.
+2. **API Contracts:** Document each API's endpoint, method, authentication, request payload, response structure, and required parameters.
+3. **Execution Flow:** Explain how these APIs interact, including dependencies, search keys, filtering sequences, and location resolution.
+4. **Service Segregation:** Recommend which backend services we should create, similar to our existing Flight Search, Apply Filter, and Location services.
+5. **Code References:** Include exact files and functions where these APIs are currently implemented or invoked.
 
-**Do not modify code.** Provide a brief, evidence-based, management-ready explanation of the problems, their impact, and recommended improvements.
+### Deliverable
+
+Create a concise but explanatory **`HOTEL_API_ARCHITECTURE.md`** containing:
+- API inventory and responsibilities.
+- Request/response examples from the actual code.
+- End-to-end API execution flow.
+- Recommended backend service structure.
+- Any missing information or dependencies.
+
+**Important:**
+- Analyze the actual codebase; do not assume API behavior.
+- Focus strictly on **API discovery, documentation, and service planning**.
+- Do not create Hotel Agents or agent tools yet.
+- Do not modify existing code.
+
+**Goal:** Establish a clear understanding of all hotel APIs and the services we'll need before discussing agent and tool implementation.
