@@ -1,51 +1,25 @@
-Enhance our existing **Hotel Specialist (Manager V2)** and **Next.js client** to support complete hotel-card interactions and intelligent tool usage.
+Enhance **Gateway V1's Flight Agent** to intelligently handle date-range queries using `price_prediction`.
 
-### 1. Next.js Client — Hotel Context & Cards
+### Required Changes
 
-- Inspect how Flight Context, flight cards, and card selection are currently handled.
-- Implement equivalent handling for **Hotel Context** and hotel-card rendering.
-- Ensure hotel search and filter results dynamically update the client through the existing streaming/context hydration flow.
-- Support hotel-card selection and relevant user interactions.
-- Reuse existing UI patterns and components wherever possible while keeping hotel cards visually clean.
+1. **Date Range Detection:** Whenever a user provides a flexible date or range, invoke `price_prediction` before `flight_search`, even if they don't explicitly ask for the cheapest fare.
+   - "Flights to Dubai next month"
+   - "Planning to travel in December"
+   - "Anytime after September 15"
+   - "Between October 10–20"
+   - "Sometime next week"
 
-### 2. Backend — Hotel Card Interaction Tool
+2. **Successful Prediction:** Use the relevant date suggested by `price_prediction` to initiate `flight_search`, following the user's intent and existing search criteria.
 
-Review our existing Flight Agent tool used for reading, discussing, and selecting individual flight cards.
+3. **Prediction Failure:** Preserve the current fallback behavior if `price_prediction` fails, returns no usable dates, or cannot resolve the range. Do not introduce new fallback logic.
 
-Implement an equivalent **Hotel Card Interaction Tool** that:
+4. **Prompt & Tool Handling:** Review and update the Flight Agent instructions, tool-selection rules, and relevant examples. Ensure flexible dates are not automatically reduced to the first day of a month without attempting prediction.
 
-- Allows users to ask questions about a particular hotel card.
-- Retrieves relevant details from the existing Hotel Context.
-- Supports selecting a hotel option and updating the appropriate context.
-- Returns rich, structured feedback to the Hotel Agent and Manager.
-- **Must not be used for searching or filtering hotels.** Those responsibilities remain with `hotel_search` and `hotel_apply_filter`.
-
-### 3. Improve Hotel Agent Intelligence
-
-Our current Hotel Agent prompt lacks the detailed tool-selection intelligence already implemented in Flight Agent.
-
-Thoroughly review Flight Agent's instructions and improve Hotel Agent prompting for:
-
-- Correct selection between `hotel_search`, `hotel_apply_filter`, and the Hotel Card Interaction Tool.
-- Multi-turn context understanding and follow-up requests.
-- Hotel location ambiguity and clarification.
-- Search vs. filter vs. card-selection decisions.
-- Handling incomplete user inputs and API/tool feedback.
-- Avoiding unnecessary tool calls and repeated searches.
-
-Use the Flight Agent's proven intelligence patterns, adapted specifically for hotels.
-
-### 4. Implementation & Testing
-
-- Implement the necessary backend and Next.js changes.
-- Test search → filter → card discussion → hotel selection across multiple turns.
-- Verify Hotel Context persistence, streaming hydration, card rendering, and tool feedback.
-- Fix failures and retest sequentially.
-- Preserve existing Flight and Trip Planner behavior.
+5. **Testing:** Verify actual tool-call sequences for date ranges, explicit dates, prediction success/failure, and multi-turn conversations.
 
 **Important:**
-- **Manager V2 only. Do not modify Gateway V1.**
-- Reuse existing functionality and keep the implementation simple.
-- Avoid unnecessary wrappers, hardcoded intent rules, or extra LLM calls.
+- **Gateway V1 Flight Agent only.** Do not modify Manager V2.
+- Preserve existing functionality and avoid unnecessary wrappers or hardcoded date-handling rules.
+- Make minimal prompt-level changes wherever possible.
 
-**Goal:** Deliver a complete Hotel Specialist experience with intelligent tool routing, persistent context, interactive hotel cards, and seamless Next.js rendering.
+**Goal:** For flexible travel dates, consistently use `price_prediction` before flight searching, while retaining our existing fallback behavior if prediction is unsuccessful.
