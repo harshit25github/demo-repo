@@ -1,1 +1,25 @@
+Enhance **Gateway V1 Flight Agent's trip-type clarification and multi-city user experience**.
 
+### 1. Consistent Trip-Type Clarification
+- When trip type is missing, always ask the user to choose between **one-way, round-trip, and multi-city**.
+- Never omit multi-city from the clarification nudge.
+- Do not assume a trip type without explicit user intent or previously confirmed context.
+
+### 2. Multi-City CTA Intelligence
+- Review our existing suggested-question/CTA generation.
+- Verify that CTAs are contextual, relevant, and actionable when users select multi-city.
+- Ensure CTAs intelligently guide users through missing destinations, segments, dates, and other required details.
+- Avoid generic, repetitive, or irrelevant suggestions.
+
+### 3. End-to-End Multi-City Testing
+- Test trip-type clarification → multi-city selection → segment collection → flight search → follow-up interactions.
+- Include incomplete inputs, multi-turn conversations, and changes to existing segments.
+- Inspect actual agent responses, CTA generation, tool calls, and context updates.
+- Identify and fix inconsistent behavior, then rerun failed scenarios.
+
+**Important:**
+- **Gateway V1 Flight Agent only.** Do not modify Manager V2.
+- Preserve existing trip-type validation and flight-search behavior.
+- Prefer minimal prompt and tool-feedback improvements without unnecessary custom logic.
+
+**Goal:** Consistently present all three trip types and provide an intelligent, seamless multi-city flight-search experience.
