@@ -1,25 +1,33 @@
-Enhance **Gateway V1 Flight Agent's trip-type clarification and multi-city user experience**.
+Thoroughly investigate and fix our **Post-Booking Decision API Guardrail**, which is failing to recognize even explicit existing-booking requests.
 
-### 1. Consistent Trip-Type Clarification
-- When trip type is missing, always ask the user to choose between **one-way, round-trip, and multi-city**.
-- Never omit multi-city from the clarification nudge.
-- Do not assume a trip type without explicit user intent or previously confirmed context.
+### Core Requirement
 
-### 2. Multi-City CTA Intelligence
-- Review our existing suggested-question/CTA generation.
-- Verify that CTAs are contextual, relevant, and actionable when users select multi-city.
-- Ensure CTAs intelligently guide users through missing destinations, segments, dates, and other required details.
-- Avoid generic, repetitive, or irrelevant suggestions.
+**Any request explicitly related to an existing booking must be classified as post-booking, regardless of `hasUpcomingTrips` being true or false.**
 
-### 3. End-to-End Multi-City Testing
-- Test trip-type clarification → multi-city selection → segment collection → flight search → follow-up interactions.
-- Include incomplete inputs, multi-turn conversations, and changes to existing segments.
-- Inspect actual agent responses, CTA generation, tool calls, and context updates.
-- Identify and fix inconsistent behavior, then rerun failed scenarios.
+Examples:
+- "I need help with my existing booking."
+- "I want to modify my reservation."
+- "Can you check my booking details?"
+- "I booked from another account."
+- "I need assistance with a previous reservation."
+
+**Important:** `hasUpcomingTrips = false` must never override clear post-booking intent. Booking ownership and availability are separate from intent classification.
+
+### Your Task
+
+1. Thoroughly inspect the current Decision API policy, prompts, confidence handling, and context hydration.
+2. Identify why explicit existing-booking requests are being misclassified.
+3. Improve the Decision API's semantic understanding rather than adding isolated keyword-based rules.
+4. Ensure clear post-booking intent triggers the Post-Booking Guardrail, while genuinely ambiguous queries still receive appropriate clarification.
+5. Build challenging test cases covering explicit, implicit, multilingual, multi-turn, and conflicting-context requests.
+6. Implement the necessary fixes and repeatedly test until classification is consistent, without breaking existing pre-booking behavior.
 
 **Important:**
-- **Gateway V1 Flight Agent only.** Do not modify Manager V2.
-- Preserve existing trip-type validation and flight-search behavior.
-- Prefer minimal prompt and tool-feedback improvements without unnecessary custom logic.
+- Prioritize a robust, generalizable solution over quick prompt patches.
+- Avoid regex, hardcoded keyword lists, and unnecessary wrappers.
+- Validate the actual Decision API outputs and final routing, not just prompt expectations.
+- Keep changes focused on the Post-Booking Guardrail.
 
-**Goal:** Consistently present all three trip types and provide an intelligent, seamless multi-city flight-search experience.
+**Goal:** Make the Decision API reliably recognize any genuine existing-booking intent, even when the user has no upcoming trips associated with their current account.
+
+**Put substantial effort into root-cause investigation, implementation, and comprehensive regression testing.** Provide a concise report of the failures found, fixes made, and before/after test results.
