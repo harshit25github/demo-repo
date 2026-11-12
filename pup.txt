@@ -1,33 +1,76 @@
-Thoroughly investigate and fix our **Post-Booking Decision API Guardrail**, which is failing to recognize even explicit existing-booking requests.
+[Likely] The real test isn't just whether the Agent offers multi-city. It's whether its CTAs intelligently adapt as the user adds, changes, and completes flight segments.
 
-### Core Requirement
+Here are 3 realistic multi-turn conversations. Send each user message separately and observe the actual Agent response and suggested questions.
 
-**Any request explicitly related to an existing booking must be classified as post-booking, regardless of `hasUpcomingTrips` being true or false.**
+## Scenario 1 — Missing trip type → Multi-city
 
-Examples:
-- "I need help with my existing booking."
-- "I want to modify my reservation."
-- "Can you check my booking details?"
-- "I booked from another account."
-- "I need assistance with a previous reservation."
+T1
 
-**Important:** `hasUpcomingTrips = false` must never override clear post-booking intent. Booking ownership and availability are separate from intent classification.
+Delhi to Dubai in December
 
-### Your Task
+T2
 
-1. Thoroughly inspect the current Decision API policy, prompts, confidence handling, and context hydration.
-2. Identify why explicit existing-booking requests are being misclassified.
-3. Improve the Decision API's semantic understanding rather than adding isolated keyword-based rules.
-4. Ensure clear post-booking intent triggers the Post-Booking Guardrail, while genuinely ambiguous queries still receive appropriate clarification.
-5. Build challenging test cases covering explicit, implicit, multilingual, multi-turn, and conflicting-context requests.
-6. Implement the necessary fixes and repeatedly test until classification is consistent, without breaking existing pre-booking behavior.
+multi city
 
-**Important:**
-- Prioritize a robust, generalizable solution over quick prompt patches.
-- Avoid regex, hardcoded keyword lists, and unnecessary wrappers.
-- Validate the actual Decision API outputs and final routing, not just prompt expectations.
-- Keep changes focused on the Post-Booking Guardrail.
+T3
 
-**Goal:** Make the Decision API reliably recognize any genuine existing-booking intent, even when the user has no upcoming trips associated with their current account.
+add singapore too
 
-**Put substantial effort into root-cause investigation, implementation, and comprehensive regression testing.** Provide a concise report of the failures found, fixes made, and before/after test results.
+T4
+
+DEL to DXB 12 Dec, DXB to SIN 17 Dec, SIN to DEL 23 Dec. 2 adults
+
+Verify: Initial nudge includes all three trip types. After selecting multi-city, CTAs should help collect segments and dates. Once complete, the Agent should search and offer relevant next steps.
+
+## Scenario 2 — Change trip type mid-conversation
+
+T1
+
+Mumbai to Bangkok next month, 2 people
+
+T2
+
+actually multi city
+
+T3
+
+add Phuket after Bangkok
+
+T4
+
+BOM to BKK Dec 5, BKK to HKT Dec 10, HKT to BOM Dec 15
+
+Verify: The Agent preserves two passengers, understands the multi-city change, builds the correct segments, and doesn't show stale one-way or round-trip CTAs.
+
+## Scenario 3 — Multi-city segment correction
+
+T1
+
+multi city europe trip
+
+T2
+
+Delhi to Paris Jan 10, Paris to Rome Jan 14
+
+T3
+
+add Rome to London Jan 18
+
+T4
+
+no London, Rome to Delhi Jan 22 instead
+
+Verify: The Agent correctly replaces the London segment, preserves the Paris and Rome legs, requests only genuinely missing information, and generates fresh CTAs based on the updated route.
+
+### CTA intelligence — What to evaluate
+
+| Check                | Expected behavior                                               |
+| -------------------- | --------------------------------------------------------------- |
+| Trip-type nudge      | Always includes one-way, round-trip, multi-city                 |
+| Missing details      | CTAs focus on the next missing information                      |
+| Context preservation | Previously provided passengers, cities, and dates remain intact |
+| Segment changes      | CTAs reflect the latest route, not deleted segments             |
+| Search readiness     | No premature flight search; proceed when criteria are complete  |
+| Relevance            | No generic, repetitive, or stale suggested questions            |
+
+My recommendation: Start with Scenario 2. It's particularly useful because it tests trip-type switching, context preservation, segment construction, and CTA relevance in just four short messages.
