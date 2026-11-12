@@ -1,72 +1,51 @@
+Enhance our existing **Hotel Specialist (Manager V2)** and **Next.js client** to support complete hotel-card interactions and intelligent tool usage.
 
-We need to implement the **Hotel Specialist for Manager V2 only**, following our existing Flight Agent architecture.
+### 1. Next.js Client — Hotel Context & Cards
 
-First review our Hotel documentation (`documentation.md`), Python MCP codebase, and existing TypeScript Flight Agent implementation.
+- Inspect how Flight Context, flight cards, and card selection are currently handled.
+- Implement equivalent handling for **Hotel Context** and hotel-card rendering.
+- Ensure hotel search and filter results dynamically update the client through the existing streaming/context hydration flow.
+- Support hotel-card selection and relevant user interactions.
+- Reuse existing UI patterns and components wherever possible while keeping hotel cards visually clean.
 
-## 1. Hotel Search Service
+### 2. Backend — Hotel Card Interaction Tool
 
-Create a Hotel Search Service covering:
+Review our existing Flight Agent tool used for reading, discussing, and selecting individual flight cards.
 
-**A. Hotel Location Auto-Suggest / Location Resolution**
+Implement an equivalent **Hotel Card Interaction Tool** that:
 
-I've added **two location-search API cURL commands** to `documentation.md`:
+- Allows users to ask questions about a particular hotel card.
+- Retrieves relevant details from the existing Hotel Context.
+- Supports selecting a hotel option and updating the appropriate context.
+- Returns rich, structured feedback to the Hotel Agent and Manager.
+- **Must not be used for searching or filtering hotels.** Those responsibilities remain with `hotel_search` and `hotel_apply_filter`.
 
-- Intelligence Services Location API
-- `/api/trip/hotels/search`
+### 3. Improve Hotel Agent Intelligence
 
-**Important:** Both APIs are intended to **search and resolve hotel locations, not to retrieve hotel listings**.
+Our current Hotel Agent prompt lacks the detailed tool-selection intelligence already implemented in Flight Agent.
 
-Our primary objective is to identify the correct destination `code` required by the Hotel List API.
+Thoroughly review Flight Agent's instructions and improve Hotel Agent prompting for:
 
-- Compare both APIs' request parameters, response structures, supported location types, and available metadata.
-- Evaluate location name, country, state, type (hotel, POI, locality, etc.), destination code, and coordinates.
-- Test both APIs with identical locations, including ambiguous destinations.
-- Determine which API provides more accurate and reliable destination-code resolution.
-- Implement and test both approaches before recommending the best one.
-- If multiple plausible matches exist, return clear options through structured tool feedback and ask the user to clarify.
+- Correct selection between `hotel_search`, `hotel_apply_filter`, and the Hotel Card Interaction Tool.
+- Multi-turn context understanding and follow-up requests.
+- Hotel location ambiguity and clarification.
+- Search vs. filter vs. card-selection decisions.
+- Handling incomplete user inputs and API/tool feedback.
+- Avoiding unnecessary tool calls and repeated searches.
 
-**Do not finalize the location API choice yet.** Share comparative R&D findings so we can decide after testing.
+Use the Flight Agent's proven intelligence patterns, adapted specifically for hotels.
 
-**B. Hotel Search / UUID Registration**
-- Generate a UUID for the hotel search lifecycle.
-- Send it to the actual Hotel Search API identified in the MCP implementation.
-- Validate that the API successfully registers and returns the expected UUID.
-- Handle missing tokens, mismatches, and failures through structured feedback.
+### 4. Implementation & Testing
 
-**C. Hotel List API**
-- Call the Hotel List API using the registered UUID, resolved destination code, UID, and other required parameters.
-- Follow the existing MCP contract.
-- Validate results and update Hotel Context for client-side hotel-card rendering.
+- Implement the necessary backend and Next.js changes.
+- Test search → filter → card discussion → hotel selection across multiple turns.
+- Verify Hotel Context persistence, streaming hydration, card rendering, and tool feedback.
+- Fix failures and retest sequentially.
+- Preserve existing Flight and Trip Planner behavior.
 
-## 2. Persistent Hotel Context
+**Important:**
+- **Manager V2 only. Do not modify Gateway V1.**
+- Reuse existing functionality and keep the implementation simple.
+- Avoid unnecessary wrappers, hardcoded intent rules, or extra LLM calls.
 
-Create a dedicated Hotel Context in PostgreSQL `chat_v2`, following our existing Flight Context pattern.
-
-Persist the UUID, location/code, search criteria, hotel results, and filters. Maintain the correct UID association, conversation state, and UUID lifecycle.
-
-## 3. Hotel Filter Service
-
-Implement a separate TypeScript Hotel Filter Service using the custom filtering approach in our Python MCP implementation.
-
-Support consecutive filters, multi-turn changes, context updates, and structured tool feedback.
-
-## 4. Tools & Hotel Specialist
-
-Create two tools:
-
-- `hotel_search` — Location resolution → UUID registration → Hotel List → Context update.
-- `hotel_apply_filter` — Filter existing hotel results and update context.
-
-Follow Flight Agent's tool schemas, validation, error handling, and rich feedback patterns.
-
-Integrate the Hotel Specialist into **Manager V2 only**.
-
-## 5. Implementation & Verification
-
-Implement and test sequentially: location API comparison → Hotel Search Service → Hotel Context → Hotel Filter Service → tools → Hotel Specialist → Manager integration.
-
-Use our existing TypeScript backend and actual MCP API contracts.
-
-Preserve Gateway V1, Flight Agent, and Trip Planner. Avoid unnecessary wrappers or abstractions.
-
-**Goal:** Build a reliable Hotel Specialist while identifying the best location-resolution API through actual testing, without confusing location search with hotel listing retrieval.
+**Goal:** Deliver a complete Hotel Specialist experience with intelligent tool routing, persistent context, interactive hotel cards, and seamless Next.js rendering.
