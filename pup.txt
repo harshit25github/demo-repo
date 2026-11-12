@@ -1,1 +1,65 @@
+Enhance **Gateway V1 Flight Agent's Price Prediction → Flight Search workflow**.
 
+### 1. When to Use Price Prediction
+
+Invoke `price_prediction` whenever the user:
+- Provides a flexible date range (next month, December, next two months, between two dates, etc.).
+- Asks for the **cheapest, best, or most suitable travel dates**.
+
+### 2. Price Prediction Success
+
+- Use `price_prediction` to identify the strongest recommended date.
+- **Immediately invoke `flight_search` for that date without asking for user confirmation**, provided the other required search criteria are available.
+- In the final response, clearly mention:
+  - Which date was selected and searched.
+  - Why it was recommended, based on actual prediction results.
+  - Other promising dates returned by the tool, which the user can explore.
+
+**Example:**
+
+User: "Find me the cheapest Delhi to Dubai flights next month."
+
+Expected flow:
+
+`price_prediction → identify best date → flight_search → response`
+
+The Agent should search immediately, not just recommend a date and wait for confirmation.
+
+### 3. Price Prediction Failure
+
+If `price_prediction` fails or returns no usable dates:
+
+**First attempt:**
+- Ask the user to provide a specific travel date, following the existing prediction-failure nudge.
+
+**If the user again provides a flexible date range:**
+- Do not repeatedly invoke the same failing prediction for that origin/destination and applicable range.
+- Do not ask for the date again.
+- Use the Agent's reasoning and available date/conversation context to choose a reasonable **specific date within the user's requested range**.
+- Immediately invoke `flight_search` using that date.
+- Clearly explain which date was selected, without claiming it is the cheapest unless supported by actual data.
+
+**Example:**
+
+User: "I'm flexible to travel from Delhi to LAX within the next two months."
+
+Prediction fails → Agent asks for a specific date.
+
+User: "Any date within those two months is fine."
+
+Expected behavior: Agent intelligently selects a valid date within that range and proceeds with `flight_search`, without further date clarification.
+
+### 4. Implementation
+
+- Thoroughly inspect existing Flight Agent prompts, `price_prediction`, `flight_search`, failure feedback, and conversation context.
+- Update tool-selection intelligence and relevant prompt examples.
+- Preserve existing search criteria, required-field validation, acknowledgement behavior, and response tone.
+- Avoid hardcoded date-selection rules, regex, additional LLM calls, and unnecessary wrappers.
+- Test successful predictions, failures, repeated flexible-date requests, cheapest/best queries, and multi-turn conversations.
+- Verify actual tool execution order and API payloads.
+
+**Important:** Gateway V1 only. Do not modify Manager V2.
+
+**Goal:** Make the Flight Agent proactively search using predicted dates, gracefully recover from prediction failures, and avoid repeatedly asking users for dates when they have already expressed flexibility.
+
+Implement the improvements and verify them through sequential testing.
