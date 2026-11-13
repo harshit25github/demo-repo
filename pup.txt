@@ -1,76 +1,33 @@
-[Likely] The real test isn't just whether the Agent offers multi-city. It's whether its CTAs intelligently adapt as the user adds, changes, and completes flight segments.
+Enhance our existing **App Insights event tracking** for Flight Agent's external API and database operations.
 
-Here are 3 realistic multi-turn conversations. Send each user message separately and observe the actual Agent response and suggested questions.
+### APIs to Track
 
-## Scenario 1 — Missing trip type → Multi-city
+1. **Flight Search Tool:** Digital API requests.
+2. **Price Prediction Tool:** Database queries used for price prediction.
+3. **Apply Filter Tool:** Filter API requests.
 
-T1
+### Requirements
 
-Delhi to Dubai in December
+For every API/DB execution, emit a structured App Insights event containing:
 
-T2
+- Operation/tool name and request ID.
+- Request payload or DB query parameters.
+- Execution duration in milliseconds.
+- Result status: `success`, `failure`, `no_results`, or `timeout`.
+- Error details when failures occur.
+- Relevant response metadata, such as result count.
 
-multi city
+### Implementation
 
-T3
+- Inspect our existing App Insights integration and reuse its event-tracking patterns.
+- Add events at the actual API/DB execution points, including retries and failed attempts.
+- Track empty results separately from API failures.
+- Preserve correlation with the originating chat request.
+- Exclude credentials, tokens, and sensitive user information from logged payloads.
+- Keep existing API behavior unchanged.
 
-add singapore too
+**Important:** Keep implementation minimal. Avoid unnecessary wrappers, duplicate events, or additional logging infrastructure.
 
-T4
+Implement and verify tracking for all three operations, including successful, failed, timeout, and empty-result scenarios.
 
-DEL to DXB 12 Dec, DXB to SIN 17 Dec, SIN to DEL 23 Dec. 2 adults
-
-Verify: Initial nudge includes all three trip types. After selecting multi-city, CTAs should help collect segments and dates. Once complete, the Agent should search and offer relevant next steps.
-
-## Scenario 2 — Change trip type mid-conversation
-
-T1
-
-Mumbai to Bangkok next month, 2 people
-
-T2
-
-actually multi city
-
-T3
-
-add Phuket after Bangkok
-
-T4
-
-BOM to BKK Dec 5, BKK to HKT Dec 10, HKT to BOM Dec 15
-
-Verify: The Agent preserves two passengers, understands the multi-city change, builds the correct segments, and doesn't show stale one-way or round-trip CTAs.
-
-## Scenario 3 — Multi-city segment correction
-
-T1
-
-multi city europe trip
-
-T2
-
-Delhi to Paris Jan 10, Paris to Rome Jan 14
-
-T3
-
-add Rome to London Jan 18
-
-T4
-
-no London, Rome to Delhi Jan 22 instead
-
-Verify: The Agent correctly replaces the London segment, preserves the Paris and Rome legs, requests only genuinely missing information, and generates fresh CTAs based on the updated route.
-
-### CTA intelligence — What to evaluate
-
-| Check                | Expected behavior                                               |
-| -------------------- | --------------------------------------------------------------- |
-| Trip-type nudge      | Always includes one-way, round-trip, multi-city                 |
-| Missing details      | CTAs focus on the next missing information                      |
-| Context preservation | Previously provided passengers, cities, and dates remain intact |
-| Segment changes      | CTAs reflect the latest route, not deleted segments             |
-| Search readiness     | No premature flight search; proceed when criteria are complete  |
-| Relevance            | No generic, repetitive, or stale suggested questions            |
-
-My recommendation: Start with Scenario 2. It's particularly useful because it tests trip-type switching, context preservation, segment construction, and CTA relevance in just four short messages.
+**Goal:** Make it easy to identify which API or DB operation failed, what safe request parameters were used, and how long execution took through App Insights.
