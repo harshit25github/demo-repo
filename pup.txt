@@ -1,33 +1,56 @@
-Enhance our existing **App Insights event tracking** for Flight Agent's external API and database operations.
+Enhance **Manager V2's orchestration intelligence** to fully leverage our three specialists: **Flight Agent, Hotel Agent, and Trip Planner**.
 
-### APIs to Track
+### 1. Intelligent Multi-Agent Coordination
 
-1. **Flight Search Tool:** Digital API requests.
-2. **Price Prediction Tool:** Database queries used for price prediction.
-3. **Apply Filter Tool:** Filter API requests.
+Currently, the Manager is not optimally utilizing the capabilities of all three specialists.
 
-### Requirements
+We need the Manager to intelligently understand the user's complete travel requirements and coordinate specialists whenever they can provide meaningful value.
 
-For every API/DB execution, emit a structured App Insights event containing:
+**Example:**
+User: "Plan a comfortable 7-day trip to Paris, preferably with nonstop flights, a centrally located hotel, and a $1,500 budget."
 
-- Operation/tool name and request ID.
-- Request payload or DB query parameters.
-- Execution duration in milliseconds.
-- Result status: `success`, `failure`, `no_results`, or `timeout`.
-- Error details when failures occur.
-- Relevant response metadata, such as result count.
+Expected behavior:
+- **Trip Planner:** Create an itinerary aligned with the user's preferences.
+- **Flight Agent:** Search flights and intelligently apply relevant filters, such as stops, airlines, baggage, timings, duration, and price.
+- **Hotel Agent:** Search hotels and apply relevant filters, such as location, ratings, amenities, price, and other supported criteria.
+- **Manager:** Coordinate these operations, preserve shared constraints, and deliver one cohesive recommendation.
 
-### Implementation
+### 2. Explore Complete Specialist Capabilities
 
-- Inspect our existing App Insights integration and reuse its event-tracking patterns.
-- Add events at the actual API/DB execution points, including retries and failed attempts.
-- Track empty results separately from API failures.
-- Preserve correlation with the originating chat request.
-- Exclude credentials, tokens, and sensitive user information from logged payloads.
-- Keep existing API behavior unchanged.
+Thoroughly inspect **all existing tools, filters, schemas, prompts, context, and feedback mechanisms** across Flight, Hotel, and Trip Planner.
 
-**Important:** Keep implementation minimal. Avoid unnecessary wrappers, duplicate events, or additional logging infrastructure.
+Understand how the Manager can intelligently:
+- Identify relevant user preferences, including implicit and multi-turn requirements.
+- Pass appropriate criteria to each specialist without losing context.
+- Leverage available search and filtering capabilities rather than stopping after initial results.
+- Coordinate dependencies between agents, including destinations, dates, budgets, locations, and travel preferences.
+- Reuse existing searches and apply filters when appropriate instead of unnecessarily restarting searches.
+- Adapt recommendations based on actual specialist results and constraints.
 
-Implement and verify tracking for all three operations, including successful, failed, timeout, and empty-result scenarios.
+**Do not limit this improvement to budget handling. Explore every useful capability already supported by our specialists.**
 
-**Goal:** Make it easy to identify which API or DB operation failed, what safe request parameters were used, and how long execution took through App Insights.
+### 3. Improve Manager Intelligence
+
+- Identify current routing and coordination gaps.
+- Enhance Manager prompting, specialist instructions, and feedback where necessary.
+- Encourage meaningful multi-agent collaboration without blindly invoking every specialist.
+- Handle missing information intelligently without inventing required search criteria.
+- Preserve existing tool contracts and avoid unnecessary custom orchestration logic.
+
+### 4. Hotel Response Styling
+
+Investigate why Hotel Agent responses are missing appropriate icons.
+
+Verify existing client-side SVG hydration and backend-generated Unicode icons. Improve visual presentation with subtle, contextual icons without duplication.
+
+### 5. Implementation & Testing
+
+Create challenging multi-turn scenarios involving different combinations of flight filters, hotel preferences, itinerary requirements, and changing user constraints.
+
+Inspect actual routing, tool payloads, filter execution, context updates, and final responses.
+
+Implement improvements, fix failures, and rerun tests sequentially.
+
+**Important:** Manager V2 only. Preserve Gateway V1. Prefer LLM intelligence and existing capabilities over hardcoded rules, additional wrappers, or unnecessary abstractions.
+
+**Goal:** Make Manager V2 a sophisticated travel orchestrator that intelligently combines **all available specialist capabilities, search criteria, and filters** to deliver the most relevant, personalized travel experience—not simply invoke multiple agents.
