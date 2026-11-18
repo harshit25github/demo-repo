@@ -1,1 +1,47 @@
 
+Implement a **new GET API** to retrieve all records from our existing `request` table using sliding-window pagination.
+
+### Requirements
+
+1. **Separate Endpoint**
+
+   - Create a new API without modifying the existing `chatId`/`requestId` lookup API.
+   - This endpoint should allow admins to browse all records without providing either identifier.
+
+2. **Sliding-Window Pagination**
+
+   - Implement efficient cursor-based pagination.
+   - Default window size: `10`.
+   - Maximum allowed window size: **100 records**.
+   - Support navigating forward and backward through records.
+   - Return `nextCursor`, `previousCursor`, `hasNextPage`, and `hasPreviousPage` where applicable.
+   - Use deterministic ordering, preferably newest records first, with a unique tie-breaker.
+   - Ensure records are not unnecessarily duplicated or skipped during pagination.
+
+3. **Response**
+
+   - Return all relevant fields from `request`.
+   - Include pagination metadata and the current page's records.
+   - Handle empty tables, invalid cursors, and database errors gracefully.
+
+4. **Authentication**
+
+   - **Admin-token authentication is mandatory.**
+   - Reuse exactly the same admin-token authentication mechanism already implemented for the existing `request` lookup API.
+   - Do not introduce a new authentication system.
+
+### Implementation
+
+- Inspect the existing `request` schema, lookup API, and authentication middleware.
+- Follow existing controller, service, database, and response patterns.
+- Use efficient indexed queries where possible.
+- Avoid loading the entire table into memory.
+- Add the new endpoint to Swagger.
+- Test forward/backward navigation, maximum window size, empty results, invalid cursors, and unauthorized requests.
+- Keep the implementation simple and avoid unnecessary abstractions.
+
+**Important:** Preserve the existing lookup API and logging functionality.
+
+**Goal:** Allow an authenticated admin to browse every record in `request`, 10 records at a time, through a reliable and efficient paginated API.
+
+Implement and verify the complete flow end-to-end.
