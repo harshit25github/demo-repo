@@ -1,1 +1,136 @@
 
+Enhance **Gateway V1 Flight Agent's context hydration and recent-search intelligence**.
+
+### 1. Problem
+
+Currently, when a new chat starts, we receive a `recentSearch` object that resembles `searchCriteria`.
+
+Our backend hydrates `recentSearch` directly into `searchCriteria`, causing the Flight Agent to reuse outdated information even when the user requests a completely different O&D.
+
+**Example:**
+
+Previous recent search:
+- Route: Mumbai → London
+- Trip type: Round-trip
+- Departure: January 15
+- Return: February 14
+
+New chat user message:
+"Find flights from Delhi to New York in December."
+
+**Current incorrect behavior:** The Agent combines the new route and December departure with the previous February return date, resulting in an invalid search.
+
+### 2. Separate Context Hydration
+
+- Stop automatically merging `recentSearch` into `searchCriteria`.
+- Hydrate `recentSearch` as a **separate context object**, just as we hydrate `searchCriteria`.
+- Keep both available to Gateway V1 Flight Agent on every request.
+- `searchCriteria` should represent the **current conversation's active flight-search state**.
+- `recentSearch` should be treated as historical reference data, not automatically as current search criteria.
+
+### 3. Intelligent Recent Search Reuse
+
+The Flight Agent should intelligently decide whether `recentSearch` is relevant based on the user's current intent and O&D.
+
+**Case A — Same O&D**
+
+Recent search: Delhi → New York, round-trip, January 15–25.
+
+User: "Find Delhi to New York flights again."
+
+Expected:
+- Recognize the matching O&D.
+- Reuse relevant recent-search criteria when the user hasn't overridden them.
+- Continue the flight-search flow without unnecessarily asking for already available information.
+- **Nudge the user that previous search details are being reused.**
+
+**Case B — Different O&D**
+
+Recent search: Mumbai → London, round-trip, January 15–February 14.
+
+User: "Find Delhi to New York flights in December."
+
+Expected:
+- Identify that the O&D has changed.
+- **Do not inherit trip type, return date, or any other stale search-specific information from `recentSearch`.**
+- Treat this as a fresh search using the current user's input.
+- Ask for missing required fields through our existing clarification flow.
+
+**Case C — Same O&D but Changed Criteria**
+
+Recent search: Delhi → New York, January 15–25.
+
+User: "Find Delhi to New York in December instead."
+
+Expected:
+- Recognize the matching O&D.
+- Prioritize the new travel-date requirements.
+- Reuse only compatible information from the recent search.
+- Never combine incompatible dates or generate an invalid itinerary.
+- Clearly acknowledge any previous search details that were actually reused.
+
+### 4. Context Precedence
+
+Follow these principles:
+
+1. **Current user message** — Highest priority.
+2. **Active conversation `searchCriteria`** — Preserve current conversation state.
+3. **`recentSearch`** — Optional fallback only when relevant to the user's requested O&D.
+
+If the user changes O&D during an active conversation, ensure outdated route-dependent criteria are not silently reused.
+
+For multi-city searches, validate the relevant segments rather than assuming that one matching location means the entire itinerary matches.
+
+### 5. User Nudge When Reusing Recent Search
+
+Whenever the Agent actually uses information from `recentSearch`:
+
+- Explicitly acknowledge that details from the user's previous search were reused.
+- Briefly mention the relevant reused details, such as dates, trip type, passengers, or cabin class.
+- Make it easy for the user to correct or change those details.
+- Do not ask for confirmation before searching if all required criteria are valid.
+- Do not mention `recentSearch` or imply reuse when no previous information was used.
+- Preserve our existing friendly acknowledgement and response tone.
+
+**Example response:**
+
+"I found your previous Delhi → New York search and reused your round-trip dates (Jan 15–25) to find flights. ✈️ You can change the dates or other preferences anytime!"
+
+### 6. Implementation
+
+- Thoroughly inspect how `recentSearch` currently enters the backend and gets merged into `searchCriteria`.
+- Identify the exact hydration and context propagation points.
+- Implement separate hydration of both objects.
+- Update Gateway V1 Flight Agent instructions to intelligently interpret both contexts.
+- Ensure the Agent can identify which fields were actually reused so the acknowledgement remains accurate.
+- Preserve existing flight search, filtering, price prediction, and trip-type clarification behavior.
+- Avoid unnecessary wrappers, hardcoded intent handlers, or additional LLM calls.
+
+### 7. Testing
+
+Test these scenarios sequentially:
+
+- New chat + same O&D as recent search.
+- New chat + completely different O&D.
+- Same O&D + different dates.
+- Same O&D + changed trip type.
+- Different O&D + partial date information.
+- Multi-turn search followed by an O&D change.
+- No recent search available.
+- Multi-city search with changed segments.
+- Reusing recent search and verifying the acknowledgement.
+- Not using recent search and verifying no misleading acknowledgement.
+
+For every scenario, verify:
+- Hydrated context received by the Agent.
+- Final `searchCriteria`.
+- Flight Agent decisions and clarifications.
+- Actual `flight_search` payload.
+- Accuracy of the user-facing recent-search nudge.
+- No accidental reuse of stale fields.
+
+**Important: Gateway V1 only. Do not modify Manager V2.**
+
+**Goal:** Keep `recentSearch` and `searchCriteria` completely separate while enabling the Flight Agent to intelligently reuse historical search information **only when relevant**, transparently acknowledge that reuse to the user, and prevent stale dates, incorrect trip types, and unnecessary clarifications.
+
+Investigate the existing implementation, make the minimal required changes, and verify the complete flow through sequential testing.
