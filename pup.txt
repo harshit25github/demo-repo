@@ -1,214 +1,166 @@
-Conduct a thorough **R&D and architecture investigation of Hotel Location Resolution Intelligence in Manager V2**, focusing on ambiguous destinations, Flight–Hotel context coordination, and existing API capabilities.
+Act as a **Senior Product Manager, UI/UX Designer, and Next.js Frontend Architect** to completely enhance the user experience of our existing **Nexus Next.js Client Application**, which is connected to our AI travel backend.
 
-**Important: This is an investigation and solution-design task only. Do not implement any changes yet. First identify the problems, investigate potential solutions, and share your findings for discussion.**
+Our Nexus application is currently functional but has a basic UI. I want to transform it into a **modern, polished, highly interactive AI travel assistant**, with exceptional usability for flights, hotels, trip planning, and conversational interactions.
 
-### 1. Understand the Current End-to-End Flow
+**Important: This is strictly a Next.js frontend improvement project. Do not modify the AI backend, API contracts, agent logic, or database.**
 
-Thoroughly inspect:
+## 1. Git Branch Preparation — Mandatory First Step
 
-- Hotel Agent and Hotel Location IntelliSuggest API.
-- The alternative Hotel Location Search API.
-- Hotel Search Service, location codes, and context hydration.
-- Flight Agent's location resolution APIs.
-- Flight Search Context and Digital API flight contracts.
-- Trip Planner Context and Manager V2 orchestration.
-- How user latitude/longitude influences hotel location results.
+Before making any changes:
 
-Identify how location information flows between these components and where ambiguity or incorrect inference can occur.
+1. Inspect the current Git branch and working-tree status.
+2. Commit existing changes on the current branch, ensuring no untracked or modified work is lost. Inspect changes first and avoid committing secrets or generated files.
+3. Create a new dedicated feature branch from the updated current branch, such as `feature/nexus-ui-enhancement`.
+4. Perform **all UI enhancement work exclusively on the new branch**.
+5. Do not merge changes into the original branch.
 
-### 2. Investigate the Main Problem
+## 2. Product & UX Research
 
-**Example:**
+First, thoroughly explore the entire Nexus Next.js application and understand the existing user journey.
 
-User searches for flights from New York → Delhi, India.
+Review:
 
-The Flight Agent correctly identifies Delhi, India.
+- Chat interface and message rendering.
+- Flight search results and flight cards.
+- Hotel search results and hotel cards.
+- Trip Planner itinerary presentation.
+- Suggested questions and CTA chips.
+- Search/filter interactions.
+- Card selection and detail exploration.
+- Loading, streaming, and response states.
+- Navigation, layout, typography, colors, spacing, and responsiveness.
 
-Later, the user requests:
+Think from a real traveler's perspective.
 
-"Find me hotels in Delhi."
+Identify where users may experience confusion, excessive scrolling, unclear information, poor component positioning, visual inconsistency, or perceived latency.
 
-However, the Hotel IntelliSuggest API returns multiple locations:
+Study modern AI chat and travel-booking UI/UX patterns and determine which approaches are practical for our existing capabilities.
 
-- Delhi, India
-- Delhi, New York, USA
-- Delhi, Ontario, Canada
-- Other similarly named locations
+## 3. Redesign the Complete User Experience
 
-If the Hotel Agent blindly selects the first result, it may search for hotels in the wrong country.
+Propose and implement a cohesive design system with modern components, consistent spacing, typography, colors, icons, and subtle animations.
 
-**Expected intelligence:** The Hotel Agent should recognize the flight destination and intelligently resolve Delhi, India, instead of blindly trusting the first location suggestion.
+Explore the best placement and behavior of these components:
 
-Investigate why our current system can fail in these situations.
+**A. AI Chat Interface**
+- Clean, premium conversational experience.
+- Clear separation between user and AI messages.
+- Better message formatting, acknowledgements, and visual hierarchy.
+- Intelligent suggested-question/CTA presentation.
+- Modern composer/input experience.
+- Smooth streaming and scrolling behavior.
 
-### 3. Identify All Possible Corner Cases
+**B. Flight Cards**
+- Beautiful, compact, easy-to-compare flight cards.
+- Clear visibility of price, airline, departure/arrival times, stops, duration, baggage, and relevant available details.
+- Better card selection, expansion, and interaction.
+- Appropriate layout for multiple search results.
+- Avoid clutter and unnecessary information.
 
-Think beyond this example and identify comprehensive real-world scenarios, including:
+**C. Hotel Cards**
+- Visually appealing hotel cards with meaningful images where already available.
+- Clear hotel name, location, price, rating, amenities, and other existing information.
+- Better hotel comparison and selection.
+- Responsive layouts and intuitive interactions.
 
-- Same city name across multiple countries or states.
-- User's current coordinates biasing destination searches.
-- Flight destination and hotel destination matching.
-- Flight destination and hotel destination intentionally differing.
-- Nearby cities, airports, landmarks, and tourist destinations.
-- Multi-city flight itineraries with multiple hotel destinations.
-- Round-trip and connecting-flight locations.
-- User changing the destination during a conversation.
-- Missing, partial, outdated, or conflicting Flight Context.
-- Hotel searches without any previous flight search.
-- Ambiguous location types: cities, hotels, POIs, airports, regions.
-- Multiple matching hotel location codes.
-- Incorrect country/state inference.
-- Conflicting user messages and hydrated context.
-- Cases where the destination is not directly served by an airport.
+**D. Trip Planner**
+- Present itineraries in a structured, visually engaging format.
+- Explore timelines, day-wise itinerary cards, and expandable details.
+- Ensure users can understand travel plans without reading unnecessarily long chat responses.
 
-Also identify additional corner cases discovered through the actual codebase and API responses.
+**E. Cross-Agent Experience**
+- Determine how flight results, hotel results, and itineraries should coexist in the interface.
+- Explore whether a contextual side panel, dedicated result area, tabs, or hybrid chat layout would improve usability.
+- Ensure users can switch between discussing their trip and exploring results without losing context.
 
-For each issue, document:
-- Example user conversation.
-- Current expected or observed behavior.
-- Potential failure.
-- Root cause or likely cause.
-- Severity and impact on the user experience.
+Do not blindly implement these ideas. Evaluate the existing Next.js architecture and choose the most practical and intuitive product design.
 
-**Do not limit your investigation to the examples above.**
+## 4. Improve Next.js Performance and Smoothness
 
-### 4. Explore Existing APIs and Context for Better Intelligence
+Some interactions currently feel laggy.
 
-We already have substantial location information in our system. Investigate how to leverage it.
+Investigate and improve:
 
-**A. Flight Agent Location Resolution**
+- Unnecessary React re-renders.
+- Expensive card rendering.
+- Streaming UI updates.
+- Loading and transition states.
+- Layout shifts and flickering.
+- Auto-scroll behavior.
+- Switching between flight/hotel result views.
+- Rendering large result lists.
+- Next.js client/server component boundaries, where applicable.
+- Image loading and rendering performance.
+- Unnecessary client-side JavaScript and bundle size.
 
-- What metadata does the Flight Location API provide?
-- Does it expose city, state, country, airport codes, or coordinates?
-- Can we reuse its resolved destination information for Hotel Agent?
-- How reliably can the hotel destination be mapped to the flight destination?
+Use appropriate Next.js and React optimization techniques, such as component memoization, dynamic imports, image optimization, virtualization, skeletons, and progressive rendering **only where justified**.
 
-**B. Digital Flight Search API**
+The interface should feel responsive even while the backend is processing requests.
 
-Inspect actual flight search responses and contracts.
+Do not hide failures or show misleading completion states.
 
-Determine whether we can extract:
+## 5. Responsive & Interactive Design
 
-- Destination city.
-- Destination state.
-- Destination country.
-- Airport IATA code.
-- Latitude/longitude or other geographic identifiers.
+Ensure the experience works well across:
 
-Verify what is actually available in the API response instead of assuming these fields exist.
+- Desktop.
+- Tablet.
+- Mobile.
 
-Also investigate whether existing `searchCriteria` or Flight Context already contains this information, so we can avoid unnecessary API calls.
+Use accessible interactions, intuitive navigation, appropriate animations, and consistent visual feedback.
 
-**C. Hotel Location APIs**
+Avoid excessive animations, unnecessary complexity, and over-engineered component structures.
 
-Investigate both available Hotel Location Search APIs.
+## 6. Product Decisions & Implementation Plan
 
-Determine:
+Before implementing the redesign:
 
-- Can we filter locations by country or state?
-- Can we use coordinates as a destination hint rather than the user's current location?
-- Can we reliably distinguish between cities, hotels, POIs, and regions?
-- How are location codes assigned and resolved?
-- Can we select the correct code using existing context and returned location metadata?
-- Which API is more reliable for ambiguous location resolution?
+1. Audit the existing Next.js architecture and UI.
+2. Identify all major UX and visual problems.
+3. Propose a clear design direction and information architecture.
+4. Decide the best layout for chat, flight results, hotel results, and itineraries.
+5. Prioritize enhancements based on user impact and implementation complexity.
+6. Present a concise implementation plan with your technical and product decisions.
 
-Use actual API contracts and test responses to validate your findings.
+**You are responsible for making well-reasoned product and technical decisions. Do not simply apply cosmetic styling to existing components.**
 
-### 5. Explore Intelligent Cross-Agent Location Resolution
+After preparing the plan, proceed with implementation on the new feature branch.
 
-Investigate how Manager V2 can coordinate:
+## 7. Implementation & Testing
 
-**Flight Agent + Hotel Agent + Trip Planner**
+- Reuse the existing **Next.js, React, TypeScript, styling system, and UI libraries**.
+- Respect the existing Next.js routing and component architecture.
+- Keep backend integration exactly as it is.
+- Refactor frontend components only where it improves maintainability, usability, or performance.
+- Preserve existing chat, streaming, hydration, flight, hotel, itinerary, CTA, and selection functionality.
+- Test all major user journeys end-to-end.
+- Verify responsiveness, loading states, card interactions, and perceived performance.
+- Run available lint, TypeScript, and Next.js production-build checks.
+- Fix UI regressions before considering the work complete.
 
-For example:
+## 8. Final Deliverables
 
-User: "Find flights from New York to Delhi."
+Provide:
 
-Then:
+1. **UX audit** — Existing problems and improvement opportunities.
+2. **Product design decisions** — Final layout, component positioning, and design rationale.
+3. **Implementation summary** — Next.js components redesigned, added, or optimized.
+4. **Before/after screenshots** of important screens.
+5. **Testing results** — Desktop, mobile, streaming, cards, and navigation.
+6. **Git branch name and commit summary**.
 
-User: "Show me good hotels there."
+Leave all changes on the feature branch for my review. Do not merge or deploy.
 
-Expected: Hotel Agent should use the already-resolved Delhi, India destination.
+### Non-Negotiable Constraints
 
-However:
+- **Next.js frontend changes only — absolutely no backend changes.**
+- No changes to API contracts, agent tools, business logic, or databases.
+- Preserve existing Next.js server-side integrations and communication contracts.
+- No unnecessary new dependencies or features.
+- Reuse existing data and functionality.
+- Prioritize usability, clarity, aesthetics, smoothness, and performance.
+- Make the application feel like a polished, production-quality AI travel product rather than a basic chatbot demo.
 
-User: "Find hotels in Agra instead."
+**Final Goal:** Transform our Nexus Next.js application into a beautiful, modern, fast, and highly interactive AI travel experience where users can effortlessly chat, explore flights, compare hotels, view itineraries, and make selections through one seamless interface.
 
-Expected: Hotel Agent should honor Agra and not force the flight destination.
-
-Explore a context-precedence strategy considering:
-
-1. Explicit user destination and clarification.
-2. Current Hotel Context.
-3. Flight Context and resolved destination metadata.
-4. Trip Planner itinerary and destinations.
-5. Relevant conversation history.
-6. Location API suggestions and geographic metadata.
-
-Treat this as an initial approach to investigate, not a finalized priority order.
-
-**The goal is intelligent contextual resolution, not blindly forcing flight and hotel destinations to match.**
-
-### 6. Evaluate Potential Solutions
-
-After identifying the problems, compare viable approaches such as:
-
-- Reusing Flight Context's resolved destination.
-- Country/state-aware Hotel IntelliSuggest searches.
-- Cross-validating Flight and Hotel location API results.
-- Using airport/city geographic metadata.
-- Improving Hotel Agent and Manager prompt intelligence.
-- Asking users to clarify only when ambiguity cannot be resolved confidently.
-- Other simpler or more reliable approaches you discover.
-
-For each solution, explain:
-
-- How it would work.
-- Which existing APIs/context it would use.
-- Advantages and disadvantages.
-- Reliability and limitations.
-- Additional latency/API cost.
-- Required backend or prompt changes.
-
-**Prefer leveraging existing contexts and API capabilities rather than creating unnecessary new services, wrappers, or hardcoded location mappings.**
-
-### 7. R&D Validation
-
-Design and, where practical, execute focused API-level tests covering ambiguous cities, changed destinations, flight-to-hotel continuity, and independent hotel searches.
-
-Inspect real API payloads and responses.
-
-Clearly distinguish:
-- Confirmed behavior.
-- Reproduced failures.
-- Findings supported by existing code.
-- Hypotheses requiring further validation.
-
-Avoid unnecessary LLM test executions or expensive repeated API calls.
-
-### 8. Expected Deliverables
-
-Provide a structured R&D report containing:
-
-1. **Current architecture and location-resolution flow.**
-2. **Complete corner-case matrix**, with examples and impact.
-3. **Root-cause analysis** of existing vulnerabilities.
-4. **Flight, Hotel, and Digital API metadata comparison.**
-5. **Available context that can already solve ambiguities.**
-6. **Potential solutions**, ranked by reliability, complexity, and reuse of existing components.
-7. **Recommended architecture and intelligence improvements.**
-8. **Proposed validation and implementation plan.**
-
-### Important Constraints
-
-- Manager V2 and Hotel Specialist only for the proposed changes.
-- Do not modify Gateway V1 or existing Flight Agent functionality.
-- Avoid hardcoded city/country mappings.
-- Do not assume Digital API contracts contain state/country metadata; verify it.
-- Do not blindly trust the first location API result.
-- Preserve user intent when the hotel destination differs from the flight destination.
-- Prefer existing context and agent intelligence over unnecessary abstractions.
-
-**Final Goal:** Understand every major way Hotel Location Resolution can fail, identify how our existing Flight, Hotel, Digital API, and Trip Planner information can improve accuracy, and propose the most reliable, scalable solution.
-
-**First complete the R&D and share all corner cases, findings, and recommendations. Wait for my approval before implementing any solution.**
+**Take ownership of the product experience, plan carefully, implement thoroughly, and leave the completed work on the new branch for my review.**
