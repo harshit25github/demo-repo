@@ -1,136 +1,89 @@
+Thoroughly investigate and fix our **Post-Booking Decision API Guardrail**, focusing on authentication context, intent classification, and incorrect pre-booking request blocking.
 
-Enhance **Gateway V1 Flight Agent's context hydration and recent-search intelligence**.
+### 1. Fix `hasUpcomingTrips` Context Handling
 
-### 1. Problem
+Currently, we are passing `hasUpcomingTrips` even when the user is not logged in.
 
-Currently, when a new chat starts, we receive a `recentSearch` object that resembles `searchCriteria`.
+- Trace how authentication state and `hasUpcomingTrips` are generated, hydrated, and passed into the Decision API.
+- For unauthenticated users, **do not pass `hasUpcomingTrips`**. Its value is unknown, not `false`.
+- Only provide this identifier when the user is authenticated and we have reliable information.
+- Ensure missing authentication context doesn't cause incorrect assumptions about booking ownership.
+- Preserve the distinction between **intent classification** and **whether the user can actually manage a booking**.
 
-Our backend hydrates `recentSearch` directly into `searchCriteria`, causing the Flight Agent to reuse outdated information even when the user requests a completely different O&D.
+### 2. Fix Incorrect Post-Booking Classification
 
-**Example:**
+We have observed a serious issue:
 
-Previous recent search:
-- Route: Mumbai → London
-- Trip type: Round-trip
-- Departure: January 15
-- Return: February 14
+**User:** "Make a new booking."
 
-New chat user message:
-"Find flights from Delhi to New York in December."
+**Current incorrect behavior:** The Decision API classifies this as post-booking and blocks the request, even when the new-booking intent has a higher probability.
 
-**Current incorrect behavior:** The Agent combines the new route and December departure with the previous February return date, resulting in an invalid search.
+**Expected behavior:** Route it through the normal **pre-booking flow**.
 
-### 2. Separate Context Hydration
+The guardrail must intelligently distinguish:
 
-- Stop automatically merging `recentSearch` into `searchCriteria`.
-- Hydrate `recentSearch` as a **separate context object**, just as we hydrate `searchCriteria`.
-- Keep both available to Gateway V1 Flight Agent on every request.
-- `searchCriteria` should represent the **current conversation's active flight-search state**.
-- `recentSearch` should be treated as historical reference data, not automatically as current search criteria.
+| User intent | Expected classification |
+|---|---|
+| "Make a new booking" | Pre-booking |
+| "Book a flight to London" | Pre-booking |
+| "Find me another flight" | Pre-booking, unless context indicates an existing-booking change |
+| "Change my existing booking" | Post-booking |
+| "Cancel my reservation" | Post-booking when referring to an existing reservation |
+| "Check my booking status" | Post-booking |
+| "I need help with my previous booking" | Post-booking |
+| "I want to book again" | Pre-booking, unless the context indicates an existing-booking action |
 
-### 3. Intelligent Recent Search Reuse
+**Critical:** Explicit new-booking intent must never be overridden merely because the message contains the word "booking."
 
-The Flight Agent should intelligently decide whether `recentSearch` is relevant based on the user's current intent and O&D.
+### 3. Improve Decision API Intelligence
 
-**Case A — Same O&D**
+- Thoroughly inspect the existing Decision API policy, classification descriptions, probability/confidence handling, context hydration, and final routing logic.
+- Identify why the higher-probability `new_booking` classification is being ignored.
+- Check whether confidence interpretation, output mapping, or downstream guardrail logic is reversing the Decision API's actual decision.
+- Improve semantic understanding of new-booking vs. existing-booking intent.
+- Use conversation history appropriately to resolve short or ambiguous follow-ups.
+- Do not rely on keyword matching or simplistic authentication rules.
 
-Recent search: Delhi → New York, round-trip, January 15–25.
+**Important distinction:**
 
-User: "Find Delhi to New York flights again."
+Authentication status and `hasUpcomingTrips` must not independently determine whether a request is pre-booking or post-booking.
 
-Expected:
-- Recognize the matching O&D.
-- Reuse relevant recent-search criteria when the user hasn't overridden them.
-- Continue the flight-search flow without unnecessarily asking for already available information.
-- **Nudge the user that previous search details are being reused.**
+An unauthenticated user can still ask about an existing booking. Such intent belongs to post-booking classification, even if completing the action requires authentication later.
 
-**Case B — Different O&D**
+### 4. Comprehensive Regression Testing
 
-Recent search: Mumbai → London, round-trip, January 15–February 14.
+Test the actual Decision API and end-to-end routing across:
 
-User: "Find Delhi to New York flights in December."
+- Logged-in and logged-out users.
+- Explicit new-booking requests.
+- Existing-booking modifications and inquiries.
+- Ambiguous booking-related messages.
+- Short, natural user prompts.
+- Multi-turn conversations with changing intent.
+- Conflicting context or classification probabilities.
+- Cases where `hasUpcomingTrips` is missing, `true`, or `false`.
 
-Expected:
-- Identify that the O&D has changed.
-- **Do not inherit trip type, return date, or any other stale search-specific information from `recentSearch`.**
-- Treat this as a fresh search using the current user's input.
-- Ask for missing required fields through our existing clarification flow.
+Specifically verify:
+- Decision API inputs and returned probabilities.
+- Selected classification and why it was selected.
+- Final routing to pre-booking or post-booking.
+- No unintended blocking of valid new-booking requests.
 
-**Case C — Same O&D but Changed Criteria**
+### 5. Implementation Expectations
 
-Recent search: Delhi → New York, January 15–25.
+- Perform a serious root-cause investigation before changing prompts.
+- Fix the actual cause, whether it is the Decision API policy, prompt intelligence, context mapping, or routing implementation.
+- Prefer robust semantic classification over hardcoded keyword rules.
+- Keep modifications focused and avoid unnecessary wrappers or abstractions.
+- Preserve existing correct post-booking detection.
+- Test sequentially, fix failures, and rerun regression cases.
 
-User: "Find Delhi to New York in December instead."
+**Goal:** Build a reliable guardrail that clearly understands:
 
-Expected:
-- Recognize the matching O&D.
-- Prioritize the new travel-date requirements.
-- Reuse only compatible information from the recent search.
-- Never combine incompatible dates or generate an invalid itinerary.
-- Clearly acknowledge any previous search details that were actually reused.
+**New booking → Pre-booking flow.**
 
-### 4. Context Precedence
+**Existing booking management or inquiry → Post-booking flow.**
 
-Follow these principles:
+**Authentication and upcoming-trip availability → Contextual signals, not substitutes for user intent.**
 
-1. **Current user message** — Highest priority.
-2. **Active conversation `searchCriteria`** — Preserve current conversation state.
-3. **`recentSearch`** — Optional fallback only when relevant to the user's requested O&D.
-
-If the user changes O&D during an active conversation, ensure outdated route-dependent criteria are not silently reused.
-
-For multi-city searches, validate the relevant segments rather than assuming that one matching location means the entire itinerary matches.
-
-### 5. User Nudge When Reusing Recent Search
-
-Whenever the Agent actually uses information from `recentSearch`:
-
-- Explicitly acknowledge that details from the user's previous search were reused.
-- Briefly mention the relevant reused details, such as dates, trip type, passengers, or cabin class.
-- Make it easy for the user to correct or change those details.
-- Do not ask for confirmation before searching if all required criteria are valid.
-- Do not mention `recentSearch` or imply reuse when no previous information was used.
-- Preserve our existing friendly acknowledgement and response tone.
-
-**Example response:**
-
-"I found your previous Delhi → New York search and reused your round-trip dates (Jan 15–25) to find flights. ✈️ You can change the dates or other preferences anytime!"
-
-### 6. Implementation
-
-- Thoroughly inspect how `recentSearch` currently enters the backend and gets merged into `searchCriteria`.
-- Identify the exact hydration and context propagation points.
-- Implement separate hydration of both objects.
-- Update Gateway V1 Flight Agent instructions to intelligently interpret both contexts.
-- Ensure the Agent can identify which fields were actually reused so the acknowledgement remains accurate.
-- Preserve existing flight search, filtering, price prediction, and trip-type clarification behavior.
-- Avoid unnecessary wrappers, hardcoded intent handlers, or additional LLM calls.
-
-### 7. Testing
-
-Test these scenarios sequentially:
-
-- New chat + same O&D as recent search.
-- New chat + completely different O&D.
-- Same O&D + different dates.
-- Same O&D + changed trip type.
-- Different O&D + partial date information.
-- Multi-turn search followed by an O&D change.
-- No recent search available.
-- Multi-city search with changed segments.
-- Reusing recent search and verifying the acknowledgement.
-- Not using recent search and verifying no misleading acknowledgement.
-
-For every scenario, verify:
-- Hydrated context received by the Agent.
-- Final `searchCriteria`.
-- Flight Agent decisions and clarifications.
-- Actual `flight_search` payload.
-- Accuracy of the user-facing recent-search nudge.
-- No accidental reuse of stale fields.
-
-**Important: Gateway V1 only. Do not modify Manager V2.**
-
-**Goal:** Keep `recentSearch` and `searchCriteria` completely separate while enabling the Flight Agent to intelligently reuse historical search information **only when relevant**, transparently acknowledge that reuse to the user, and prevent stale dates, incorrect trip types, and unnecessary clarifications.
-
-Investigate the existing implementation, make the minimal required changes, and verify the complete flow through sequential testing.
+Implement a proper fix and provide the root cause, changes made, and before/after test results. Do not consider this complete until the actual Decision API outputs and downstream routing have been verified.
