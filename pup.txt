@@ -1,89 +1,214 @@
-Thoroughly investigate and fix our **Post-Booking Decision API Guardrail**, focusing on authentication context, intent classification, and incorrect pre-booking request blocking.
+Conduct a thorough **R&D and architecture investigation of Hotel Location Resolution Intelligence in Manager V2**, focusing on ambiguous destinations, Flight–Hotel context coordination, and existing API capabilities.
 
-### 1. Fix `hasUpcomingTrips` Context Handling
+**Important: This is an investigation and solution-design task only. Do not implement any changes yet. First identify the problems, investigate potential solutions, and share your findings for discussion.**
 
-Currently, we are passing `hasUpcomingTrips` even when the user is not logged in.
+### 1. Understand the Current End-to-End Flow
 
-- Trace how authentication state and `hasUpcomingTrips` are generated, hydrated, and passed into the Decision API.
-- For unauthenticated users, **do not pass `hasUpcomingTrips`**. Its value is unknown, not `false`.
-- Only provide this identifier when the user is authenticated and we have reliable information.
-- Ensure missing authentication context doesn't cause incorrect assumptions about booking ownership.
-- Preserve the distinction between **intent classification** and **whether the user can actually manage a booking**.
+Thoroughly inspect:
 
-### 2. Fix Incorrect Post-Booking Classification
+- Hotel Agent and Hotel Location IntelliSuggest API.
+- The alternative Hotel Location Search API.
+- Hotel Search Service, location codes, and context hydration.
+- Flight Agent's location resolution APIs.
+- Flight Search Context and Digital API flight contracts.
+- Trip Planner Context and Manager V2 orchestration.
+- How user latitude/longitude influences hotel location results.
 
-We have observed a serious issue:
+Identify how location information flows between these components and where ambiguity or incorrect inference can occur.
 
-**User:** "Make a new booking."
+### 2. Investigate the Main Problem
 
-**Current incorrect behavior:** The Decision API classifies this as post-booking and blocks the request, even when the new-booking intent has a higher probability.
+**Example:**
 
-**Expected behavior:** Route it through the normal **pre-booking flow**.
+User searches for flights from New York → Delhi, India.
 
-The guardrail must intelligently distinguish:
+The Flight Agent correctly identifies Delhi, India.
 
-| User intent | Expected classification |
-|---|---|
-| "Make a new booking" | Pre-booking |
-| "Book a flight to London" | Pre-booking |
-| "Find me another flight" | Pre-booking, unless context indicates an existing-booking change |
-| "Change my existing booking" | Post-booking |
-| "Cancel my reservation" | Post-booking when referring to an existing reservation |
-| "Check my booking status" | Post-booking |
-| "I need help with my previous booking" | Post-booking |
-| "I want to book again" | Pre-booking, unless the context indicates an existing-booking action |
+Later, the user requests:
 
-**Critical:** Explicit new-booking intent must never be overridden merely because the message contains the word "booking."
+"Find me hotels in Delhi."
 
-### 3. Improve Decision API Intelligence
+However, the Hotel IntelliSuggest API returns multiple locations:
 
-- Thoroughly inspect the existing Decision API policy, classification descriptions, probability/confidence handling, context hydration, and final routing logic.
-- Identify why the higher-probability `new_booking` classification is being ignored.
-- Check whether confidence interpretation, output mapping, or downstream guardrail logic is reversing the Decision API's actual decision.
-- Improve semantic understanding of new-booking vs. existing-booking intent.
-- Use conversation history appropriately to resolve short or ambiguous follow-ups.
-- Do not rely on keyword matching or simplistic authentication rules.
+- Delhi, India
+- Delhi, New York, USA
+- Delhi, Ontario, Canada
+- Other similarly named locations
 
-**Important distinction:**
+If the Hotel Agent blindly selects the first result, it may search for hotels in the wrong country.
 
-Authentication status and `hasUpcomingTrips` must not independently determine whether a request is pre-booking or post-booking.
+**Expected intelligence:** The Hotel Agent should recognize the flight destination and intelligently resolve Delhi, India, instead of blindly trusting the first location suggestion.
 
-An unauthenticated user can still ask about an existing booking. Such intent belongs to post-booking classification, even if completing the action requires authentication later.
+Investigate why our current system can fail in these situations.
 
-### 4. Comprehensive Regression Testing
+### 3. Identify All Possible Corner Cases
 
-Test the actual Decision API and end-to-end routing across:
+Think beyond this example and identify comprehensive real-world scenarios, including:
 
-- Logged-in and logged-out users.
-- Explicit new-booking requests.
-- Existing-booking modifications and inquiries.
-- Ambiguous booking-related messages.
-- Short, natural user prompts.
-- Multi-turn conversations with changing intent.
-- Conflicting context or classification probabilities.
-- Cases where `hasUpcomingTrips` is missing, `true`, or `false`.
+- Same city name across multiple countries or states.
+- User's current coordinates biasing destination searches.
+- Flight destination and hotel destination matching.
+- Flight destination and hotel destination intentionally differing.
+- Nearby cities, airports, landmarks, and tourist destinations.
+- Multi-city flight itineraries with multiple hotel destinations.
+- Round-trip and connecting-flight locations.
+- User changing the destination during a conversation.
+- Missing, partial, outdated, or conflicting Flight Context.
+- Hotel searches without any previous flight search.
+- Ambiguous location types: cities, hotels, POIs, airports, regions.
+- Multiple matching hotel location codes.
+- Incorrect country/state inference.
+- Conflicting user messages and hydrated context.
+- Cases where the destination is not directly served by an airport.
 
-Specifically verify:
-- Decision API inputs and returned probabilities.
-- Selected classification and why it was selected.
-- Final routing to pre-booking or post-booking.
-- No unintended blocking of valid new-booking requests.
+Also identify additional corner cases discovered through the actual codebase and API responses.
 
-### 5. Implementation Expectations
+For each issue, document:
+- Example user conversation.
+- Current expected or observed behavior.
+- Potential failure.
+- Root cause or likely cause.
+- Severity and impact on the user experience.
 
-- Perform a serious root-cause investigation before changing prompts.
-- Fix the actual cause, whether it is the Decision API policy, prompt intelligence, context mapping, or routing implementation.
-- Prefer robust semantic classification over hardcoded keyword rules.
-- Keep modifications focused and avoid unnecessary wrappers or abstractions.
-- Preserve existing correct post-booking detection.
-- Test sequentially, fix failures, and rerun regression cases.
+**Do not limit your investigation to the examples above.**
 
-**Goal:** Build a reliable guardrail that clearly understands:
+### 4. Explore Existing APIs and Context for Better Intelligence
 
-**New booking → Pre-booking flow.**
+We already have substantial location information in our system. Investigate how to leverage it.
 
-**Existing booking management or inquiry → Post-booking flow.**
+**A. Flight Agent Location Resolution**
 
-**Authentication and upcoming-trip availability → Contextual signals, not substitutes for user intent.**
+- What metadata does the Flight Location API provide?
+- Does it expose city, state, country, airport codes, or coordinates?
+- Can we reuse its resolved destination information for Hotel Agent?
+- How reliably can the hotel destination be mapped to the flight destination?
 
-Implement a proper fix and provide the root cause, changes made, and before/after test results. Do not consider this complete until the actual Decision API outputs and downstream routing have been verified.
+**B. Digital Flight Search API**
+
+Inspect actual flight search responses and contracts.
+
+Determine whether we can extract:
+
+- Destination city.
+- Destination state.
+- Destination country.
+- Airport IATA code.
+- Latitude/longitude or other geographic identifiers.
+
+Verify what is actually available in the API response instead of assuming these fields exist.
+
+Also investigate whether existing `searchCriteria` or Flight Context already contains this information, so we can avoid unnecessary API calls.
+
+**C. Hotel Location APIs**
+
+Investigate both available Hotel Location Search APIs.
+
+Determine:
+
+- Can we filter locations by country or state?
+- Can we use coordinates as a destination hint rather than the user's current location?
+- Can we reliably distinguish between cities, hotels, POIs, and regions?
+- How are location codes assigned and resolved?
+- Can we select the correct code using existing context and returned location metadata?
+- Which API is more reliable for ambiguous location resolution?
+
+Use actual API contracts and test responses to validate your findings.
+
+### 5. Explore Intelligent Cross-Agent Location Resolution
+
+Investigate how Manager V2 can coordinate:
+
+**Flight Agent + Hotel Agent + Trip Planner**
+
+For example:
+
+User: "Find flights from New York to Delhi."
+
+Then:
+
+User: "Show me good hotels there."
+
+Expected: Hotel Agent should use the already-resolved Delhi, India destination.
+
+However:
+
+User: "Find hotels in Agra instead."
+
+Expected: Hotel Agent should honor Agra and not force the flight destination.
+
+Explore a context-precedence strategy considering:
+
+1. Explicit user destination and clarification.
+2. Current Hotel Context.
+3. Flight Context and resolved destination metadata.
+4. Trip Planner itinerary and destinations.
+5. Relevant conversation history.
+6. Location API suggestions and geographic metadata.
+
+Treat this as an initial approach to investigate, not a finalized priority order.
+
+**The goal is intelligent contextual resolution, not blindly forcing flight and hotel destinations to match.**
+
+### 6. Evaluate Potential Solutions
+
+After identifying the problems, compare viable approaches such as:
+
+- Reusing Flight Context's resolved destination.
+- Country/state-aware Hotel IntelliSuggest searches.
+- Cross-validating Flight and Hotel location API results.
+- Using airport/city geographic metadata.
+- Improving Hotel Agent and Manager prompt intelligence.
+- Asking users to clarify only when ambiguity cannot be resolved confidently.
+- Other simpler or more reliable approaches you discover.
+
+For each solution, explain:
+
+- How it would work.
+- Which existing APIs/context it would use.
+- Advantages and disadvantages.
+- Reliability and limitations.
+- Additional latency/API cost.
+- Required backend or prompt changes.
+
+**Prefer leveraging existing contexts and API capabilities rather than creating unnecessary new services, wrappers, or hardcoded location mappings.**
+
+### 7. R&D Validation
+
+Design and, where practical, execute focused API-level tests covering ambiguous cities, changed destinations, flight-to-hotel continuity, and independent hotel searches.
+
+Inspect real API payloads and responses.
+
+Clearly distinguish:
+- Confirmed behavior.
+- Reproduced failures.
+- Findings supported by existing code.
+- Hypotheses requiring further validation.
+
+Avoid unnecessary LLM test executions or expensive repeated API calls.
+
+### 8. Expected Deliverables
+
+Provide a structured R&D report containing:
+
+1. **Current architecture and location-resolution flow.**
+2. **Complete corner-case matrix**, with examples and impact.
+3. **Root-cause analysis** of existing vulnerabilities.
+4. **Flight, Hotel, and Digital API metadata comparison.**
+5. **Available context that can already solve ambiguities.**
+6. **Potential solutions**, ranked by reliability, complexity, and reuse of existing components.
+7. **Recommended architecture and intelligence improvements.**
+8. **Proposed validation and implementation plan.**
+
+### Important Constraints
+
+- Manager V2 and Hotel Specialist only for the proposed changes.
+- Do not modify Gateway V1 or existing Flight Agent functionality.
+- Avoid hardcoded city/country mappings.
+- Do not assume Digital API contracts contain state/country metadata; verify it.
+- Do not blindly trust the first location API result.
+- Preserve user intent when the hotel destination differs from the flight destination.
+- Prefer existing context and agent intelligence over unnecessary abstractions.
+
+**Final Goal:** Understand every major way Hotel Location Resolution can fail, identify how our existing Flight, Hotel, Digital API, and Trip Planner information can improve accuracy, and propose the most reliable, scalable solution.
+
+**First complete the R&D and share all corner cases, findings, and recommendations. Wait for my approval before implementing any solution.**
